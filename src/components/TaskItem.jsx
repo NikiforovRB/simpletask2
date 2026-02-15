@@ -26,6 +26,7 @@ import downNavIcon from '../assets/down-nav.svg';
 import molniaredIcon from '../assets/molniared.svg';
 import molnianavIcon from '../assets/molnianav.svg';
 import molniacompleteIcon from '../assets/molniacomplete.svg';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { CalendarPopover } from './CalendarPopover';
 import './TaskItem.css';
 
@@ -78,6 +79,7 @@ export function TaskItem({
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [lightningHover, setLightningHover] = useState(false);
 
+  const hasHover = useMediaQuery('(hover: hover)');
   const showLightning = (isCompleted && color === RED_COLOR) || (!isCompleted && color === RED_COLOR);
   const isParentTask = !task.parent_id;
 
@@ -91,8 +93,8 @@ export function TaskItem({
   };
 
   const checkIcon = isCompleted
-    ? (isParent ? (checkHover ? chpCompNavIcon : chpCompIcon) : (checkHover ? kvCompleteNavIcon : kvCompleteIcon))
-    : (isParent ? (checkHover ? chpNavIcon : chpIcon) : (checkHover ? kvNavIcon : kvIcon));
+    ? (isParent ? (hasHover && checkHover ? chpCompNavIcon : chpCompIcon) : (hasHover && checkHover ? kvCompleteNavIcon : kvCompleteIcon))
+    : (isParent ? (hasHover && checkHover ? chpNavIcon : chpIcon) : (hasHover && checkHover ? kvNavIcon : kvIcon));
 
   return (
     <div
@@ -104,8 +106,8 @@ export function TaskItem({
           type="button"
           className="task-item__checkbox"
           onClick={handleComplete}
-          onMouseEnter={() => setCheckHover(true)}
-          onMouseLeave={() => setCheckHover(false)}
+          onMouseEnter={() => hasHover && setCheckHover(true)}
+          onMouseLeave={() => hasHover && setCheckHover(false)}
           aria-label={isCompleted ? 'Вернуть в список' : 'Выполнено'}
         >
           <img src={checkIcon} alt="" />
@@ -114,12 +116,12 @@ export function TaskItem({
           <button
             type="button"
             className="task-item__lightning-btn"
-            onMouseEnter={() => setLightningHover(true)}
-            onMouseLeave={() => setLightningHover(false)}
+            onMouseEnter={() => hasHover && setLightningHover(true)}
+            onMouseLeave={() => hasHover && setLightningHover(false)}
             onClick={clearRed}
             aria-label="Убрать красный"
           >
-            <img src={isCompleted ? molniacompleteIcon : (lightningHover ? molnianavIcon : molniaredIcon)} alt="" />
+            <img src={isCompleted ? molniacompleteIcon : (hasHover && lightningHover ? molnianavIcon : molniaredIcon)} alt="" />
           </button>
         )}
         {editing ? (
@@ -147,24 +149,24 @@ export function TaskItem({
                 <button
                   type="button"
                   className="task-item__action-btn"
-                  onMouseEnter={() => setCollapseSubHover(true)}
-                  onMouseLeave={() => setCollapseSubHover(false)}
+                  onMouseEnter={() => hasHover && setCollapseSubHover(true)}
+                  onMouseLeave={() => hasHover && setCollapseSubHover(false)}
                   onClick={() => onUpdate(task.id, { subtasks_collapsed: !subtasksCollapsed })}
                   aria-label={subtasksCollapsed ? 'Развернуть подзадачи' : 'Свернуть подзадачи'}
                 >
-                  <img src={subtasksCollapsed ? (collapseSubHover ? downNavIcon : downIcon) : (collapseSubHover ? upNavIcon : upIcon)} alt="" />
+                  <img src={subtasksCollapsed ? (hasHover && collapseSubHover ? downNavIcon : downIcon) : (hasHover && collapseSubHover ? upNavIcon : upIcon)} alt="" />
                 </button>
               )}
               {onAddSubtask && (
                 <button
                   type="button"
                   className="task-item__action-btn"
-                  onMouseEnter={() => setPodHover(true)}
-                  onMouseLeave={() => setPodHover(false)}
+                  onMouseEnter={() => hasHover && setPodHover(true)}
+                  onMouseLeave={() => hasHover && setPodHover(false)}
                   onClick={() => onAddSubtask(task.id)}
                   aria-label="Подзадача"
                 >
-                  <img src={podHover ? podNavIcon : podIcon} alt="" />
+                  <img src={hasHover && podHover ? podNavIcon : podIcon} alt="" />
                 </button>
               )}
               <button
@@ -177,12 +179,12 @@ export function TaskItem({
               <button
                 type="button"
                 className="task-item__action-btn"
-                onMouseEnter={() => setLineHover(true)}
-                onMouseLeave={() => setLineHover(false)}
+                onMouseEnter={() => hasHover && setLineHover(true)}
+                onMouseLeave={() => hasHover && setLineHover(false)}
                 onClick={cycleTopStyle}
                 aria-label="Отступ сверху"
               >
-                <img src={lineHover ? lineNavIcon : lineIcon} alt="" />
+                <img src={hasHover && lineHover ? lineNavIcon : lineIcon} alt="" />
               </button>
             </>
           )}
@@ -191,12 +193,12 @@ export function TaskItem({
             <button
               type="button"
               className="task-item__action-btn"
-              onMouseEnter={() => setCalendarHover(true)}
-              onMouseLeave={() => setCalendarHover(false)}
+              onMouseEnter={() => hasHover && setCalendarHover(true)}
+              onMouseLeave={() => hasHover && setCalendarHover(false)}
               onClick={() => setCalendarOpen((v) => !v)}
               aria-label="Дата"
             >
-              <img src={calendarHover ? calendarNavIcon : calendarIcon} alt="" />
+              <img src={hasHover && calendarHover ? calendarNavIcon : calendarIcon} alt="" />
             </button>
             {calendarOpen && (
               <>
@@ -215,12 +217,12 @@ export function TaskItem({
           <button
             type="button"
             className="task-item__action-btn"
-            onMouseEnter={() => setDeleteHover(true)}
-            onMouseLeave={() => setDeleteHover(false)}
+            onMouseEnter={() => hasHover && setDeleteHover(true)}
+            onMouseLeave={() => hasHover && setDeleteHover(false)}
             onClick={() => onDelete(task.id)}
             aria-label="Удалить"
           >
-            <img src={deleteHover ? deleteNavIcon : deleteIcon} alt="" />
+            <img src={hasHover && deleteHover ? deleteNavIcon : deleteIcon} alt="" />
           </button>
           {dragHandleProps ? (
             <span

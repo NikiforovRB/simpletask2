@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { DraggableTask } from './DraggableTask';
 import { DropSlot } from './DropSlot';
 import { getContainerId } from '../lib/dnd';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DEFAULT_TASK_COLOR } from '../constants';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
@@ -14,6 +15,7 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
   const open = getListCollapsed ? !getListCollapsed(NO_DATE_KEY) : true;
   const completedOpen = getListCollapsed ? !getListCollapsed(NO_DATE_COMPLETED_KEY) : true;
   const [plusHover, setPlusHover] = useState(false);
+  const hasHover = useMediaQuery('(hover: hover)');
 
   const toggleOpen = () => setListCollapsed?.(NO_DATE_KEY, !getListCollapsed(NO_DATE_KEY));
   const toggleCompleted = () => setListCollapsed?.(NO_DATE_COMPLETED_KEY, !getListCollapsed(NO_DATE_COMPLETED_KEY));
@@ -51,8 +53,8 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
         <button type="button" className="no-date-list__title-btn" onClick={toggleOpen}>
           Задачи без даты
         </button>
-        <button type="button" className="no-date-list__icon-btn no-date-list__icon-btn--plus" onMouseEnter={() => setPlusHover(true)} onMouseLeave={() => setPlusHover(false)} onClick={handleAddAtStart} aria-label="Добавить задачу">
-          <img src={plusHover ? plusNavIcon : plusIcon} alt="" />
+        <button type="button" className="no-date-list__icon-btn no-date-list__icon-btn--plus" onMouseEnter={() => hasHover && setPlusHover(true)} onMouseLeave={() => hasHover && setPlusHover(false)} onClick={handleAddAtStart} aria-label="Добавить задачу">
+          <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
         </button>
       </div>
       {open && (

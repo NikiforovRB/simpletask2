@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTasks } from '../hooks/useTasks';
 import { useSettings } from '../hooks/useSettings';
 import { useListCollapsed } from '../hooks/useListCollapsed';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DayCard } from '../components/DayCard';
 import { NoDateList } from '../components/NoDateList';
 import { getContainerId, parseContainerId } from '../lib/dnd';
@@ -89,6 +90,7 @@ export default function Dashboard() {
   const [settingsHover, setSettingsHover] = useState(false);
   const [exitHover, setExitHover] = useState(false);
   const [refreshHover, setRefreshHover] = useState(false);
+  const hasHover = useMediaQuery('(hover: hover)');
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -213,25 +215,25 @@ export default function Dashboard() {
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
-            <button type="button" className="dashboard__shift-btn" onMouseEnter={() => setDateLeftHover(true)} onMouseLeave={() => setDateLeftHover(false)} onClick={() => setDateOffset((o) => o - 1)} aria-label="Назад">
-              <img src={dateLeftHover ? leftNavIcon : leftIcon} alt="" />
+            <button type="button" className="dashboard__shift-btn" onMouseEnter={() => hasHover && setDateLeftHover(true)} onMouseLeave={() => hasHover && setDateLeftHover(false)} onClick={() => setDateOffset((o) => o - 1)} aria-label="Назад">
+              <img src={hasHover && dateLeftHover ? leftNavIcon : leftIcon} alt="" />
             </button>
-            <button type="button" className="dashboard__shift-btn" onMouseEnter={() => setDateRightHover(true)} onMouseLeave={() => setDateRightHover(false)} onClick={() => setDateOffset((o) => o + 1)} aria-label="Вперёд">
-              <img src={dateRightHover ? rightNavIcon : rightIcon} alt="" />
+            <button type="button" className="dashboard__shift-btn" onMouseEnter={() => hasHover && setDateRightHover(true)} onMouseLeave={() => hasHover && setDateRightHover(false)} onClick={() => setDateOffset((o) => o + 1)} aria-label="Вперёд">
+              <img src={hasHover && dateRightHover ? rightNavIcon : rightIcon} alt="" />
             </button>
           </div>
           <div className="dashboard__header-actions">
-            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => setBezdatHover(true)} onMouseLeave={() => setBezdatHover(false)} onClick={() => setNoDateListVisible(!noDateListVisible)} aria-label={noDateListVisible ? 'Скрыть список без даты' : 'Показать список без даты'}>
-              <img src={bezdatHover ? bezdatNavIcon : bezdatIcon} alt="" />
+            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setBezdatHover(true)} onMouseLeave={() => hasHover && setBezdatHover(false)} onClick={() => setNoDateListVisible(!noDateListVisible)} aria-label={noDateListVisible ? 'Скрыть список без даты' : 'Показать список без даты'}>
+              <img src={hasHover && bezdatHover ? bezdatNavIcon : bezdatIcon} alt="" />
             </button>
-            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => setEyeHover(true)} onMouseLeave={() => setEyeHover(false)} onClick={() => setCompletedVisible((v) => !v)} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
-              <img src={eyeHover ? eyeNavIcon : eyeIcon} alt="" />
+            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={() => setCompletedVisible((v) => !v)} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
+              <img src={hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
-            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => setSettingsHover(true)} onMouseLeave={() => setSettingsHover(false)} onClick={() => setSettingsOpen((v) => !v)} aria-label="Настройки">
-              <img src={settingsHover ? settingsNavIcon : settingsIcon} alt="" />
+            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setSettingsHover(true)} onMouseLeave={() => hasHover && setSettingsHover(false)} onClick={() => setSettingsOpen((v) => !v)} aria-label="Настройки">
+              <img src={hasHover && settingsHover ? settingsNavIcon : settingsIcon} alt="" />
             </button>
-            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => setExitHover(true)} onMouseLeave={() => setExitHover(false)} onClick={signOut} aria-label="Выйти">
-              <img src={exitHover ? exitNavIcon : exitIcon} alt="" />
+            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setExitHover(true)} onMouseLeave={() => hasHover && setExitHover(false)} onClick={signOut} aria-label="Выйти">
+              <img src={hasHover && exitHover ? exitNavIcon : exitIcon} alt="" />
             </button>
           </div>
         </div>
@@ -284,8 +286,8 @@ export default function Dashboard() {
         setListCollapsed={setListCollapsed}
       />
 
-      <button type="button" className="dashboard__refresh" onMouseEnter={() => setRefreshHover(true)} onMouseLeave={() => setRefreshHover(false)} onClick={() => window.location.reload()} aria-label="Обновить">
-        <img src={refreshHover ? refreshNavIcon : refreshIcon} alt="" />
+      <button type="button" className="dashboard__refresh" onMouseEnter={() => hasHover && setRefreshHover(true)} onMouseLeave={() => hasHover && setRefreshHover(false)} onClick={() => window.location.reload()} aria-label="Обновить">
+        <img src={hasHover && refreshHover ? refreshNavIcon : refreshIcon} alt="" />
       </button>
     </div>
     </DndContext>

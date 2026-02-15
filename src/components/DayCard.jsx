@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { DraggableTask } from './DraggableTask';
 import { DropSlot } from './DropSlot';
 import { getContainerId } from '../lib/dnd';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DEFAULT_TASK_COLOR, formatDayLabel } from '../constants';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
@@ -51,6 +52,7 @@ export function DayCard({
   const getSubtasks = (parentId) => (byParent.get(parentId) || []).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
   const [plusHover, setPlusHover] = useState(false);
+  const hasHover = useMediaQuery('(hover: hover)');
 
   const handleAddAtStart = () => {
     onAddAtStart?.({ scheduled_date: dateStr, text_color: DEFAULT_TASK_COLOR });
@@ -62,8 +64,8 @@ export function DayCard({
         <button type="button" className="day-card__title-btn" onClick={toggleCard}>
           {formatDayLabel(dateStr)}
         </button>
-        <button type="button" className="day-card__icon-btn day-card__icon-btn--plus" onMouseEnter={() => setPlusHover(true)} onMouseLeave={() => setPlusHover(false)} onClick={handleAddAtStart} aria-label="Добавить задачу">
-          <img src={plusHover ? plusNavIcon : plusIcon} alt="" />
+        <button type="button" className="day-card__icon-btn day-card__icon-btn--plus" onMouseEnter={() => hasHover && setPlusHover(true)} onMouseLeave={() => hasHover && setPlusHover(false)} onClick={handleAddAtStart} aria-label="Добавить задачу">
+          <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
         </button>
       </div>
       <div className="day-card__header-line" />
