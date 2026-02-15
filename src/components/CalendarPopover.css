@@ -1,0 +1,74 @@
+.calendar-popover {
+  background: #111;
+  padding: 0.75rem;
+  min-width: 220px;
+}
+
+.calendar-popover__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.calendar-popover__nav-btn {
+  background: none;
+  border: none;
+  color: #888;
+  padding: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.calendar-popover__nav-btn:hover {
+  color: #fff;
+}
+
+.calendar-popover__title {
+  font-size: 0.8125rem;
+  color: #aaa;
+}
+
+.calendar-popover__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 0.25rem;
+}
+
+.calendar-popover__wd {
+  font-size: 0.6875rem;
+  color: #666;
+  text-align: center;
+}
+
+.calendar-popover__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar-popover__cell {
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 0.8125rem;
+  padding: 0.35rem;
+  cursor: pointer;
+  border-radius: 2px;
+  font-family: inherit;
+}
+
+.calendar-popover__cell:hover {
+  background: #222;
+  color: #fff;
+}
+
+.calendar-popover__cell--today {
+  background: #5a86ee;
+  color: #fff;
+}
+
+.calendar-popover__cell--today:hover {
+  background: #6a96ff;
+}

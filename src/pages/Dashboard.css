@@ -1,0 +1,174 @@
+.dashboard {
+  min-height: 100vh;
+  background: #000000;
+  color: #e0e0e0;
+  padding: 1rem;
+  padding-bottom: 3rem;
+}
+
+.dashboard__header {
+  margin-bottom: 1.25rem;
+}
+
+.dashboard__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dashboard__top-left {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dashboard__select {
+  background: #1e1e1e;
+  border: none;
+  color: #666666;
+  padding: 0 0.5rem;
+  font-size: 0.9375rem;
+  border-radius: 6px;
+  cursor: pointer;
+  min-width: 2.5rem;
+  height: 2.25rem;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
+  text-align: center;
+  text-align-last: center;
+}
+
+.dashboard__select:focus {
+  outline: none;
+}
+
+.dashboard__shift-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  background: #1e1e1e;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard__shift-btn img {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+}
+
+.dashboard__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dashboard__icon-btn {
+  width: 2rem;
+  height: 2rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard__icon-btn img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
+.dashboard__days {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (min-width: 501px) {
+  .dashboard__days {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
+
+  .dashboard__days .day-card {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.dashboard__settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard__settings-popup {
+  background: #111;
+  padding: 1.25rem;
+  min-width: 220px;
+}
+
+.dashboard__settings-title {
+  color: #888;
+  font-size: 0.8125rem;
+  margin-bottom: 0.75rem;
+}
+
+.dashboard__settings-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: #888;
+  padding: 0.5rem 0;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dashboard__settings-option:hover {
+  color: #fff;
+}
+
+.dashboard__settings-option--active {
+  color: #5a86ee;
+}
+
+.dashboard__refresh {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: #1e1e1e;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.dashboard__refresh img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}

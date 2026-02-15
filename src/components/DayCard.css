@@ -1,0 +1,114 @@
+.day-card {
+  background: #000000;
+  min-width: 0;
+}
+
+.day-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.day-card__title-btn {
+  flex: 1;
+  font-size: 0.9375rem;
+  font-weight: normal;
+  color: #666666;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  width: 100%;
+}
+
+.day-card__title-btn:hover {
+  color: #ffffff;
+}
+
+.day-card__header-line {
+  margin-top: 15px;
+  margin-bottom: 0.75rem;
+  width: 100%;
+  border-bottom: 1px solid #2f2f2f;
+}
+
+.day-card__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.day-card__icon-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.day-card__icon-btn img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
+@media (min-width: 501px) {
+  .day-card__icon-btn--plus {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .day-card__header:hover .day-card__icon-btn--plus {
+    opacity: 1;
+  }
+}
+
+.day-card__section {
+  margin-bottom: 0.5rem;
+}
+
+.day-card__section--completed {
+  margin-top: 0.4rem;
+}
+
+.day-card__completed-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: #666666;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  padding: 0.25rem 0 0.35rem;
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid #2f2f2f;
+  font-family: inherit;
+}
+
+.day-card__completed-toggle:hover {
+  color: #ffffff;
+}
+
+.day-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.day-card__list li {
+  margin: 0;
+  padding: 0;
+}
+
+.day-card__list--completed .task-item__title {
+  color: #666;
+}

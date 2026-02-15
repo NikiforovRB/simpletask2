@@ -1,0 +1,106 @@
+.no-date-list {
+  margin-top: 1.5rem;
+}
+
+.no-date-list__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid #2f2f2f;
+  width: 100%;
+}
+
+.no-date-list__title-btn {
+  flex: 1;
+  font-size: 0.9375rem;
+  font-weight: normal;
+  color: #666666;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.no-date-list__title-btn:hover {
+  color: #ffffff;
+}
+
+.no-date-list__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.no-date-list__icon-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.no-date-list__icon-btn img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
+@media (min-width: 501px) {
+  .no-date-list__icon-btn--plus {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .no-date-list__header:hover .no-date-list__icon-btn--plus {
+    opacity: 1;
+  }
+}
+
+.no-date-list__body {
+  margin-top: 0.5rem;
+}
+
+.no-date-list__completed-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: #666666;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  padding: 0.5rem 0 0.35rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid #2f2f2f;
+  font-family: inherit;
+}
+
+.no-date-list__completed-toggle:hover {
+  color: #ffffff;
+}
+
+.no-date-list__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.no-date-list__list li {
+  margin: 0;
+  padding: 0;
+}
+
+.no-date-list__list--completed .task-item__title {
+  color: #666;
+}
+

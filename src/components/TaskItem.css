@@ -1,0 +1,259 @@
+.task-item {
+  margin-bottom: 0;
+}
+
+.task-item--top-1 {
+  margin-top: 40px;
+}
+
+.task-item--top-2 {
+  margin-top: 15px;
+  padding-top: 28px;
+  border-top: 1px solid #2f2f2f;
+}
+
+.task-item__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.5rem;
+  position: relative;
+}
+
+.task-item__drag-handle {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: #666;
+}
+
+.task-item__drag-handle:active {
+  cursor: grabbing;
+}
+
+.task-item__drag-handle img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.task-item__checkbox {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-item__checkbox img {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+}
+
+.task-item__lightning-btn {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-item__lightning-btn img {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+}
+
+.task-item__actions {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-left: 0.5rem;
+  background: #000000;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.task-item__row:hover .task-item__actions {
+  opacity: 1;
+}
+
+.task-item__action-btn {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-item__action-btn img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+}
+
+.task-item__pod-btn {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-item__pod-btn img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+}
+
+.task-item__calendar-wrap {
+  position: relative;
+}
+
+.task-item__calendar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.task-item__calendar-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.25rem;
+  z-index: 51;
+}
+
+.task-item__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9375rem;
+  cursor: text;
+  word-break: break-word;
+}
+
+.task-item__title--completed {
+  text-decoration: line-through;
+}
+
+.task-item__input {
+  flex: 1;
+  background: transparent;
+  border: 1px solid #333;
+  color: #e0e0e0;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.9375rem;
+  border-radius: 2px;
+}
+
+.task-item__input:focus {
+  outline: none;
+  border-color: #555;
+}
+
+.task-item__color-btn {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+}
+
+.task-item__color-option {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+}
+
+.task-item__colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  margin-left: 1.75rem;
+}
+
+.task-item__delete {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-item__delete img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
+.task-item__subtasks {
+  list-style: none;
+  margin: 0.04rem 0 0 1.75rem;
+  padding: 0;
+  padding-left: 0.75rem;
+}
+
+.task-item__subtasks li {
+  margin: 0;
+  padding: 0;
+}
+
+.task-item__subtasks--collapsed {
+  display: none;
+}
+
+.task-item--entering {
+  animation: task-enter-done 0.4s ease-out;
+}
+
+@keyframes task-enter-done {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

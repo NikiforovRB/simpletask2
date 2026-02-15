@@ -1,0 +1,23 @@
+.drop-slot {
+  min-height: 2px;
+  padding: 2px 0;
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.drop-slot--over {
+  outline: none;
+}
+
+.drop-slot--over::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  margin-top: -0.5px;
+  height: 1px;
+  background: #5a86ee;
+  z-index: 1;
+  pointer-events: none;
+}
