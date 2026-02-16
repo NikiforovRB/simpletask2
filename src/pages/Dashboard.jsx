@@ -179,18 +179,26 @@ export default function Dashboard() {
       targetIds.splice(index, 0, movedTask.id);
       const newOrderedIds = targetIds;
 
-      await moveTask(movedTask.id, { scheduled_date, parent_id, completed_at, position: index });
+      const updates = [];
+      updates.push({ id: movedTask.id, payload: { scheduled_date, parent_id, completed_at, position: index } });
       for (let i = 0; i < newOrderedIds.length; i++) {
         if (newOrderedIds[i] !== movedTask.id) {
-          await updateTask(newOrderedIds[i], { position: i });
+          updates.push({ id: newOrderedIds[i], payload: { position: i } });
         }
       }
       if (sourceContainerId !== containerId) {
         const sourceList = getTasksInContainer(tasks, sourceContainerId).filter((t) => t.id !== movedTask.id);
         for (let i = 0; i < sourceList.length; i++) {
-          await updateTask(sourceList[i].id, { position: i });
+          updates.push({ id: sourceList[i].id, payload: { position: i } });
         }
       }
+      updates.forEach(({ id, payload }) => {
+        if (id === movedTask.id) {
+          moveTask(id, payload);
+        } else {
+          updateTask(id, payload);
+        }
+      });
     },
     [tasks, moveTask, updateTask]
   );

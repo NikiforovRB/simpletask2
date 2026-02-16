@@ -1,6 +1,5 @@
 .draggable-task {
   cursor: grab;
-  transition: opacity 0.2s ease, box-shadow 0.2s ease;
 }
 
 .draggable-task:active {
@@ -11,8 +10,10 @@
   opacity: 0.85;
   z-index: 10;
   cursor: grabbing;
+  transition: none;
 }
 
 .draggable-task--dragging .task-item {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: none;
 }

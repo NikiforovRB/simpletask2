@@ -29,6 +29,10 @@
   justify-content: center;
   cursor: grab;
   color: #666;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
 }
 
 .task-item__drag-handle:active {
@@ -40,6 +44,20 @@
   height: 1.1rem;
   object-fit: contain;
   pointer-events: none;
+}
+
+@media (max-width: 500px) {
+  .task-item__drag-handle {
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0.2rem;
+    margin: -0.2rem;
+  }
+  
+  .task-item__drag-handle img {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
 }
 
 .task-item__checkbox {

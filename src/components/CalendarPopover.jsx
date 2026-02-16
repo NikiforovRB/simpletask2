@@ -20,6 +20,9 @@ export function CalendarPopover({ value, onChange, onClose }) {
   for (let i = 0; i < startPad; i++) cells.push(null);
   for (let i = 1; i <= daysInMonth; i++) cells.push(i);
 
+  const valueDate = value ? new Date(value + 'T12:00:00') : null;
+  if (valueDate) valueDate.setHours(0, 0, 0, 0);
+
   const pick = (day) => {
     const date = new Date(year, month, day);
     const y = date.getFullYear();
@@ -56,11 +59,12 @@ export function CalendarPopover({ value, onChange, onClose }) {
           const date = new Date(year, month, day);
           date.setHours(0, 0, 0, 0);
           const isToday = date.getTime() === today.getTime();
+          const isSelected = valueDate && date.getTime() === valueDate.getTime();
           return (
             <button
               key={day}
               type="button"
-              className={`calendar-popover__cell ${isToday ? 'calendar-popover__cell--today' : ''}`}
+              className={`calendar-popover__cell ${isToday ? 'calendar-popover__cell--today' : ''} ${isSelected ? 'calendar-popover__cell--selected' : ''}`}
               onClick={() => pick(day)}
             >
               {day}

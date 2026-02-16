@@ -72,3 +72,11 @@
 .calendar-popover__cell--today:hover {
   background: #6a96ff;
 }
+
+.calendar-popover__cell--selected {
+  border: 1px solid #5a86ee;
+}
+
+.calendar-popover__cell--selected:hover {
+  border-color: #6a96ff;
+}
