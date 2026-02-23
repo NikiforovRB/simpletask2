@@ -92,3 +92,45 @@
 .login-toggle:hover {
   color: #aaa;
 }
+
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.login-popup {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1.25rem;
+  max-width: 360px;
+}
+
+.login-popup__text {
+  color: #e0e0e0;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  margin: 0 0 1rem;
+}
+
+.login-popup__btn {
+  display: block;
+  width: 100%;
+  background: #333;
+  color: #e0e0e0;
+  border: 1px solid #444;
+  padding: 0.5rem 1rem;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.login-popup__btn:hover {
+  background: #444;
+}

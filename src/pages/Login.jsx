@@ -8,17 +8,21 @@ export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showConfirmMessage, setShowConfirmMessage] = useState(false);
   const { signIn, signUp } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
     setLoading(true);
+    setShowConfirmMessage(false);
     try {
       const fn = isSignUp ? signUp : signIn;
       const { error } = await fn(email, password);
       if (error) {
         setMessage(error.message || 'Ошибка входа');
+      } else if (isSignUp) {
+        setShowConfirmMessage(true);
       }
     } finally {
       setLoading(false);
@@ -27,6 +31,18 @@ export default function Login() {
 
   return (
     <div className="login-page">
+      {showConfirmMessage && (
+        <div className="login-overlay" onClick={() => setShowConfirmMessage(false)}>
+          <div className="login-popup" onClick={(e) => e.stopPropagation()}>
+            <p className="login-popup__text">
+              На указанный email отправлено письмо для подтверждения регистрации. Если его нет во входящих, проверь папку Спам.
+            </p>
+            <button type="button" className="login-popup__btn" onClick={() => setShowConfirmMessage(false)}>
+              OK
+            </button>
+          </div>
+        </div>
+      )}
       <div className="login-card">
         <h1 className="login-title">Задачи</h1>
         <form onSubmit={handleSubmit} className="login-form">
