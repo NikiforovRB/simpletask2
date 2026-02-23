@@ -116,6 +116,12 @@
   opacity: 1;
 }
 
+@media (max-width: 500px) {
+  .task-item--editing .task-item__actions {
+    display: none;
+  }
+}
+
 .task-item__action-btn {
   flex-shrink: 0;
   width: 1.1rem;
@@ -192,6 +198,14 @@
   padding: 0.2rem 0.4rem;
   font-size: 0.9375rem;
   border-radius: 2px;
+}
+
+.task-item__input--multiline {
+  resize: none;
+  overflow: hidden;
+  min-height: 1.5rem;
+  line-height: 1.35;
+  word-wrap: break-word;
 }
 
 @media (max-width: 768px) {

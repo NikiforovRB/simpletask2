@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { DraggableTask } from './DraggableTask';
 import { DropSlot } from './DropSlot';
 import { TASK_COLORS, DEFAULT_TASK_COLOR } from '../constants';
@@ -58,9 +58,29 @@ export function TaskItem({
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       e.target.blur();
     }
+  };
+
+  const inputRef = useRef(null);
+
+  const resizeInput = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(el.scrollHeight, 24)}px`;
+  };
+
+  useEffect(() => {
+    if (editing) resizeInput();
+  }, [editing, editTitle]);
+
+  const handleInputResize = (e) => {
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(el.scrollHeight, 24)}px`;
   };
 
   const handleComplete = () => {
@@ -98,7 +118,7 @@ export function TaskItem({
 
   return (
     <div
-      className={`task-item ${isCompleted ? 'task-item--completed' : ''} ${isRecentlyCompleted ? 'task-item--entering' : ''} task-item--top-${topStyle}`}
+      className={`task-item ${isCompleted ? 'task-item--completed' : ''} ${isRecentlyCompleted ? 'task-item--entering' : ''} task-item--top-${topStyle} ${editing ? 'task-item--editing' : ''}`}
       data-task-id={task.id}
     >
       <div className="task-item__row">
@@ -125,13 +145,16 @@ export function TaskItem({
           </button>
         )}
         {editing ? (
-          <input
-            className="task-item__input"
+          <textarea
+            ref={inputRef}
+            className="task-item__input task-item__input--multiline"
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
+            onInput={handleInputResize}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             autoFocus
+            rows={1}
           />
         ) : (
           <span
