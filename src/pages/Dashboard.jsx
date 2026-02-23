@@ -63,7 +63,7 @@ function getTasksInContainer(tasks, containerId) {
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const { tasks, addTask, updateTask, deleteTask, toggleComplete, moveTask } = useTasks();
-  const { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible } = useSettings();
+  const { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible, setCompletedVisible } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const [dateOffset, setDateOffset] = useState(() => {
     try {
@@ -81,7 +81,7 @@ export default function Dashboard() {
   }, [dateOffset]);
   const [recentCompletedIds, setRecentCompletedIds] = useState(new Set());
   const noDateListVisible = settings.no_date_list_visible !== false;
-  const [completedVisible, setCompletedVisible] = useState(true);
+  const completedVisible = settings.completed_visible !== false;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dateLeftHover, setDateLeftHover] = useState(false);
   const [dateRightHover, setDateRightHover] = useState(false);
@@ -234,7 +234,7 @@ export default function Dashboard() {
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setBezdatHover(true)} onMouseLeave={() => hasHover && setBezdatHover(false)} onClick={() => setNoDateListVisible(!noDateListVisible)} aria-label={noDateListVisible ? 'Скрыть список без даты' : 'Показать список без даты'}>
               <img src={hasHover && bezdatHover ? bezdatNavIcon : bezdatIcon} alt="" />
             </button>
-            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={() => setCompletedVisible((v) => !v)} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
+            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={() => setCompletedVisible(!completedVisible)} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setSettingsHover(true)} onMouseLeave={() => hasHover && setSettingsHover(false)} onClick={() => setSettingsOpen((v) => !v)} aria-label="Настройки">

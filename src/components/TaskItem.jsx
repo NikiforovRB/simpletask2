@@ -166,20 +166,20 @@ export function TaskItem({
           </span>
         )}
         <div className="task-item__actions">
+          {isParent && (
+            <button
+              type="button"
+              className="task-item__action-btn"
+              onMouseEnter={() => hasHover && setCollapseSubHover(true)}
+              onMouseLeave={() => hasHover && setCollapseSubHover(false)}
+              onClick={() => onUpdate(task.id, { subtasks_collapsed: !subtasksCollapsed })}
+              aria-label={subtasksCollapsed ? 'Развернуть подзадачи' : 'Свернуть подзадачи'}
+            >
+              <img src={subtasksCollapsed ? (hasHover && collapseSubHover ? downNavIcon : downIcon) : (hasHover && collapseSubHover ? upNavIcon : upIcon)} alt="" />
+            </button>
+          )}
           {!isCompleted && (
             <>
-              {isParent && (
-                <button
-                  type="button"
-                  className="task-item__action-btn"
-                  onMouseEnter={() => hasHover && setCollapseSubHover(true)}
-                  onMouseLeave={() => hasHover && setCollapseSubHover(false)}
-                  onClick={() => onUpdate(task.id, { subtasks_collapsed: !subtasksCollapsed })}
-                  aria-label={subtasksCollapsed ? 'Развернуть подзадачи' : 'Свернуть подзадачи'}
-                >
-                  <img src={subtasksCollapsed ? (hasHover && collapseSubHover ? downNavIcon : downIcon) : (hasHover && collapseSubHover ? upNavIcon : upIcon)} alt="" />
-                </button>
-              )}
               {onAddSubtask && (
                 <button
                   type="button"
@@ -275,8 +275,8 @@ export function TaskItem({
           ))}
         </div>
       )}
-      {!isCompleted && (
-        <ul className={`task-item__subtasks ${isParent && subtasksCollapsed ? 'task-item__subtasks--collapsed' : ''}`}>
+      {(isParent && subtasks.length > 0) && (
+        <ul className={`task-item__subtasks ${subtasksCollapsed ? 'task-item__subtasks--collapsed' : ''}`}>
           {subtasks.map((st, i) => (
             <li key={st.id}>
               <DropSlot id={`sub-${task.id}`} index={i} />
@@ -293,7 +293,7 @@ export function TaskItem({
               />
             </li>
           ))}
-          {subtasks.length > 0 && <li><DropSlot id={`sub-${task.id}`} index={subtasks.length} /></li>}
+          <li><DropSlot id={`sub-${task.id}`} index={subtasks.length} /></li>
         </ul>
       )}
     </div>

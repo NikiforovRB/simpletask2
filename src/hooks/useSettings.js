@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export function useSettings() {
   const { user } = useAuth();
-  const [settings, setSettings] = useState({ days_count: 3, new_tasks_position: 'start', no_date_list_visible: true });
+  const [settings, setSettings] = useState({ days_count: 3, new_tasks_position: 'start', no_date_list_visible: true, completed_visible: true });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -15,7 +15,7 @@ export function useSettings() {
     const fetch = async () => {
       const { data, error } = await supabase
         .from('user_settings')
-        .select('days_count, new_tasks_position, no_date_list_visible')
+        .select('days_count, new_tasks_position, no_date_list_visible, completed_visible')
         .eq('user_id', user.id)
         .maybeSingle();
       if (!error && data) {
@@ -23,10 +23,11 @@ export function useSettings() {
           days_count: data.days_count,
           new_tasks_position: data.new_tasks_position || 'start',
           no_date_list_visible: data.no_date_list_visible !== false,
+          completed_visible: data.completed_visible !== false,
         });
       } else if (!error && !data) {
-        await supabase.from('user_settings').insert({ user_id: user.id, days_count: 3, new_tasks_position: 'start', no_date_list_visible: true });
-        setSettings({ days_count: 3, new_tasks_position: 'start', no_date_list_visible: true });
+        await supabase.from('user_settings').insert({ user_id: user.id, days_count: 3, new_tasks_position: 'start', no_date_list_visible: true, completed_visible: true });
+        setSettings({ days_count: 3, new_tasks_position: 'start', no_date_list_visible: true, completed_visible: true });
       }
       setLoading(false);
     };
@@ -53,5 +54,11 @@ export function useSettings() {
     setSettings((s) => ({ ...s, no_date_list_visible }));
   };
 
-  return { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible, loading };
+  const setCompletedVisible = async (completed_visible) => {
+    if (!user) return;
+    await supabase.from('user_settings').update({ completed_visible }).eq('user_id', user.id);
+    setSettings((s) => ({ ...s, completed_visible }));
+  };
+
+  return { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible, setCompletedVisible, loading };
 }
