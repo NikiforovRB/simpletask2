@@ -116,10 +116,8 @@
   opacity: 1;
 }
 
-@media (max-width: 500px) {
-  .task-item--editing .task-item__actions {
-    display: none;
-  }
+.task-item--editing .task-item__actions {
+  display: none;
 }
 
 /* Hide actions while dragging task or subtask */
