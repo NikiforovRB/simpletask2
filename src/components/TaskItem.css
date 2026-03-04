@@ -122,6 +122,11 @@
   }
 }
 
+/* Hide actions while dragging task or subtask */
+.draggable-task--dragging .task-item__actions {
+  display: none;
+}
+
 .task-item__action-btn {
   flex-shrink: 0;
   width: 1.1rem;
