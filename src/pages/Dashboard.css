@@ -24,6 +24,25 @@
   gap: 0.35rem;
 }
 
+.dashboard__menu-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  background: #1e1e1e;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard__menu-btn img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
 .dashboard__select {
   background: #1e1e1e;
   border: none;
@@ -107,6 +126,46 @@
   }
 }
 
+.dashboard__context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+
+.dashboard__context-menu {
+  position: fixed;
+  z-index: 201;
+  background: #1e1e1e;
+  border-radius: 8px;
+  padding: 0.25rem 0;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.dashboard__context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #e0e0e0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dashboard__context-menu-item-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+}
+
+.dashboard__context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .dashboard__settings-overlay {
   position: fixed;
   inset: 0;
@@ -121,6 +180,10 @@
   background: #111;
   padding: 1.25rem;
   min-width: 220px;
+}
+
+.dashboard__settings-popup--edit-project {
+  min-width: 340px;
 }
 
 .dashboard__settings-title {
@@ -150,6 +213,69 @@
   color: #5a86ee;
 }
 
+.dashboard__settings-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  background: #1e1e1e;
+  border: 1px solid #2f2f2f;
+  color: #e0e0e0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  margin-bottom: 0.75rem;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.dashboard__settings-input:focus {
+  outline: none;
+  border-color: #5a86ee;
+}
+
+.dashboard__settings-submit {
+  display: block;
+  width: 100%;
+  background: #666666;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dashboard__settings-submit:hover {
+  background: #5a86ee;
+}
+
+.dashboard__settings-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.dashboard__settings-edit-actions .dashboard__settings-submit {
+  flex: 1;
+}
+
+.dashboard__settings-delete {
+  flex: 1;
+  background: transparent;
+  color: #666666;
+  border: 1px solid #2f2f2f;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dashboard__settings-delete:hover {
+  color: #f33737;
+  border-color: #f33737;
+}
+
 .dashboard__refresh {
   position: fixed;
   bottom: 1.5rem;
@@ -171,4 +297,156 @@
   width: 1.25rem;
   height: 1.25rem;
   object-fit: contain;
+}
+
+@media (min-width: 600px) {
+  .dashboard--menu-open {
+    padding-left: calc(220px + 18px);
+  }
+
+  .dashboard-menu--side {
+    width: 220px;
+  }
+}
+
+.dashboard-menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 90;
+  display: flex;
+  align-items: stretch;
+}
+
+.dashboard-menu {
+  background: #141414;
+  padding: 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dashboard-menu:not(.dashboard-menu--side) {
+  position: relative;
+  padding-top: 2.5rem;
+}
+
+.dashboard-menu__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: none;
+  color: #666666;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.dashboard-menu__close:hover {
+  color: #5a86ee;
+}
+
+.dashboard-menu--side {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 90;
+}
+
+.dashboard-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.25rem;
+  background: none;
+  border: none;
+  color: #666666;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.dashboard-menu__item:hover {
+  color: #5A86EE;
+}
+
+.dashboard-menu__item img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+}
+
+.dashboard-menu__item--active {
+  color: #5A86EE;
+}
+
+.dashboard-menu__divider {
+  display: none;
+}
+
+.dashboard-menu__add-project {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  background: none;
+  border: none;
+  color: #666666;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  text-align: center;
+  line-height: 1;
+}
+
+.dashboard-menu__add-project:hover {
+  color: #5a86ee;
+}
+
+.dashboard-menu__project-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.dashboard-menu__project-row .dashboard-menu__item {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-menu__project-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.dashboard-menu__project-row:hover .dashboard-menu__project-drag-handle {
+  opacity: 1;
+}
+
+.dashboard-menu__project-drag-handle:active {
+  cursor: grabbing;
+}
+
+.dashboard-menu__project-drag-handle img {
+  width: 0.9rem;
+  height: 0.9rem;
+  object-fit: contain;
+}
+
+.dashboard-menu__project-row--dragging .dashboard-menu__project-drag-handle {
+  opacity: 1;
 }

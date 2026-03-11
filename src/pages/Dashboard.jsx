@@ -1,20 +1,37 @@
-import { useState, useCallback, useEffect } from 'react';
-import { DndContext, PointerSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../contexts/AuthContext';
 import { useTasks } from '../hooks/useTasks';
 import { useSettings } from '../hooks/useSettings';
 import { useListCollapsed } from '../hooks/useListCollapsed';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useProjects } from '../hooks/useProjects';
 import { DayCard } from '../components/DayCard';
 import { NoDateList } from '../components/NoDateList';
-import { getContainerId, parseContainerId } from '../lib/dnd';
+import { SomedayList } from '../components/SomedayList';
+import { ProjectList } from '../components/ProjectList';
+import { getContainerId, getContainerIdForBucket, getContainerIdFromTask, parseContainerId } from '../lib/dnd';
+import { toLocalDateString } from '../constants';
 import { parseSlotId } from '../components/DropSlot';
+import menuIcon from '../assets/menu.svg';
+import menuNavIcon from '../assets/menu-nav.svg';
 import leftIcon from '../assets/left.svg';
 import leftNavIcon from '../assets/left-nav.svg';
 import rightIcon from '../assets/right.svg';
 import rightNavIcon from '../assets/right-nav.svg';
-import bezdatIcon from '../assets/bezdat.svg';
-import bezdatNavIcon from '../assets/bezdat-nav.svg';
+import starIcon from '../assets/star.svg';
+import starNavIcon from '../assets/star-nav.svg';
+import calendarIcon from '../assets/calendar.svg';
+import calendarNavIcon from '../assets/calendar-nav.svg';
+import layersIcon from '../assets/layers.svg';
+import layersNavIcon from '../assets/layers-nav.svg';
+import archiveIcon from '../assets/archive.svg';
+import archiveNavIcon from '../assets/archive-nav.svg';
+import folderIcon from '../assets/folder.svg';
+import folderNavIcon from '../assets/folder-nav.svg';
+import dragIcon from '../assets/drag.svg';
 import exitIcon from '../assets/exit.svg';
 import exitNavIcon from '../assets/exit-nav.svg';
 import eyeIcon from '../assets/eye.svg';
@@ -49,15 +66,53 @@ function getTasksInContainer(tasks, containerId) {
       .filter((t) => t.parent_id === c.parent_id)
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   }
+  if (c.list_type === 'someday') {
+    return tasks
+      .filter((t) => !t.parent_id && (t.list_type || '') === 'someday' && (c.completed ? !!t.completed_at : !t.completed_at))
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  }
+  if (c.list_type === 'project' && c.project_id) {
+    const pid = String(c.project_id);
+    return tasks
+      .filter((t) => !t.parent_id && (t.list_type || '') === 'project' && String(t.project_id) === pid && (c.completed ? !!t.completed_at : !t.completed_at))
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  }
   const wantDate = normDate(c.scheduled_date);
   return tasks
     .filter(
       (t) =>
         !t.parent_id &&
+        (t.list_type || 'inbox') === 'inbox' &&
         normDate(t.scheduled_date) === wantDate &&
         (c.completed ? !!t.completed_at : !t.completed_at)
     )
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+}
+
+function SortableProjectItem({ project, isActive, isHover, folderIcon, folderNavIcon, dragIcon, onClick, onMouseEnter, onMouseLeave }) {
+  const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: project.id });
+  const icon = (isActive || isHover) ? folderNavIcon : folderIcon;
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className={`dashboard-menu__project-row ${isDragging ? 'dashboard-menu__project-row--dragging' : ''}`}>
+      <button
+        type="button"
+        className={`dashboard-menu__item ${isActive ? 'dashboard-menu__item--active' : ''}`}
+        onClick={onClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      >
+        <img src={icon} alt="" />
+        <span>{project.title}</span>
+      </button>
+      <span className="dashboard-menu__project-drag-handle" {...attributes} {...listeners} aria-label="Переместить">
+        <img src={dragIcon} alt="" />
+      </span>
+    </div>
+  );
 }
 
 export default function Dashboard() {
@@ -65,6 +120,7 @@ export default function Dashboard() {
   const { tasks, addTask, updateTask, deleteTask, toggleComplete, moveTask } = useTasks();
   const { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible, setCompletedVisible } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
+  const { projects, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const [dateOffset, setDateOffset] = useState(() => {
     try {
       const v = localStorage.getItem('dashboard_date_offset');
@@ -82,21 +138,144 @@ export default function Dashboard() {
   const [recentCompletedIds, setRecentCompletedIds] = useState(new Set());
   const noDateListVisible = settings.no_date_list_visible !== false;
   const completedVisible = settings.completed_visible !== false;
+  const [viewMode, setViewMode] = useState('plans'); // 'today' | 'plans' | 'no_date' | 'someday' | 'project'
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeProjectId, setActiveProjectId] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dateLeftHover, setDateLeftHover] = useState(false);
   const [dateRightHover, setDateRightHover] = useState(false);
-  const [bezdatHover, setBezdatHover] = useState(false);
+  const [menuHover, setMenuHover] = useState(false);
+  const [todayHover, setTodayHover] = useState(false);
+  const [plansHover, setPlansHover] = useState(false);
+  const [noDateHover, setNoDateHover] = useState(false);
+  const [somedayHover, setSomedayHover] = useState(false);
+  const [projectHoverId, setProjectHoverId] = useState(null);
   const [eyeHover, setEyeHover] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
   const [exitHover, setExitHover] = useState(false);
   const [refreshHover, setRefreshHover] = useState(false);
+  const [addProjectModalOpen, setAddProjectModalOpen] = useState(false);
+  const [addProjectTitle, setAddProjectTitle] = useState('');
+  const [editProjectOpen, setEditProjectOpen] = useState(false);
+  const [editProjectId, setEditProjectId] = useState(null);
+  const [editProjectTitle, setEditProjectTitle] = useState('');
+  const [activeDragId, setActiveDragId] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
   const hasHover = useMediaQuery('(hover: hover)');
+  const isWideMenu = useMediaQuery('(min-width: 600px)');
+
+  const handleMenuSelect = useCallback((viewModeOrProject) => {
+    const isViewMode = ['today', 'plans', 'no_date', 'someday'].includes(viewModeOrProject);
+    if (isViewMode) {
+      setViewMode(viewModeOrProject);
+      setActiveProjectId(null);
+    } else {
+      setViewMode('project');
+      setActiveProjectId(viewModeOrProject);
+    }
+    if (!isWideMenu) setMenuOpen(false);
+  }, [isWideMenu]);
+
+  const handleAddProjectSubmit = useCallback(() => {
+    const title = addProjectTitle.trim();
+    if (title) {
+      addProject(title);
+      setAddProjectTitle('');
+      setAddProjectModalOpen(false);
+    }
+  }, [addProjectTitle, addProject]);
+
+  const handleOpenEditProject = useCallback((id, title) => {
+    setEditProjectId(id);
+    setEditProjectTitle(title ?? '');
+    setEditProjectOpen(true);
+  }, []);
+
+  const handleEditProjectSave = useCallback(() => {
+    if (editProjectId && editProjectTitle.trim()) {
+      updateProject(editProjectId, { title: editProjectTitle.trim() });
+      setEditProjectOpen(false);
+      setEditProjectId(null);
+      setEditProjectTitle('');
+    }
+  }, [editProjectId, editProjectTitle, updateProject]);
+
+  const handleEditProjectDelete = useCallback(() => {
+    if (!editProjectId) return;
+    if (window.confirm('Удалить проект и все его задачи?')) {
+      deleteProject(editProjectId);
+      setViewMode('plans');
+      setActiveProjectId(null);
+      setEditProjectOpen(false);
+      setEditProjectId(null);
+      setEditProjectTitle('');
+    }
+  }, [editProjectId, deleteProject]);
+
+  const handleTaskContextMenu = useCallback((e, task) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, task });
+  }, []);
+
+  const getTargetPayload = useCallback(
+    (destination) => {
+      const completed_at = contextMenu?.task?.completed_at ?? null;
+      if (destination.type === 'today') {
+        const todayStr = toLocalDateString(new Date());
+        const containerId = getContainerId(todayStr, null, !!completed_at);
+        const targetList = getTasksInContainer(tasks, containerId);
+        const position = targetList.length ? Math.max(...targetList.map((t) => t.position ?? 0)) + 1 : 0;
+        return { list_type: 'inbox', project_id: null, scheduled_date: todayStr, parent_id: null, position, completed_at };
+      }
+      if (destination.type === 'plans' || destination.type === 'no_date') {
+        const containerId = getContainerId(null, null, !!completed_at);
+        const targetList = getTasksInContainer(tasks, containerId);
+        const position = targetList.length ? Math.max(...targetList.map((t) => t.position ?? 0)) + 1 : 0;
+        return { list_type: 'inbox', project_id: null, scheduled_date: null, parent_id: null, position, completed_at };
+      }
+      if (destination.type === 'someday') {
+        const containerId = getContainerIdForBucket('someday', null, !!completed_at);
+        const targetList = getTasksInContainer(tasks, containerId);
+        const position = targetList.length ? Math.max(...targetList.map((t) => t.position ?? 0)) + 1 : 0;
+        return { list_type: 'someday', project_id: null, scheduled_date: null, parent_id: null, position, completed_at };
+      }
+      if (destination.type === 'project' && destination.projectId) {
+        const containerId = getContainerIdForBucket('project', destination.projectId, !!completed_at);
+        const targetList = getTasksInContainer(tasks, containerId);
+        const position = targetList.length ? Math.max(...targetList.map((t) => t.position ?? 0)) + 1 : 0;
+        return { list_type: 'project', project_id: destination.projectId, scheduled_date: null, parent_id: null, position, completed_at };
+      }
+      return null;
+    },
+    [tasks, contextMenu]
+  );
+
+  const handleMoveTaskToDestination = useCallback(
+    (destination) => {
+      if (!contextMenu?.task) return;
+      const task = contextMenu.task;
+      const payload = getTargetPayload(destination);
+      if (!payload) return;
+      const sourceContainerId = getContainerIdFromTask(task);
+      moveTask(task.id, payload);
+      const sourceList = getTasksInContainer(tasks, sourceContainerId).filter((t) => t.id !== task.id);
+      sourceList.forEach((t, i) => updateTask(t.id, { position: i }));
+      setContextMenu(null);
+    },
+    [contextMenu, getTargetPayload, tasks, moveTask, updateTask]
+  );
+
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const baseDate = new Date(today);
   baseDate.setDate(baseDate.getDate() + dateOffset);
-  const days = getDays(baseDate, settings.days_count);
+  const days =
+    viewMode === 'today'
+      ? [today]
+      : getDays(baseDate, settings.days_count);
+
+  const inboxTasks = useMemo(() => tasks.filter((t) => (t.list_type || 'inbox') === 'inbox'), [tasks]);
 
   const handleToggle = useCallback(
     async (task) => {
@@ -127,11 +306,20 @@ export default function Dashboard() {
 
   const handleAddTaskAt = useCallback(
     (payload) => {
-      const sameDate = tasks.filter((t) => (t.scheduled_date === payload.scheduled_date && !t.parent_id));
+      let sameBucket;
+      if (payload.list_type === 'someday') {
+        sameBucket = tasks.filter((t) => !t.parent_id && (t.list_type || '') === 'someday');
+      } else if (payload.list_type === 'project' && payload.project_id) {
+        sameBucket = tasks.filter((t) => !t.parent_id && (t.list_type || '') === 'project' && t.project_id === payload.project_id);
+      } else if (payload.scheduled_date == null && (payload.list_type || 'inbox') === 'inbox') {
+        sameBucket = tasks.filter((t) => !t.parent_id && (t.list_type || 'inbox') === 'inbox' && t.scheduled_date == null);
+      } else {
+        sameBucket = tasks.filter((t) => !t.parent_id && t.scheduled_date === payload.scheduled_date);
+      }
       const atStart = settings.new_tasks_position === 'start';
       const position = atStart
-        ? (sameDate.length ? Math.min(...sameDate.map((t) => t.position ?? 0)) : 0) - 1
-        : (sameDate.length ? Math.max(...sameDate.map((t) => t.position ?? 0)) : 0) + 1;
+        ? (sameBucket.length ? Math.min(...sameBucket.map((t) => t.position ?? 0)) : 0) - 1
+        : (sameBucket.length ? Math.max(...sameBucket.map((t) => t.position ?? 0)) : 0) + 1;
       addTask({ ...payload, title: 'Новая задача', position });
     },
     [tasks, addTask, settings.new_tasks_position]
@@ -147,6 +335,8 @@ export default function Dashboard() {
         title: 'Подзадача',
         parent_id: parentId,
         scheduled_date: parent.scheduled_date,
+        list_type: parent.list_type || 'inbox',
+        project_id: parent.project_id ?? null,
         text_color: '#ffffff',
         position: maxPos + 1,
       });
@@ -157,30 +347,54 @@ export default function Dashboard() {
   const handleDragEnd = useCallback(
     async (event) => {
       const { active, over } = event;
+      const projectIds = projects.map((p) => p.id);
+      if (projectIds.includes(active.id) && over && projectIds.includes(over.id) && active.id !== over.id) {
+        const oldIndex = projectIds.indexOf(active.id);
+        const newIndex = projectIds.indexOf(over.id);
+        const newOrder = arrayMove(projectIds, oldIndex, newIndex);
+        await reorderProjects(newOrder);
+        return;
+      }
       if (!over) return;
+      let containerId;
+      let index;
       const slot = parseSlotId(over.id);
-      if (!slot) return;
-      const { containerId, index } = slot;
+      if (slot) {
+        containerId = slot.containerId;
+        index = slot.index;
+      } else {
+        const overTask = tasks.find((t) => t.id === over.id);
+        if (!overTask) return;
+        containerId = getContainerIdFromTask(overTask);
+        const list = getTasksInContainer(tasks, containerId);
+        const idx = list.findIndex((t) => t.id === over.id);
+        if (idx < 0) return;
+        index = idx;
+      }
       const movedTask = tasks.find((t) => t.id === active.id);
       if (!movedTask) return;
       const targetConfig = parseContainerId(containerId);
       if (!targetConfig) return;
       let scheduled_date = targetConfig.scheduled_date;
-      const parent_id = targetConfig.parent_id ?? null;
+      let parent_id = targetConfig.parent_id ?? null;
+      let list_type = targetConfig.list_type ?? 'inbox';
+      let project_id = targetConfig.project_id ?? null;
       if (targetConfig.parent_id) {
         const parentTask = tasks.find((t) => t.id === targetConfig.parent_id);
         scheduled_date = parentTask?.scheduled_date ?? null;
+        list_type = parentTask?.list_type ?? 'inbox';
+        project_id = parentTask?.project_id ?? null;
       }
       const completed_at = targetConfig.completed ? new Date().toISOString() : null;
 
       const targetList = getTasksInContainer(tasks, containerId);
-      const sourceContainerId = getContainerId(movedTask.scheduled_date, movedTask.parent_id, !!movedTask.completed_at);
+      const sourceContainerId = getContainerIdFromTask(movedTask);
       const targetIds = targetList.map((t) => t.id).filter((id) => id !== movedTask.id);
       targetIds.splice(index, 0, movedTask.id);
       const newOrderedIds = targetIds;
 
       const updates = [];
-      updates.push({ id: movedTask.id, payload: { scheduled_date, parent_id, completed_at, position: index } });
+      updates.push({ id: movedTask.id, payload: { scheduled_date, parent_id, completed_at, position: index, list_type, project_id } });
       for (let i = 0; i < newOrderedIds.length; i++) {
         if (newOrderedIds[i] !== movedTask.id) {
           updates.push({ id: newOrderedIds[i], payload: { position: i } });
@@ -200,40 +414,65 @@ export default function Dashboard() {
         }
       });
     },
-    [tasks, moveTask, updateTask]
+    [tasks, projects, moveTask, updateTask, reorderProjects]
   );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
+  const handleDragStart = useCallback((event) => {
+    setActiveDragId(event.active.id);
+  }, []);
+
+  const handleDragEndWithClear = useCallback(
+    async (event) => {
+      await handleDragEnd(event);
+      setActiveDragId(null);
+    },
+    [handleDragEnd]
+  );
+
+  const activeTask = activeDragId ? tasks.find((t) => t.id === activeDragId) : null;
+
   return (
-    <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={handleDragEnd}>
-    <div className="dashboard">
+    <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
+    <div className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''}`}>
       <header className="dashboard__header">
         <div className="dashboard__header-row">
           <div className="dashboard__top-left">
-            <select
-              value={settings.days_count}
-              onChange={(e) => setDaysCount(Number(e.target.value))}
-              className="dashboard__select"
-              aria-label="Количество дней"
+            <button
+              type="button"
+              className="dashboard__menu-btn"
+              onMouseEnter={() => hasHover && setMenuHover(true)}
+              onMouseLeave={() => hasHover && setMenuHover(false)}
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="Меню"
             >
-              {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-            <button type="button" className="dashboard__shift-btn" onMouseEnter={() => hasHover && setDateLeftHover(true)} onMouseLeave={() => hasHover && setDateLeftHover(false)} onClick={() => setDateOffset((o) => o - 1)} aria-label="Назад">
-              <img src={hasHover && dateLeftHover ? leftNavIcon : leftIcon} alt="" />
+              <img src={hasHover && menuHover ? menuNavIcon : menuIcon} alt="" />
             </button>
-            <button type="button" className="dashboard__shift-btn" onMouseEnter={() => hasHover && setDateRightHover(true)} onMouseLeave={() => hasHover && setDateRightHover(false)} onClick={() => setDateOffset((o) => o + 1)} aria-label="Вперёд">
-              <img src={hasHover && dateRightHover ? rightNavIcon : rightIcon} alt="" />
-            </button>
+            {(viewMode === 'plans') && (
+              <>
+                <select
+                  value={settings.days_count}
+                  onChange={(e) => setDaysCount(Number(e.target.value))}
+                  className="dashboard__select"
+                  aria-label="Количество дней"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <button type="button" className="dashboard__shift-btn" onMouseEnter={() => hasHover && setDateLeftHover(true)} onMouseLeave={() => hasHover && setDateLeftHover(false)} onClick={() => setDateOffset((o) => o - 1)} aria-label="Назад">
+                  <img src={hasHover && dateLeftHover ? leftNavIcon : leftIcon} alt="" />
+                </button>
+                <button type="button" className="dashboard__shift-btn" onMouseEnter={() => hasHover && setDateRightHover(true)} onMouseLeave={() => hasHover && setDateRightHover(false)} onClick={() => setDateOffset((o) => o + 1)} aria-label="Вперёд">
+                  <img src={hasHover && dateRightHover ? rightNavIcon : rightIcon} alt="" />
+                </button>
+              </>
+            )}
           </div>
           <div className="dashboard__header-actions">
-            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setBezdatHover(true)} onMouseLeave={() => hasHover && setBezdatHover(false)} onClick={() => setNoDateListVisible(!noDateListVisible)} aria-label={noDateListVisible ? 'Скрыть список без даты' : 'Показать список без даты'}>
-              <img src={hasHover && bezdatHover ? bezdatNavIcon : bezdatIcon} alt="" />
-            </button>
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={() => setCompletedVisible(!completedVisible)} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
@@ -246,6 +485,241 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
+
+      {menuOpen && (
+        isWideMenu ? (
+          <nav
+            className="dashboard-menu dashboard-menu--side"
+            style={{ width: '220px' }}
+          >
+            <button
+              type="button"
+              className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
+              onMouseEnter={() => hasHover && setTodayHover(true)}
+              onMouseLeave={() => hasHover && setTodayHover(false)}
+              onClick={() => handleMenuSelect('today')}
+            >
+              <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
+              <span>Сегодня</span>
+            </button>
+            <button
+              type="button"
+              className={`dashboard-menu__item ${viewMode === 'plans' ? 'dashboard-menu__item--active' : ''}`}
+              onMouseEnter={() => hasHover && setPlansHover(true)}
+              onMouseLeave={() => hasHover && setPlansHover(false)}
+              onClick={() => handleMenuSelect('plans')}
+            >
+              <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
+              <span>Планы</span>
+            </button>
+            <button
+              type="button"
+              className={`dashboard-menu__item ${viewMode === 'no_date' ? 'dashboard-menu__item--active' : ''}`}
+              onMouseEnter={() => hasHover && setNoDateHover(true)}
+              onMouseLeave={() => hasHover && setNoDateHover(false)}
+              onClick={() => handleMenuSelect('no_date')}
+            >
+              <img src={viewMode === 'no_date' || (hasHover && noDateHover) ? layersNavIcon : layersIcon} alt="" />
+              <span>Задачи без даты</span>
+            </button>
+            <button
+              type="button"
+              className={`dashboard-menu__item ${viewMode === 'someday' ? 'dashboard-menu__item--active' : ''}`}
+              onMouseEnter={() => hasHover && setSomedayHover(true)}
+              onMouseLeave={() => hasHover && setSomedayHover(false)}
+              onClick={() => handleMenuSelect('someday')}
+            >
+              <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
+              <span>Когда-нибудь</span>
+            </button>
+            <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+              {projects.map((p) => (
+                <SortableProjectItem
+                  key={p.id}
+                  project={p}
+                  isActive={viewMode === 'project' && activeProjectId === p.id}
+                  isHover={hasHover && projectHoverId === p.id}
+                  folderIcon={folderIcon}
+                  folderNavIcon={folderNavIcon}
+                  dragIcon={dragIcon}
+                  onClick={() => handleMenuSelect(p.id)}
+                  onMouseEnter={() => setProjectHoverId(p.id)}
+                  onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
+                />
+              ))}
+            </SortableContext>
+            <button
+              type="button"
+              className="dashboard-menu__add-project"
+              onClick={() => setAddProjectModalOpen(true)}
+              aria-label="Добавить проект"
+            >
+              +
+            </button>
+          </nav>
+        ) : (
+          <div className="dashboard-menu-overlay" onClick={() => setMenuOpen(false)}>
+            <nav
+              className="dashboard-menu"
+              style={{ width: '100%' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="dashboard-menu__close"
+                onClick={() => setMenuOpen(false)}
+                aria-label="Закрыть меню"
+              >
+                ×
+              </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setTodayHover(true)}
+                onMouseLeave={() => hasHover && setTodayHover(false)}
+                onClick={() => handleMenuSelect('today')}
+              >
+                <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
+                <span>Сегодня</span>
+              </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'plans' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setPlansHover(true)}
+                onMouseLeave={() => hasHover && setPlansHover(false)}
+                onClick={() => handleMenuSelect('plans')}
+              >
+                <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
+                <span>Планы</span>
+              </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'no_date' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setNoDateHover(true)}
+                onMouseLeave={() => hasHover && setNoDateHover(false)}
+                onClick={() => handleMenuSelect('no_date')}
+              >
+                <img src={viewMode === 'no_date' || (hasHover && noDateHover) ? layersNavIcon : layersIcon} alt="" />
+                <span>Задачи без даты</span>
+              </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'someday' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setSomedayHover(true)}
+                onMouseLeave={() => hasHover && setSomedayHover(false)}
+                onClick={() => handleMenuSelect('someday')}
+              >
+                <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
+                <span>Когда-нибудь</span>
+              </button>
+              <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+                {projects.map((p) => (
+                  <SortableProjectItem
+                    key={p.id}
+                    project={p}
+                    isActive={viewMode === 'project' && activeProjectId === p.id}
+                    isHover={hasHover && projectHoverId === p.id}
+                    folderIcon={folderIcon}
+                    folderNavIcon={folderNavIcon}
+                    dragIcon={dragIcon}
+                    onClick={() => handleMenuSelect(p.id)}
+                    onMouseEnter={() => setProjectHoverId(p.id)}
+                    onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
+                  />
+                ))}
+              </SortableContext>
+              <button
+                type="button"
+                className="dashboard-menu__add-project"
+                onClick={() => { setAddProjectModalOpen(true); setMenuOpen(false); }}
+                aria-label="Добавить проект"
+              >
+                +
+              </button>
+            </nav>
+          </div>
+        )
+      )}
+
+      {addProjectModalOpen && (
+        <div className="dashboard__settings-overlay" onClick={() => setAddProjectModalOpen(false)}>
+          <div className="dashboard__settings-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="dashboard__settings-title">Новый проект</div>
+            <input
+              type="text"
+              className="dashboard__settings-input"
+              value={addProjectTitle}
+              onChange={(e) => setAddProjectTitle(e.target.value)}
+              placeholder="Название проекта"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAddProjectSubmit(); }}
+            />
+            <button type="button" className="dashboard__settings-submit" onClick={handleAddProjectSubmit}>
+              Добавить проект
+            </button>
+          </div>
+        </div>
+      )}
+
+      {editProjectOpen && (
+        <div className="dashboard__settings-overlay" onClick={() => { setEditProjectOpen(false); setEditProjectId(null); setEditProjectTitle(''); }}>
+          <div className="dashboard__settings-popup dashboard__settings-popup--edit-project" onClick={(e) => e.stopPropagation()}>
+            <div className="dashboard__settings-title">Редактировать проект</div>
+            <input
+              type="text"
+              className="dashboard__settings-input"
+              value={editProjectTitle}
+              onChange={(e) => setEditProjectTitle(e.target.value)}
+              placeholder="Название проекта"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleEditProjectSave(); }}
+            />
+            <div className="dashboard__settings-edit-actions">
+              <button type="button" className="dashboard__settings-submit" onClick={handleEditProjectSave}>
+                Сохранить
+              </button>
+              <button type="button" className="dashboard__settings-delete" onClick={handleEditProjectDelete}>
+                Удалить проект
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {contextMenu && (
+        <>
+          <div className="dashboard__context-menu-backdrop" aria-hidden onClick={() => setContextMenu(null)} />
+          <div
+            className="dashboard__context-menu"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button type="button" className="dashboard__context-menu-item" onClick={() => handleMoveTaskToDestination({ type: 'today' })}>
+              <img src={starIcon} alt="" className="dashboard__context-menu-item-icon" />
+              <span>Сегодня</span>
+            </button>
+            <button type="button" className="dashboard__context-menu-item" onClick={() => handleMoveTaskToDestination({ type: 'no_date' })}>
+              <img src={layersIcon} alt="" className="dashboard__context-menu-item-icon" />
+              <span>Задачи без даты</span>
+            </button>
+            <button type="button" className="dashboard__context-menu-item" onClick={() => handleMoveTaskToDestination({ type: 'someday' })}>
+              <img src={archiveIcon} alt="" className="dashboard__context-menu-item-icon" />
+              <span>Когда-нибудь</span>
+            </button>
+            {projects.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="dashboard__context-menu-item"
+                onClick={() => handleMoveTaskToDestination({ type: 'project', projectId: p.id })}
+              >
+                <img src={folderIcon} alt="" className="dashboard__context-menu-item-icon" />
+                <span>{p.title}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {settingsOpen && (
         <div className="dashboard__settings-overlay" onClick={() => setSettingsOpen(false)}>
@@ -261,42 +735,94 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="dashboard__days">
-        {days.map((date) => (
-          <DayCard
-            key={date.toISOString().slice(0, 10)}
-            date={date}
-            tasks={tasks}
-            onToggle={handleToggle}
-            onUpdate={updateTask}
-            onDelete={deleteTask}
-            onAddTask={handleAddTask}
-            onAddSubtask={handleAddSubtask}
-            onAddAtStart={handleAddTaskAt}
-            recentCompletedIds={recentCompletedIds}
-            completedVisible={completedVisible}
-            getListCollapsed={getListCollapsed}
-            setListCollapsed={setListCollapsed}
-          />
-        ))}
-      </div>
+      {(viewMode === 'plans' || viewMode === 'today') && (
+        <div className="dashboard__days">
+          {days.map((date) => (
+            <DayCard
+              key={date.toISOString().slice(0, 10)}
+              date={date}
+              tasks={inboxTasks}
+              onToggle={handleToggle}
+              onUpdate={updateTask}
+              onDelete={deleteTask}
+              onAddTask={handleAddTask}
+              onAddSubtask={handleAddSubtask}
+              onAddAtStart={handleAddTaskAt}
+              onTaskContextMenu={handleTaskContextMenu}
+              recentCompletedIds={recentCompletedIds}
+              completedVisible={completedVisible}
+              getListCollapsed={getListCollapsed}
+              setListCollapsed={setListCollapsed}
+            />
+          ))}
+        </div>
+      )}
 
-      <NoDateList
-        tasks={tasks}
-        onToggle={handleToggle}
-        onUpdate={updateTask}
-        onDelete={deleteTask}
-        onAddSubtask={handleAddSubtask}
-        onAddAtStart={handleAddTaskAt}
-        visible={noDateListVisible}
-        completedVisible={completedVisible}
-        getListCollapsed={getListCollapsed}
-        setListCollapsed={setListCollapsed}
-      />
+      {viewMode === 'no_date' && (
+        <NoDateList
+          tasks={inboxTasks}
+          onToggle={handleToggle}
+          onUpdate={updateTask}
+          onDelete={deleteTask}
+          onAddSubtask={handleAddSubtask}
+          onAddAtStart={handleAddTaskAt}
+          onTaskContextMenu={handleTaskContextMenu}
+          visible
+          completedVisible={completedVisible}
+          getListCollapsed={getListCollapsed}
+          setListCollapsed={setListCollapsed}
+        />
+      )}
+
+      {viewMode === 'someday' && (
+        <SomedayList
+          tasks={tasks}
+          onToggle={handleToggle}
+          onUpdate={updateTask}
+          onDelete={deleteTask}
+          onAddSubtask={handleAddSubtask}
+          onAddAtStart={handleAddTaskAt}
+          onTaskContextMenu={handleTaskContextMenu}
+          completedVisible={completedVisible}
+          getListCollapsed={getListCollapsed}
+          setListCollapsed={setListCollapsed}
+        />
+      )}
+
+      {viewMode === 'project' && activeProjectId && (
+        <ProjectList
+          projectId={activeProjectId}
+          projectTitle={projects.find((p) => p.id === activeProjectId)?.title ?? 'Проект'}
+          tasks={tasks}
+          onToggle={handleToggle}
+          onUpdate={updateTask}
+          onDelete={deleteTask}
+          onAddSubtask={handleAddSubtask}
+          onAddAtStart={handleAddTaskAt}
+          onTaskContextMenu={handleTaskContextMenu}
+          onOpenEditProject={handleOpenEditProject}
+          completedVisible={completedVisible}
+          getListCollapsed={getListCollapsed}
+          setListCollapsed={setListCollapsed}
+        />
+      )}
 
       <button type="button" className="dashboard__refresh" onMouseEnter={() => hasHover && setRefreshHover(true)} onMouseLeave={() => hasHover && setRefreshHover(false)} onClick={() => window.location.reload()} aria-label="Обновить">
         <img src={hasHover && refreshHover ? refreshNavIcon : refreshIcon} alt="" />
       </button>
+
+      <DragOverlay dropAnimation={null}>
+        {activeTask ? (
+          <div className="draggable-task draggable-task--overlay" style={{ cursor: 'grabbing', pointerEvents: 'none' }}>
+            <div className="task-item task-item--overlay">
+              <div className="task-item__row">
+                <span className="task-item__checkbox task-item__checkbox--placeholder" aria-hidden />
+                <span className="task-item__title" style={{ color: activeTask.text_color || '#e0e0e0' }}>{activeTask.title}</span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </DragOverlay>
     </div>
     </DndContext>
   );

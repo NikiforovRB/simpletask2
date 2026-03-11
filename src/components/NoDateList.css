@@ -7,10 +7,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.5rem;
-  padding-bottom: 0.35rem;
-  border-bottom: 1px solid #2f2f2f;
+  margin-bottom: 0;
+  padding-bottom: 0;
   width: 100%;
+}
+
+.no-date-list__header-line {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  width: 100%;
+  border-bottom: 1px solid #2f2f2f;
 }
 
 .no-date-list__title-btn {
@@ -67,6 +73,37 @@
 
 .no-date-list__body {
   margin-top: 0.5rem;
+}
+
+.no-date-list__footer {
+  margin-top: 1rem;
+}
+
+/* Fixed to bottom when inside project list */
+.dashboard .no-date-list__footer {
+  position: fixed;
+  bottom: 20px;
+  left: 1rem;
+  margin-top: 0;
+  z-index: 5;
+}
+
+.dashboard--menu-open .no-date-list__footer {
+  left: calc(220px + 18px + 1rem);
+}
+
+.no-date-list__delete-project {
+  background: none;
+  border: none;
+  color: #666666;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  padding: 0.25rem 0;
+  font-family: inherit;
+}
+
+.no-date-list__delete-project:hover {
+  color: #5a86ee;
 }
 
 .no-date-list__completed-toggle {

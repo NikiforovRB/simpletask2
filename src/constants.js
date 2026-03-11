@@ -15,6 +15,14 @@ export const TASK_COLORS = [
 
 export const DEFAULT_TASK_COLOR = TASK_COLORS[0];
 
+/** YYYY-MM-DD in local time (avoids UTC shift with toISOString). */
+export function toLocalDateString(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 const MONTH_GENITIVE_RU = [
   'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
   'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',

@@ -1,17 +1,17 @@
-import { useDraggable } from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { TaskItem } from './TaskItem';
 import './DraggableTask.css';
 
-export function DraggableTask({ task, containerId, ...taskItemProps }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+export function SortableTask({ task, containerId, ...taskItemProps }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { task, containerId },
   });
 
   const style = isDragging
-    ? { opacity: 0 }
-    : (transform ? { transform: CSS.Translate.toString(transform) } : undefined);
+    ? { opacity: 0, transition }
+    : { ...(transform ? { transform: CSS.Translate.toString(transform) } : {}), transition };
 
   const dragHandleProps = { attributes, listeners };
 

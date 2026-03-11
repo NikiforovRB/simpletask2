@@ -17,3 +17,23 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   transition: none;
 }
+
+.draggable-task--overlay {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.draggable-task--overlay .task-item--overlay {
+  background: #1e1e1e;
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  min-width: 12rem;
+}
+
+.task-item__checkbox--placeholder {
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid #444;
+  border-radius: 3px;
+  display: inline-block;
+  flex-shrink: 0;
+}

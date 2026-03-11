@@ -59,12 +59,14 @@ export function useTasks() {
     });
   };
 
-  const moveTask = async (taskId, { scheduled_date, parent_id, position, completed_at }) => {
+  const moveTask = async (taskId, { scheduled_date, parent_id, position, completed_at, list_type, project_id }) => {
     const payload = {};
     if (scheduled_date !== undefined) payload.scheduled_date = scheduled_date;
     if (parent_id !== undefined) payload.parent_id = parent_id;
     if (position !== undefined) payload.position = position;
     if (completed_at !== undefined) payload.completed_at = completed_at;
+    if (list_type !== undefined) payload.list_type = list_type;
+    if (project_id !== undefined) payload.project_id = project_id;
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...payload } : t)));
     const { error } = await supabase.from('tasks').update(payload).eq('id', taskId);
     if (error) await fetchTasks();

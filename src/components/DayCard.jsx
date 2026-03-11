@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
-import { DraggableTask } from './DraggableTask';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
 import { getContainerId } from '../lib/dnd';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { DEFAULT_TASK_COLOR, formatDayLabel } from '../constants';
+import { DEFAULT_TASK_COLOR, formatDayLabel, toLocalDateString } from '../constants';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import './DayCard.css';
@@ -16,13 +17,14 @@ export function DayCard({
   onDelete,
   onAddTask,
   onAddSubtask,
+  onTaskContextMenu,
   recentCompletedIds,
   onAddAtStart,
   completedVisible,
   getListCollapsed,
   setListCollapsed,
 }) {
-  const dateStr = date.toISOString().slice(0, 10);
+  const dateStr = toLocalDateString(date);
   const dayKey = `day_${dateStr}`;
   const completedKey = `completed_${dateStr}`;
   const cardOpen = getListCollapsed ? !getListCollapsed(dayKey) : true;
@@ -74,21 +76,24 @@ export function DayCard({
         <>
       <div className="day-card__section">
             <ul className="day-card__list">
-              {mainTasks.map((task, i) => (
-                <li key={task.id}>
-                  <DropSlot id={getContainerId(dateStr, null, false)} index={i} />
-                  <DraggableTask
-                    task={task}
-                    containerId={getContainerId(dateStr, null, false)}
-                    subtasks={getSubtasks(task.id)}
-                    getSubtasks={getSubtasks}
-                    onToggle={onToggle}
-                    onUpdate={onUpdate}
-                    onDelete={onDelete}
-                    onAddSubtask={onAddSubtask}
-                  />
-                </li>
-              ))}
+              <SortableContext items={mainTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                {mainTasks.map((task, i) => (
+                  <li key={task.id}>
+                    <DropSlot id={getContainerId(dateStr, null, false)} index={i} />
+                    <SortableTask
+                      task={task}
+                      containerId={getContainerId(dateStr, null, false)}
+                      subtasks={getSubtasks(task.id)}
+                      getSubtasks={getSubtasks}
+                      onToggle={onToggle}
+                      onUpdate={onUpdate}
+                      onDelete={onDelete}
+                      onAddSubtask={onAddSubtask}
+                      onTaskContextMenu={onTaskContextMenu}
+                    />
+                  </li>
+                ))}
+              </SortableContext>
               <li><DropSlot id={getContainerId(dateStr, null, false)} index={mainTasks.length} /></li>
             </ul>
       </div>
@@ -100,23 +105,26 @@ export function DayCard({
         </button>
         {completedOpen && (
           <ul className="day-card__list day-card__list--completed">
-            {completedTasks.map((task, i) => (
-              <li key={task.id}>
-                <DropSlot id={getContainerId(dateStr, null, true)} index={i} />
-                <DraggableTask
-                  task={task}
-                  containerId={getContainerId(dateStr, null, true)}
-                  subtasks={getSubtasks(task.id)}
-                  getSubtasks={getSubtasks}
-                  isCompleted
-                  onToggle={onToggle}
-                  onUpdate={onUpdate}
-                  onDelete={onDelete}
-                  onAddSubtask={onAddSubtask}
-                  isRecentlyCompleted={recentCompletedIds.has(task.id)}
-                />
-              </li>
-            ))}
+            <SortableContext items={completedTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+              {completedTasks.map((task, i) => (
+                <li key={task.id}>
+                  <DropSlot id={getContainerId(dateStr, null, true)} index={i} />
+                  <SortableTask
+                    task={task}
+                    containerId={getContainerId(dateStr, null, true)}
+                    subtasks={getSubtasks(task.id)}
+                    getSubtasks={getSubtasks}
+                    isCompleted
+                    onToggle={onToggle}
+                    onUpdate={onUpdate}
+                    onDelete={onDelete}
+                    onAddSubtask={onAddSubtask}
+                    onTaskContextMenu={onTaskContextMenu}
+                    isRecentlyCompleted={recentCompletedIds.has(task.id)}
+                  />
+                </li>
+              ))}
+            </SortableContext>
             <li><DropSlot id={getContainerId(dateStr, null, true)} index={completedTasks.length} /></li>
           </ul>
         )}

@@ -2,24 +2,23 @@ import { useState, useMemo } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
-import { getContainerId } from '../lib/dnd';
+import { getContainerIdForBucket } from '../lib/dnd';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DEFAULT_TASK_COLOR } from '../constants';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import './NoDateList.css';
 
-const NO_DATE_KEY = 'no_date';
-const NO_DATE_COMPLETED_KEY = 'completed_no_date';
-
-export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, visible, completedVisible, getListCollapsed, setListCollapsed }) {
-  const open = getListCollapsed ? !getListCollapsed(NO_DATE_KEY) : true;
-  const completedOpen = getListCollapsed ? !getListCollapsed(NO_DATE_COMPLETED_KEY) : true;
+export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onOpenEditProject, onTaskContextMenu, completedVisible, getListCollapsed, setListCollapsed }) {
+  const PROJECT_KEY = `project_${projectId}`;
+  const PROJECT_COMPLETED_KEY = `completed_project_${projectId}`;
+  const open = getListCollapsed ? !getListCollapsed(PROJECT_KEY) : true;
+  const completedOpen = getListCollapsed ? !getListCollapsed(PROJECT_COMPLETED_KEY) : true;
   const [plusHover, setPlusHover] = useState(false);
   const hasHover = useMediaQuery('(hover: hover)');
 
-  const toggleOpen = () => setListCollapsed?.(NO_DATE_KEY, !getListCollapsed(NO_DATE_KEY));
-  const toggleCompleted = () => setListCollapsed?.(NO_DATE_COMPLETED_KEY, !getListCollapsed(NO_DATE_COMPLETED_KEY));
+  const toggleOpen = () => setListCollapsed?.(PROJECT_KEY, !getListCollapsed(PROJECT_KEY));
+  const toggleCompleted = () => setListCollapsed?.(PROJECT_COMPLETED_KEY, !getListCollapsed(PROJECT_COMPLETED_KEY));
 
   const byParent = useMemo(() => {
     const map = new Map();
@@ -31,28 +30,34 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
     return map;
   }, [tasks]);
 
+  const projectIdStr = String(projectId);
   const mainTasks = useMemo(
-    () => tasks.filter((t) => !t.parent_id && !t.completed_at && !t.scheduled_date && (t.list_type || 'inbox') === 'inbox').sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
-    [tasks]
+    () => tasks.filter((t) => !t.parent_id && !t.completed_at && (t.list_type || '') === 'project' && String(t.project_id) === projectIdStr).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    [tasks, projectIdStr]
   );
   const completedTasks = useMemo(
-    () => tasks.filter((t) => !t.parent_id && t.completed_at && !t.scheduled_date && (t.list_type || 'inbox') === 'inbox').sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
-    [tasks]
+    () => tasks.filter((t) => !t.parent_id && t.completed_at && (t.list_type || '') === 'project' && String(t.project_id) === projectIdStr).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    [tasks, projectIdStr]
   );
 
   const getSubtasks = (parentId) => (byParent.get(parentId) || []).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
+  const mainContainerId = getContainerIdForBucket('project', projectId, false);
+  const completedContainerId = getContainerIdForBucket('project', projectId, true);
+
   const handleAddAtStart = () => {
-    onAddAtStart?.({ scheduled_date: null, text_color: DEFAULT_TASK_COLOR });
+    onAddAtStart?.({ list_type: 'project', project_id: projectId, text_color: DEFAULT_TASK_COLOR });
   };
 
-  if (!visible) return null;
+  const handleOpenEdit = () => {
+    onOpenEditProject?.(projectId, projectTitle);
+  };
 
   return (
     <section className="no-date-list">
       <div className="no-date-list__header">
         <button type="button" className="no-date-list__title-btn" onClick={toggleOpen}>
-          Задачи без даты
+          {projectTitle}
         </button>
         <button type="button" className="no-date-list__icon-btn no-date-list__icon-btn--plus" onMouseEnter={() => hasHover && setPlusHover(true)} onMouseLeave={() => hasHover && setPlusHover(false)} onClick={handleAddAtStart} aria-label="Добавить задачу">
           <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
@@ -65,10 +70,10 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
             <SortableContext items={mainTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               {mainTasks.map((task, i) => (
                 <li key={task.id}>
-                  <DropSlot id={getContainerId(null, null, false)} index={i} />
+                  <DropSlot id={mainContainerId} index={i} />
                   <SortableTask
                     task={task}
-                    containerId={getContainerId(null, null, false)}
+                    containerId={mainContainerId}
                     subtasks={getSubtasks(task.id)}
                     getSubtasks={getSubtasks}
                     onToggle={onToggle}
@@ -80,7 +85,7 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
               </li>
             ))}
             </SortableContext>
-            <li><DropSlot id={getContainerId(null, null, false)} index={mainTasks.length} /></li>
+            <li><DropSlot id={mainContainerId} index={mainTasks.length} /></li>
           </ul>
           {completedVisible && completedTasks.length > 0 && (
             <>
@@ -90,10 +95,10 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
                 <SortableContext items={completedTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                   {completedTasks.map((task, i) => (
                     <li key={task.id}>
-                      <DropSlot id={getContainerId(null, null, true)} index={i} />
+                      <DropSlot id={completedContainerId} index={i} />
                       <SortableTask
                         task={task}
-                        containerId={getContainerId(null, null, true)}
+                        containerId={completedContainerId}
                         subtasks={getSubtasks(task.id)}
                         getSubtasks={getSubtasks}
                         isCompleted
@@ -106,13 +111,18 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
                     </li>
                   ))}
                 </SortableContext>
-                <li><DropSlot id={getContainerId(null, null, true)} index={completedTasks.length} /></li>
+                <li><DropSlot id={completedContainerId} index={completedTasks.length} /></li>
               </ul>
               )}
             </>
           )}
         </div>
       )}
+      <div className="no-date-list__footer">
+        <button type="button" className="no-date-list__delete-project" onClick={handleOpenEdit}>
+          Редактировать проект
+        </button>
+      </div>
     </section>
   );
 }

@@ -2,22 +2,12 @@
   min-height: 8px;
   padding: 6px 0;
   position: relative;
-  transition: background 0.15s ease;
+  transition: background 0.2s ease, min-height 0.2s ease;
+  border-radius: 6px;
 }
 
 .drop-slot--over {
   outline: none;
-}
-
-.drop-slot--over::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  margin-top: -0.5px;
-  height: 1px;
-  background: #5a86ee;
-  z-index: 1;
-  pointer-events: none;
+  background: #17223c;
+  min-height: 48px;
 }

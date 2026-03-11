@@ -40,6 +40,7 @@ export function TaskItem({
   onUpdate,
   onDelete,
   onAddSubtask,
+  onTaskContextMenu,
   isRecentlyCompleted,
   getSubtasks,
   dragHandleProps,
@@ -116,10 +117,18 @@ export function TaskItem({
     ? (isParent ? (hasHover && checkHover ? chpCompNavIcon : chpCompIcon) : (hasHover && checkHover ? kvCompleteNavIcon : kvCompleteIcon))
     : (isParent ? (hasHover && checkHover ? chpNavIcon : chpIcon) : (hasHover && checkHover ? kvNavIcon : kvIcon));
 
+  const handleContextMenu = (e) => {
+    if (onTaskContextMenu) {
+      e.preventDefault();
+      onTaskContextMenu(e, task);
+    }
+  };
+
   return (
     <div
       className={`task-item ${isCompleted ? 'task-item--completed' : ''} ${isRecentlyCompleted ? 'task-item--entering' : ''} task-item--top-${topStyle} ${editing ? 'task-item--editing' : ''}`}
       data-task-id={task.id}
+      onContextMenu={handleContextMenu}
     >
       <div className="task-item__row">
         <button
@@ -229,7 +238,15 @@ export function TaskItem({
                 <div className="task-item__calendar-popover">
                   <CalendarPopover
                     value={task.scheduled_date}
-                    onChange={(dateStr) => { onUpdate(task.id, { scheduled_date: dateStr }); setCalendarOpen(false); }}
+                    onChange={(dateStr) => {
+                      const next = { scheduled_date: dateStr };
+                      if ((task.list_type || 'inbox') !== 'inbox' || task.project_id) {
+                        next.list_type = 'inbox';
+                        next.project_id = null;
+                      }
+                      onUpdate(task.id, next);
+                      setCalendarOpen(false);
+                    }}
                     onClose={() => setCalendarOpen(false)}
                   />
                 </div>
@@ -289,6 +306,7 @@ export function TaskItem({
                 onUpdate={onUpdate}
                 onDelete={onDelete}
                 onAddSubtask={onAddSubtask}
+                onTaskContextMenu={onTaskContextMenu}
                 getSubtasks={getSubtasks}
               />
             </li>
