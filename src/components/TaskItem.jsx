@@ -120,6 +120,7 @@ export function TaskItem({
   const handleContextMenu = (e) => {
     if (onTaskContextMenu) {
       e.preventDefault();
+      e.stopPropagation();
       onTaskContextMenu(e, task);
     }
   };

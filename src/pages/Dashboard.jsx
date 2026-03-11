@@ -40,6 +40,7 @@ import settingsIcon from '../assets/settings.svg';
 import settingsNavIcon from '../assets/settings-nav.svg';
 import refreshIcon from '../assets/refresh.svg';
 import refreshNavIcon from '../assets/refresh-nav.svg';
+import deleteNavIcon from '../assets/delete-nav2.svg';
 import './Dashboard.css';
 
 function getDays(baseDate, count) {
@@ -200,17 +201,27 @@ export default function Dashboard() {
     }
   }, [editProjectId, editProjectTitle, updateProject]);
 
-  const handleEditProjectDelete = useCallback(() => {
+  const [deleteProjectConfirmOpen, setDeleteProjectConfirmOpen] = useState(false);
+
+  const handleEditProjectDeleteClick = useCallback(() => {
     if (!editProjectId) return;
-    if (window.confirm('Удалить проект и все его задачи?')) {
-      deleteProject(editProjectId);
-      setViewMode('plans');
-      setActiveProjectId(null);
-      setEditProjectOpen(false);
-      setEditProjectId(null);
-      setEditProjectTitle('');
-    }
+    setDeleteProjectConfirmOpen(true);
+  }, [editProjectId]);
+
+  const handleConfirmDeleteProject = useCallback(() => {
+    if (!editProjectId) return;
+    deleteProject(editProjectId);
+    setViewMode('plans');
+    setActiveProjectId(null);
+    setEditProjectOpen(false);
+    setEditProjectId(null);
+    setEditProjectTitle('');
+    setDeleteProjectConfirmOpen(false);
   }, [editProjectId, deleteProject]);
+
+  const handleCancelDeleteProject = useCallback(() => {
+    setDeleteProjectConfirmOpen(false);
+  }, []);
 
   const handleTaskContextMenu = useCallback((e, task) => {
     e.preventDefault();
@@ -264,6 +275,12 @@ export default function Dashboard() {
     },
     [contextMenu, getTargetPayload, tasks, moveTask, updateTask]
   );
+
+  const handleContextMenuDelete = useCallback(() => {
+    if (!contextMenu?.task) return;
+    deleteTask(contextMenu.task.id);
+    setContextMenu(null);
+  }, [contextMenu, deleteTask]);
 
 
   const today = new Date();
@@ -678,8 +695,25 @@ export default function Dashboard() {
               <button type="button" className="dashboard__settings-submit" onClick={handleEditProjectSave}>
                 Сохранить
               </button>
-              <button type="button" className="dashboard__settings-delete" onClick={handleEditProjectDelete}>
+              <button type="button" className="dashboard__settings-delete" onClick={handleEditProjectDeleteClick}>
                 Удалить проект
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteProjectConfirmOpen && (
+        <div className="dashboard__settings-overlay" onClick={handleCancelDeleteProject}>
+          <div className="dashboard__settings-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="dashboard__settings-title">Удалить проект?</div>
+            <p className="dashboard__confirm-text">Все задачи в этом проекте также будут удалены.</p>
+            <div className="dashboard__settings-edit-actions">
+              <button type="button" className="dashboard__settings-submit" onClick={handleCancelDeleteProject}>
+                Отмена
+              </button>
+              <button type="button" className="dashboard__settings-delete" onClick={handleConfirmDeleteProject}>
+                Да, удалить проект
               </button>
             </div>
           </div>
@@ -717,6 +751,10 @@ export default function Dashboard() {
                 <span>{p.title}</span>
               </button>
             ))}
+            <button type="button" className="dashboard__context-menu-item dashboard__context-menu-item--danger" onClick={handleContextMenuDelete}>
+              <img src={deleteNavIcon} alt="" className="dashboard__context-menu-item-icon" />
+              <span>Удалить</span>
+            </button>
           </div>
         </>
       )}
