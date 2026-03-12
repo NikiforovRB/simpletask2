@@ -183,6 +183,7 @@ export function TaskItem({
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             autoFocus
+            style={{ color: isCompleted ? '#666' : color }}
             rows={1}
           />
         ) : (
