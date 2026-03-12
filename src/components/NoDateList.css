@@ -106,6 +106,34 @@
   color: #5a86ee;
 }
 
+.no-date-list__edit-project-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: #1e1e1e;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 200ms ease, transform 200ms ease;
+}
+
+.no-date-list__edit-project-btn img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
+.no-date-list__edit-project-btn:hover {
+  background: #141414;
+}
+
+.no-date-list__edit-project-btn:active {
+  transform: translateY(1px);
+}
+
 .no-date-list__completed-toggle {
   display: block;
   width: 100%;

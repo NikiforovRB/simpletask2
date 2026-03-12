@@ -9,9 +9,13 @@ export function SortableTask({ task, containerId, ...taskItemProps }) {
     data: { task, containerId },
   });
 
+  const slowTransition = transition
+    ? transition.replace(/(\d+)ms/g, (_, ms) => `${Math.round(Number(ms) * 1.9)}ms`)
+    : 'transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1)';
+
   const style = isDragging
-    ? { opacity: 0, transition }
-    : { ...(transform ? { transform: CSS.Translate.toString(transform) } : {}), transition };
+    ? { opacity: 0, transition: slowTransition }
+    : { ...(transform ? { transform: CSS.Translate.toString(transform) } : {}), transition: slowTransition };
 
   const dragHandleProps = { attributes, listeners };
 

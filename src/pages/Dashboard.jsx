@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -90,8 +90,8 @@ function getTasksInContainer(tasks, containerId) {
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 }
 
-function SortableProjectItem({ project, isActive, isHover, folderIcon, folderNavIcon, dragIcon, onClick, onMouseEnter, onMouseLeave }) {
-  const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: project.id });
+function SortableProjectItem({ project, isActive, isHover, folderIcon, folderNavIcon, dragIcon, onClick, onMouseEnter, onMouseLeave, disableDrag }) {
+  const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: project.id, disabled: !!disableDrag });
   const icon = (isActive || isHover) ? folderNavIcon : folderIcon;
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -109,9 +109,11 @@ function SortableProjectItem({ project, isActive, isHover, folderIcon, folderNav
         <img src={icon} alt="" />
         <span>{project.title}</span>
       </button>
-      <span className="dashboard-menu__project-drag-handle" {...attributes} {...listeners} aria-label="Переместить">
-        <img src={dragIcon} alt="" />
-      </span>
+      {!disableDrag && (
+        <span className="dashboard-menu__project-drag-handle" {...attributes} {...listeners} aria-label="Переместить">
+          <img src={dragIcon} alt="" />
+        </span>
+      )}
     </div>
   );
 }
@@ -139,9 +141,30 @@ export default function Dashboard() {
   const [recentCompletedIds, setRecentCompletedIds] = useState(new Set());
   const noDateListVisible = settings.no_date_list_visible !== false;
   const completedVisible = settings.completed_visible !== false;
-  const [viewMode, setViewMode] = useState('plans'); // 'today' | 'plans' | 'no_date' | 'someday' | 'project'
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dashboard_view_state');
+      if (!raw) return 'plans';
+      const parsed = JSON.parse(raw);
+      const v = parsed?.viewMode;
+      return ['today', 'plans', 'no_date', 'someday', 'project'].includes(v) ? v : 'plans';
+    } catch {
+      return 'plans';
+    }
+  }); // 'today' | 'plans' | 'no_date' | 'someday' | 'project'
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeProjectId, setActiveProjectId] = useState(null);
+  const [mobileMenuClosing, setMobileMenuClosing] = useState(false);
+  const mobileMenuCloseTimeoutRef = useRef(null);
+  const [activeProjectId, setActiveProjectId] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dashboard_view_state');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.activeProjectId ?? null;
+    } catch {
+      return null;
+    }
+  });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dateLeftHover, setDateLeftHover] = useState(false);
   const [dateRightHover, setDateRightHover] = useState(false);
@@ -165,6 +188,52 @@ export default function Dashboard() {
   const hasHover = useMediaQuery('(hover: hover)');
   const isWideMenu = useMediaQuery('(min-width: 600px)');
 
+  const closeMenu = useCallback(() => {
+    if (mobileMenuCloseTimeoutRef.current) {
+      clearTimeout(mobileMenuCloseTimeoutRef.current);
+      mobileMenuCloseTimeoutRef.current = null;
+    }
+    setMobileMenuClosing(true);
+    setMenuOpen(false);
+    mobileMenuCloseTimeoutRef.current = setTimeout(() => {
+      setMobileMenuClosing(false);
+      mobileMenuCloseTimeoutRef.current = null;
+    }, 360);
+  }, []);
+
+  const openMenu = useCallback(() => {
+    if (mobileMenuCloseTimeoutRef.current) {
+      clearTimeout(mobileMenuCloseTimeoutRef.current);
+      mobileMenuCloseTimeoutRef.current = null;
+    }
+    setMobileMenuClosing(false);
+    setMenuOpen(true);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (mobileMenuCloseTimeoutRef.current) clearTimeout(mobileMenuCloseTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('dashboard_view_state', JSON.stringify({ viewMode, activeProjectId }));
+    } catch {}
+  }, [viewMode, activeProjectId]);
+
+  useEffect(() => {
+    if (viewMode !== 'project') return;
+    if (!activeProjectId) {
+      setViewMode('plans');
+      return;
+    }
+    if (projects.length && !projects.some((p) => p.id === activeProjectId)) {
+      setViewMode('plans');
+      setActiveProjectId(null);
+    }
+  }, [viewMode, activeProjectId, projects]);
+
   const handleMenuSelect = useCallback((viewModeOrProject) => {
     const isViewMode = ['today', 'plans', 'no_date', 'someday'].includes(viewModeOrProject);
     if (isViewMode) {
@@ -174,8 +243,8 @@ export default function Dashboard() {
       setViewMode('project');
       setActiveProjectId(viewModeOrProject);
     }
-    if (!isWideMenu) setMenuOpen(false);
-  }, [isWideMenu]);
+    if (!isWideMenu) closeMenu();
+  }, [isWideMenu, closeMenu]);
 
   const handleAddProjectSubmit = useCallback(() => {
     const title = addProjectTitle.trim();
@@ -463,7 +532,7 @@ export default function Dashboard() {
               className="dashboard__menu-btn"
               onMouseEnter={() => hasHover && setMenuHover(true)}
               onMouseLeave={() => hasHover && setMenuHover(false)}
-              onClick={() => setMenuOpen((v) => !v)}
+              onClick={() => (menuOpen ? closeMenu() : openMenu())}
               aria-label="Меню"
             >
               <img src={hasHover && menuHover ? menuNavIcon : menuIcon} alt="" />
@@ -503,10 +572,10 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {menuOpen && (
+      {(menuOpen || mobileMenuClosing) && (
         isWideMenu ? (
           <nav
-            className="dashboard-menu dashboard-menu--side"
+            className={`dashboard-menu dashboard-menu--side ${!menuOpen && mobileMenuClosing ? 'dashboard-menu--closing' : ''}`}
             style={{ width: '220px' }}
           >
             <button
@@ -575,30 +644,32 @@ export default function Dashboard() {
             </button>
           </nav>
         ) : (
-          <div className="dashboard-menu-overlay" onClick={() => setMenuOpen(false)}>
+          <div className={`dashboard-menu-overlay ${mobileMenuClosing ? 'dashboard-menu-overlay--closing' : ''}`} onClick={closeMenu}>
             <nav
-              className="dashboard-menu"
+              className={`dashboard-menu dashboard-menu--mobile ${mobileMenuClosing ? 'dashboard-menu--closing' : ''}`}
               style={{ width: '100%' }}
               onClick={(e) => e.stopPropagation()}
             >
-              <button
-                type="button"
-                className="dashboard-menu__close"
-                onClick={() => setMenuOpen(false)}
-                aria-label="Закрыть меню"
-              >
-                ×
-              </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setTodayHover(true)}
-                onMouseLeave={() => hasHover && setTodayHover(false)}
-                onClick={() => handleMenuSelect('today')}
-              >
-                <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
-                <span>Сегодня</span>
-              </button>
+              <div className="dashboard-menu__mobile-top">
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setTodayHover(true)}
+                  onMouseLeave={() => hasHover && setTodayHover(false)}
+                  onClick={() => handleMenuSelect('today')}
+                >
+                  <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
+                  <span>Сегодня</span>
+                </button>
+                <button
+                  type="button"
+                  className="dashboard-menu__close"
+                  onClick={closeMenu}
+                  aria-label="Закрыть меню"
+                >
+                  ×
+                </button>
+              </div>
               <button
                 type="button"
                 className={`dashboard-menu__item ${viewMode === 'plans' ? 'dashboard-menu__item--active' : ''}`}
@@ -639,6 +710,7 @@ export default function Dashboard() {
                     folderIcon={folderIcon}
                     folderNavIcon={folderNavIcon}
                     dragIcon={dragIcon}
+                    disableDrag
                     onClick={() => handleMenuSelect(p.id)}
                     onMouseEnter={() => setProjectHoverId(p.id)}
                     onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
@@ -648,10 +720,11 @@ export default function Dashboard() {
               <button
                 type="button"
                 className="dashboard-menu__add-project"
-                onClick={() => { setAddProjectModalOpen(true); setMenuOpen(false); }}
+                onClick={() => { setAddProjectModalOpen(true); closeMenu(); }}
                 aria-label="Добавить проект"
               >
                 +
+                <span className="dashboard-menu__add-project-text">Добавить проект</span>
               </button>
             </nav>
           </div>

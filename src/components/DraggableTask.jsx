@@ -9,9 +9,10 @@ export function DraggableTask({ task, containerId, ...taskItemProps }) {
     data: { task, containerId },
   });
 
+  const slowTransition = 'transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1)';
   const style = isDragging
     ? { opacity: 0 }
-    : (transform ? { transform: CSS.Translate.toString(transform) } : undefined);
+    : (transform ? { transform: CSS.Translate.toString(transform), transition: slowTransition } : undefined);
 
   const dragHandleProps = { attributes, listeners };
 

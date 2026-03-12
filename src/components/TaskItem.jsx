@@ -19,6 +19,8 @@ import calendarNavIcon from '../assets/calendar-nav.svg';
 import lineIcon from '../assets/line.svg';
 import lineNavIcon from '../assets/line-nav.svg';
 import dragIcon from '../assets/drag.svg';
+import editIcon from '../assets/edit.svg';
+import editNavIcon from '../assets/edit-nav.svg';
 import upIcon from '../assets/up.svg';
 import upNavIcon from '../assets/up-nav.svg';
 import downIcon from '../assets/down.svg';
@@ -101,6 +103,8 @@ export function TaskItem({
   const [lightningHover, setLightningHover] = useState(false);
 
   const hasHover = useMediaQuery('(hover: hover)');
+  const isNarrowActions = useMediaQuery('(max-width: 499px)');
+  const [ctxHover, setCtxHover] = useState(false);
   const showLightning = (isCompleted && color === RED_COLOR) || (!isCompleted && color === RED_COLOR);
   const isParentTask = !task.parent_id;
 
@@ -123,6 +127,21 @@ export function TaskItem({
       e.stopPropagation();
       onTaskContextMenu(e, task);
     }
+  };
+
+  const openContextMenuFromButton = (e) => {
+    if (!onTaskContextMenu) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    onTaskContextMenu(
+      {
+        clientX: rect.left,
+        clientY: rect.bottom,
+        preventDefault() {},
+      },
+      task
+    );
   };
 
   return (
@@ -202,6 +221,18 @@ export function TaskItem({
                   <img src={hasHover && podHover ? podNavIcon : podIcon} alt="" />
                 </button>
               )}
+              {isNarrowActions && (
+                <button
+                  type="button"
+                  className="task-item__action-btn"
+                  onMouseEnter={() => hasHover && setCtxHover(true)}
+                  onMouseLeave={() => hasHover && setCtxHover(false)}
+                  onClick={openContextMenuFromButton}
+                  aria-label="Меню"
+                >
+                  <img src={hasHover && ctxHover ? editNavIcon : editIcon} alt="" />
+                </button>
+              )}
               <button
                 type="button"
                 className="task-item__color-btn"
@@ -220,6 +251,18 @@ export function TaskItem({
                 <img src={hasHover && lineHover ? lineNavIcon : lineIcon} alt="" />
               </button>
             </>
+          )}
+          {isCompleted && isNarrowActions && (
+            <button
+              type="button"
+              className="task-item__action-btn"
+              onMouseEnter={() => hasHover && setCtxHover(true)}
+              onMouseLeave={() => hasHover && setCtxHover(false)}
+              onClick={openContextMenuFromButton}
+              aria-label="Меню"
+            >
+              <img src={hasHover && ctxHover ? editNavIcon : editIcon} alt="" />
+            </button>
           )}
           {isParentTask && (
           <div className="task-item__calendar-wrap">

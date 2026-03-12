@@ -4,6 +4,8 @@
   color: #e0e0e0;
   padding: 1rem;
   padding-bottom: 3rem;
+  padding-left: 18px;
+  transition: padding-left 360ms ease;
 }
 
 .dashboard__header {
@@ -27,7 +29,7 @@
 .dashboard__menu-btn {
   width: 2.25rem;
   height: 2.25rem;
-  background: #1e1e1e;
+  background: transparent;
   border: none;
   padding: 0;
   cursor: pointer;
@@ -336,17 +338,33 @@
   gap: 0.25rem;
 }
 
+.dashboard-menu--mobile {
+  animation: dashboardMenuSlideIn 360ms ease both;
+}
+
+.dashboard-menu--closing {
+  animation: dashboardMenuSlideOut 360ms ease both;
+}
+
+.dashboard-menu-overlay--closing {
+  animation: dashboardMenuOverlayFadeOut 360ms ease both;
+}
+
+.dashboard-menu__mobile-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .dashboard-menu:not(.dashboard-menu--side) {
   position: relative;
-  padding-top: 2.5rem;
+  padding-top: 1rem;
 }
 
 .dashboard-menu__close {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 2rem;
-  height: 2rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border: none;
   background: none;
   color: #666666;
@@ -366,6 +384,79 @@
   top: 0;
   bottom: 0;
   z-index: 90;
+  animation: dashboardMenuSlideIn 360ms ease both;
+}
+
+.dashboard-menu--side.dashboard-menu--closing {
+  animation: dashboardMenuSlideOut 360ms ease both;
+}
+
+@keyframes dashboardMenuSlideIn {
+  from { transform: translateX(-14px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes dashboardMenuSlideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-14px); opacity: 0; }
+}
+
+@keyframes dashboardMenuOverlayFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (max-width: 599px) {
+  .dashboard-menu__item {
+    font-size: 1.8rem;
+    padding: 1.05rem 0.6rem;
+    gap: 1rem;
+  }
+
+  .dashboard-menu__item img {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .dashboard-menu__close {
+    width: 3.5rem;
+    height: 3.5rem;
+    font-size: 2.1rem;
+  }
+
+  .dashboard-menu__add-project {
+    position: static;
+    left: auto;
+    bottom: auto;
+    width: fit-content;
+    height: auto;
+    font-size: 2.25rem;
+    line-height: 1;
+    margin: 1rem auto 0;
+    padding: 0.6rem 1rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: #e0e0e0;
+    transition: background 260ms ease, transform 260ms ease;
+  }
+
+  .dashboard-menu__add-project:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .dashboard-menu__add-project:active {
+    transform: translateY(1px);
+  }
+
+  .dashboard-menu__add-project-text {
+    display: inline;
+    font-size: 1.125rem;
+    color: #e0e0e0;
+  }
 }
 
 .dashboard-menu__item {
@@ -381,10 +472,17 @@
   cursor: pointer;
   text-align: left;
   font-family: inherit;
+  border-radius: 8px;
+  transition: background 260ms ease, color 260ms ease, transform 260ms ease;
 }
 
 .dashboard-menu__item:hover {
   color: #5A86EE;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dashboard-menu__item:active {
+  transform: translateY(1px);
 }
 
 .dashboard-menu__item img {
@@ -395,6 +493,7 @@
 
 .dashboard-menu__item--active {
   color: #5A86EE;
+  background: rgba(90, 134, 238, 0.12);
 }
 
 .dashboard-menu__divider {
@@ -419,6 +518,10 @@
 
 .dashboard-menu__add-project:hover {
   color: #5a86ee;
+}
+
+.dashboard-menu__add-project-text {
+  display: none;
 }
 
 .dashboard-menu__project-row {
@@ -459,4 +562,43 @@
 
 .dashboard-menu__project-row--dragging .dashboard-menu__project-drag-handle {
   opacity: 1;
+}
+
+@media (max-width: 599px) {
+  .dashboard-menu__add-project {
+    position: fixed;
+    left: 50%;
+    bottom: 40px;
+    transform: translateX(-50%);
+    width: auto;
+    height: auto;
+    font-size: 1rem;
+    line-height: 1;
+    margin: 0;
+    padding: 0.5rem 0.9rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: #666666;
+    transition: background 260ms ease, transform 260ms ease;
+    z-index: 95;
+  }
+
+  .dashboard-menu__add-project:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #5A86EE;
+  }
+
+  .dashboard-menu__add-project:active {
+    transform: translateY(1px);
+  }
+
+  .dashboard-menu__add-project-text {
+    display: inline;
+    font-size: 0.95rem;
+    color: #666666;
+  }
 }
