@@ -196,11 +196,14 @@
 .task-item__input {
   flex: 1;
   background: transparent;
-  border: 1px solid #333;
+  border: none;
   color: #e0e0e0;
-  padding: 0.2rem 0.4rem;
+  padding: 0.2rem 0;
+  padding-left: 0;
   font-size: 0.9375rem;
-  border-radius: 2px;
+  font-family: inherit;
+  font-weight: inherit;
+  line-height: inherit;
 }
 
 .task-item__input--multiline {
@@ -211,15 +214,9 @@
   word-wrap: break-word;
 }
 
-@media (max-width: 768px) {
-  .task-item__input {
-    font-size: 16px;
-  }
-}
-
 .task-item__input:focus {
   outline: none;
-  border-color: #555;
+  border: none;
 }
 
 .task-item__color-btn {

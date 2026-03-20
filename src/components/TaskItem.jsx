@@ -68,6 +68,7 @@ export function TaskItem({
   };
 
   const inputRef = useRef(null);
+  const pendingCaretOffsetRef = useRef(null);
 
   const resizeInput = () => {
     const el = inputRef.current;
@@ -77,7 +78,19 @@ export function TaskItem({
   };
 
   useEffect(() => {
-    if (editing) resizeInput();
+    if (editing) {
+      resizeInput();
+      const el = inputRef.current;
+      const pending = pendingCaretOffsetRef.current;
+      if (el && pending != null) {
+        const safe = Math.max(0, Math.min(pending, editTitle.length));
+        requestAnimationFrame(() => {
+          if (!inputRef.current) return;
+          inputRef.current.setSelectionRange(safe, safe);
+        });
+      }
+      pendingCaretOffsetRef.current = null;
+    }
   }, [editing, editTitle]);
 
   const handleInputResize = (e) => {
@@ -88,6 +101,24 @@ export function TaskItem({
 
   const handleComplete = () => {
     onToggle(task);
+  };
+
+  const getCaretOffsetFromPoint = (event) => {
+    const x = event.clientX;
+    const y = event.clientY;
+    try {
+      if (document.caretPositionFromPoint) {
+        const pos = document.caretPositionFromPoint(x, y);
+        if (pos && typeof pos.offset === 'number') return pos.offset;
+      }
+      if (document.caretRangeFromPoint) {
+        const range = document.caretRangeFromPoint(x, y);
+        if (range && typeof range.startOffset === 'number') return range.startOffset;
+      }
+    } catch {
+      return null;
+    }
+    return null;
   };
 
   const isParent = subtasks.length > 0;
@@ -190,7 +221,12 @@ export function TaskItem({
           <span
             className={`task-item__title ${isCompleted ? 'task-item__title--completed' : ''}`}
             style={{ color: isCompleted ? '#666' : color }}
-            onClick={() => { setEditTitle(task.title); setEditing(true); }}
+            onClick={(e) => {
+              const caretOffset = getCaretOffsetFromPoint(e);
+              pendingCaretOffsetRef.current = Number.isFinite(caretOffset) ? caretOffset : null;
+              setEditTitle(task.title);
+              setEditing(true);
+            }}
           >
             {displayTitle}
           </span>
