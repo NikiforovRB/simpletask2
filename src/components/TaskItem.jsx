@@ -74,7 +74,8 @@ export function TaskItem({
     const el = inputRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.max(el.scrollHeight, 24)}px`;
+    const lineHeight = parseFloat(window.getComputedStyle(el).lineHeight) || 24;
+    el.style.height = `${Math.max(el.scrollHeight, lineHeight)}px`;
   };
 
   useEffect(() => {
@@ -96,7 +97,8 @@ export function TaskItem({
   const handleInputResize = (e) => {
     const el = e.target;
     el.style.height = 'auto';
-    el.style.height = `${Math.max(el.scrollHeight, 24)}px`;
+    const lineHeight = parseFloat(window.getComputedStyle(el).lineHeight) || 24;
+    el.style.height = `${Math.max(el.scrollHeight, lineHeight)}px`;
   };
 
   const handleComplete = () => {

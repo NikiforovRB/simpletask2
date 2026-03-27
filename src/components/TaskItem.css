@@ -185,6 +185,7 @@
   flex: 1;
   min-width: 0;
   font-size: 0.9375rem;
+  line-height: 1.5rem;
   cursor: text;
   word-break: break-word;
 }
@@ -198,19 +199,20 @@
   background: transparent;
   border: none;
   color: #e0e0e0;
-  padding: 0.2rem 0;
-  padding-left: 0;
+  padding: 0;
+  margin: 0;
   font-size: 0.9375rem;
   font-family: inherit;
   font-weight: inherit;
-  line-height: inherit;
+  line-height: 1.5rem;
+  box-sizing: border-box;
 }
 
 .task-item__input--multiline {
   resize: none;
   overflow: hidden;
   min-height: 1.5rem;
-  line-height: 1.35;
+  line-height: 1.5rem;
   word-wrap: break-word;
 }
 
