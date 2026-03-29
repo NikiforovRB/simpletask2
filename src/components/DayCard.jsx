@@ -7,6 +7,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DEFAULT_TASK_COLOR, formatDayLabel, toLocalDateString } from '../constants';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
+import eyeoffIcon from '../assets/eyeoff.svg';
 import './DayCard.css';
 
 export function DayCard({
@@ -23,14 +24,18 @@ export function DayCard({
   completedVisible,
   getListCollapsed,
   setListCollapsed,
+  allowListCollapse = false,
 }) {
   const dateStr = toLocalDateString(date);
   const dayKey = `day_${dateStr}`;
   const completedKey = `completed_${dateStr}`;
-  const cardOpen = getListCollapsed ? !getListCollapsed(dayKey) : true;
+  const cardOpen = allowListCollapse && getListCollapsed ? !getListCollapsed(dayKey) : true;
   const completedOpen = getListCollapsed ? !getListCollapsed(completedKey) : true;
 
-  const toggleCard = () => setListCollapsed?.(dayKey, getListCollapsed(dayKey) ? false : true);
+  const toggleCard = () => {
+    if (!allowListCollapse) return;
+    setListCollapsed?.(dayKey, getListCollapsed(dayKey) ? false : true);
+  };
   const toggleCompleted = () => setListCollapsed?.(completedKey, getListCollapsed(completedKey) ? false : true);
   const byParent = useMemo(() => {
     const map = new Map();
@@ -63,9 +68,18 @@ export function DayCard({
   return (
     <section className="day-card">
       <div className="day-card__header">
-        <button type="button" className="day-card__title-btn" onClick={toggleCard}>
-          {formatDayLabel(dateStr)}
-        </button>
+        {allowListCollapse ? (
+          <button type="button" className="day-card__title-btn" onClick={toggleCard}>
+            <span className="day-card__title-inner">
+              {formatDayLabel(dateStr)}
+              {!cardOpen && (
+                <img src={eyeoffIcon} alt="" className="day-card__collapsed-icon" />
+              )}
+            </span>
+          </button>
+        ) : (
+          <span className="day-card__title-static">{formatDayLabel(dateStr)}</span>
+        )}
         <button type="button" className="day-card__icon-btn day-card__icon-btn--plus" onMouseEnter={() => hasHover && setPlusHover(true)} onMouseLeave={() => hasHover && setPlusHover(false)} onClick={handleAddAtStart} aria-label="Добавить задачу">
           <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
         </button>

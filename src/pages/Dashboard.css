@@ -410,6 +410,7 @@
   .dashboard-menu__item {
     font-size: 1.8rem;
     padding: 1.05rem 0.6rem;
+    padding-left: calc(0.6rem + 4px);
     gap: 1rem;
   }
 
@@ -465,6 +466,7 @@
   gap: 0.5rem;
   width: 100%;
   padding: 0.45rem 0.25rem;
+  padding-left: calc(0.25rem + 4px);
   background: none;
   border: none;
   color: #666666;

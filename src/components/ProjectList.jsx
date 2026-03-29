@@ -12,15 +12,12 @@ import editNavIcon from '../assets/edit-nav.svg';
 import './NoDateList.css';
 
 export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onOpenEditProject, onTaskContextMenu, completedVisible, getListCollapsed, setListCollapsed }) {
-  const PROJECT_KEY = `project_${projectId}`;
   const PROJECT_COMPLETED_KEY = `completed_project_${projectId}`;
-  const open = getListCollapsed ? !getListCollapsed(PROJECT_KEY) : true;
   const completedOpen = getListCollapsed ? !getListCollapsed(PROJECT_COMPLETED_KEY) : true;
   const [plusHover, setPlusHover] = useState(false);
   const [editHover, setEditHover] = useState(false);
   const hasHover = useMediaQuery('(hover: hover)');
 
-  const toggleOpen = () => setListCollapsed?.(PROJECT_KEY, !getListCollapsed(PROJECT_KEY));
   const toggleCompleted = () => setListCollapsed?.(PROJECT_COMPLETED_KEY, !getListCollapsed(PROJECT_COMPLETED_KEY));
 
   const byParent = useMemo(() => {
@@ -59,16 +56,13 @@ export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate
   return (
     <section className="no-date-list">
       <div className="no-date-list__header">
-        <button type="button" className="no-date-list__title-btn" onClick={toggleOpen}>
-          {projectTitle}
-        </button>
+        <span className="no-date-list__title">{projectTitle}</span>
         <button type="button" className="no-date-list__icon-btn no-date-list__icon-btn--plus" onMouseEnter={() => hasHover && setPlusHover(true)} onMouseLeave={() => hasHover && setPlusHover(false)} onClick={handleAddAtStart} aria-label="Добавить задачу">
           <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
         </button>
       </div>
       <div className="no-date-list__header-line" />
-      {open && (
-        <div className="no-date-list__body">
+      <div className="no-date-list__body">
           <ul className="no-date-list__list">
             <SortableContext items={mainTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               {mainTasks.map((task, i) => (
@@ -120,7 +114,6 @@ export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate
             </>
           )}
         </div>
-      )}
       <div className="no-date-list__footer">
         <button
           type="button"

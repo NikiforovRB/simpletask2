@@ -9,16 +9,13 @@ import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import './NoDateList.css';
 
-const NO_DATE_KEY = 'no_date';
 const NO_DATE_COMPLETED_KEY = 'completed_no_date';
 
 export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, visible, completedVisible, getListCollapsed, setListCollapsed }) {
-  const open = getListCollapsed ? !getListCollapsed(NO_DATE_KEY) : true;
   const completedOpen = getListCollapsed ? !getListCollapsed(NO_DATE_COMPLETED_KEY) : true;
   const [plusHover, setPlusHover] = useState(false);
   const hasHover = useMediaQuery('(hover: hover)');
 
-  const toggleOpen = () => setListCollapsed?.(NO_DATE_KEY, !getListCollapsed(NO_DATE_KEY));
   const toggleCompleted = () => setListCollapsed?.(NO_DATE_COMPLETED_KEY, !getListCollapsed(NO_DATE_COMPLETED_KEY));
 
   const byParent = useMemo(() => {
@@ -51,16 +48,13 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
   return (
     <section className="no-date-list">
       <div className="no-date-list__header">
-        <button type="button" className="no-date-list__title-btn" onClick={toggleOpen}>
-          Задачи без даты
-        </button>
+        <span className="no-date-list__title">Задачи без даты</span>
         <button type="button" className="no-date-list__icon-btn no-date-list__icon-btn--plus" onMouseEnter={() => hasHover && setPlusHover(true)} onMouseLeave={() => hasHover && setPlusHover(false)} onClick={handleAddAtStart} aria-label="Добавить задачу">
           <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
         </button>
       </div>
       <div className="no-date-list__header-line" />
-      {open && (
-        <div className="no-date-list__body">
+      <div className="no-date-list__body">
           <ul className="no-date-list__list">
             <SortableContext items={mainTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               {mainTasks.map((task, i) => (
@@ -111,8 +105,7 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
               )}
             </>
           )}
-        </div>
-      )}
+      </div>
     </section>
   );
 }

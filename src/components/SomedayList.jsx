@@ -9,16 +9,13 @@ import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import './NoDateList.css';
 
-const SOMEDAY_KEY = 'someday';
 const SOMEDAY_COMPLETED_KEY = 'completed_someday';
 
 export function SomedayList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, completedVisible, getListCollapsed, setListCollapsed }) {
-  const open = getListCollapsed ? !getListCollapsed(SOMEDAY_KEY) : true;
   const completedOpen = getListCollapsed ? !getListCollapsed(SOMEDAY_COMPLETED_KEY) : true;
   const [plusHover, setPlusHover] = useState(false);
   const hasHover = useMediaQuery('(hover: hover)');
 
-  const toggleOpen = () => setListCollapsed?.(SOMEDAY_KEY, !getListCollapsed(SOMEDAY_KEY));
   const toggleCompleted = () => setListCollapsed?.(SOMEDAY_COMPLETED_KEY, !getListCollapsed(SOMEDAY_COMPLETED_KEY));
 
   const byParent = useMemo(() => {
@@ -52,16 +49,13 @@ export function SomedayList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask,
   return (
     <section className="no-date-list">
       <div className="no-date-list__header">
-        <button type="button" className="no-date-list__title-btn" onClick={toggleOpen}>
-          Когда-нибудь
-        </button>
+        <span className="no-date-list__title">Когда-нибудь</span>
         <button type="button" className="no-date-list__icon-btn no-date-list__icon-btn--plus" onMouseEnter={() => hasHover && setPlusHover(true)} onMouseLeave={() => hasHover && setPlusHover(false)} onClick={handleAddAtStart} aria-label="Добавить задачу">
           <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
         </button>
       </div>
       <div className="no-date-list__header-line" />
-      {open && (
-        <div className="no-date-list__body">
+      <div className="no-date-list__body">
           <ul className="no-date-list__list">
             <SortableContext items={mainTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               {mainTasks.map((task, i) => (
@@ -113,7 +107,6 @@ export function SomedayList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask,
             </>
           )}
         </div>
-      )}
     </section>
   );
 }

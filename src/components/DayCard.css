@@ -30,6 +30,32 @@
   color: #ffffff;
 }
 
+.day-card__title-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.day-card__collapsed-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.day-card__title-static {
+  flex: 1;
+  font-size: 0.9375rem;
+  font-weight: normal;
+  color: #666666;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  font-family: inherit;
+  width: 100%;
+}
+
 .day-card__header-line {
   margin-top: 15px;
   margin-bottom: 0.75rem;

@@ -864,6 +864,7 @@ export default function Dashboard() {
               completedVisible={completedVisible}
               getListCollapsed={getListCollapsed}
               setListCollapsed={setListCollapsed}
+              allowListCollapse={viewMode === 'plans'}
             />
           ))}
         </div>
