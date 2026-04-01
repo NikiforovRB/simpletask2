@@ -11,7 +11,7 @@ import './NoDateList.css';
 
 const SOMEDAY_COMPLETED_KEY = 'completed_someday';
 
-export function SomedayList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, completedVisible, getListCollapsed, setListCollapsed }) {
+export function SomedayList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, editingTaskId, onEditingTaskConsumed, onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit, completedVisible, getListCollapsed, setListCollapsed }) {
   const completedOpen = getListCollapsed ? !getListCollapsed(SOMEDAY_COMPLETED_KEY) : true;
   const [plusHover, setPlusHover] = useState(false);
   const hasHover = useMediaQuery('(hover: hover)');
@@ -71,6 +71,11 @@ export function SomedayList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask,
                     onDelete={onDelete}
                   onAddSubtask={onAddSubtask}
                   onTaskContextMenu={onTaskContextMenu}
+                  editingTaskId={editingTaskId}
+                  onEditingTaskConsumed={onEditingTaskConsumed}
+                  onCreateSiblingTask={onCreateSiblingTask}
+                  onCreateSiblingSubtask={onCreateSiblingSubtask}
+                  onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
                 />
               </li>
             ))}
@@ -97,6 +102,11 @@ export function SomedayList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask,
                         onDelete={onDelete}
                         onAddSubtask={onAddSubtask}
                         onTaskContextMenu={onTaskContextMenu}
+                        editingTaskId={editingTaskId}
+                        onEditingTaskConsumed={onEditingTaskConsumed}
+                        onCreateSiblingTask={onCreateSiblingTask}
+                        onCreateSiblingSubtask={onCreateSiblingSubtask}
+                        onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
                       />
                     </li>
                   ))}

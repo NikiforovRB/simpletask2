@@ -144,6 +144,29 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
+.dashboard__context-menu-colors {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem 0.4rem;
+}
+
+.dashboard__context-menu-color {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.dashboard__context-menu-separator {
+  height: 1px;
+  background: #666666;
+  margin: 0.2rem 0.75rem;
+}
+
 .dashboard__context-menu-item {
   display: flex;
   align-items: center;

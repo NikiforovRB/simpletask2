@@ -11,7 +11,7 @@ import './NoDateList.css';
 
 const NO_DATE_COMPLETED_KEY = 'completed_no_date';
 
-export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, visible, completedVisible, getListCollapsed, setListCollapsed }) {
+export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, editingTaskId, onEditingTaskConsumed, onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit, visible, completedVisible, getListCollapsed, setListCollapsed }) {
   const completedOpen = getListCollapsed ? !getListCollapsed(NO_DATE_COMPLETED_KEY) : true;
   const [plusHover, setPlusHover] = useState(false);
   const hasHover = useMediaQuery('(hover: hover)');
@@ -70,6 +70,11 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
                     onDelete={onDelete}
                   onAddSubtask={onAddSubtask}
                   onTaskContextMenu={onTaskContextMenu}
+                  editingTaskId={editingTaskId}
+                  onEditingTaskConsumed={onEditingTaskConsumed}
+                  onCreateSiblingTask={onCreateSiblingTask}
+                  onCreateSiblingSubtask={onCreateSiblingSubtask}
+                  onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
                 />
               </li>
             ))}
@@ -96,6 +101,11 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
                         onDelete={onDelete}
                         onAddSubtask={onAddSubtask}
                         onTaskContextMenu={onTaskContextMenu}
+                        editingTaskId={editingTaskId}
+                        onEditingTaskConsumed={onEditingTaskConsumed}
+                        onCreateSiblingTask={onCreateSiblingTask}
+                        onCreateSiblingSubtask={onCreateSiblingSubtask}
+                        onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
                       />
                     </li>
                   ))}

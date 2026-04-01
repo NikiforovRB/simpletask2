@@ -41,6 +41,8 @@ import settingsNavIcon from '../assets/settings-nav.svg';
 import refreshIcon from '../assets/refresh.svg';
 import refreshNavIcon from '../assets/refresh-nav.svg';
 import deleteNavIcon from '../assets/delete-nav2.svg';
+import zavtraIcon from '../assets/zavtra.svg';
+import poslezavtraIcon from '../assets/poslezavtra.svg';
 import './Dashboard.css';
 
 function getDays(baseDate, count) {
@@ -185,6 +187,8 @@ export default function Dashboard() {
   const [editProjectTitle, setEditProjectTitle] = useState('');
   const [activeDragId, setActiveDragId] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const contextMenuRef = useRef(null);
   const hasHover = useMediaQuery('(hover: hover)');
   const isWideMenu = useMediaQuery('(min-width: 600px)');
 
@@ -297,6 +301,25 @@ export default function Dashboard() {
     setContextMenu({ x: e.clientX, y: e.clientY, task });
   }, []);
 
+  useEffect(() => {
+    if (!contextMenu || !contextMenuRef.current) return;
+    const menu = contextMenuRef.current;
+    const rect = menu.getBoundingClientRect();
+    let nextX = contextMenu.x;
+    let nextY = contextMenu.y;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    if (rect.right > viewportWidth - 8) {
+      nextX = Math.max(8, viewportWidth - rect.width - 8);
+    }
+    if (rect.bottom > viewportHeight - 8) {
+      nextY = Math.max(8, contextMenu.y - rect.height);
+    }
+    if (nextX !== contextMenu.x || nextY !== contextMenu.y) {
+      setContextMenu((prev) => (prev ? { ...prev, x: nextX, y: nextY } : prev));
+    }
+  }, [contextMenu]);
+
   const getTargetPayload = useCallback(
     (destination) => {
       const completed_at = contextMenu?.task?.completed_at ?? null;
@@ -306,6 +329,24 @@ export default function Dashboard() {
         const targetList = getTasksInContainer(tasks, containerId);
         const position = targetList.length ? Math.max(...targetList.map((t) => t.position ?? 0)) + 1 : 0;
         return { list_type: 'inbox', project_id: null, scheduled_date: todayStr, parent_id: null, position, completed_at };
+      }
+      if (destination.type === 'tomorrow') {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const dateStr = toLocalDateString(tomorrow);
+        const containerId = getContainerId(dateStr, null, !!completed_at);
+        const targetList = getTasksInContainer(tasks, containerId);
+        const position = targetList.length ? Math.max(...targetList.map((t) => t.position ?? 0)) + 1 : 0;
+        return { list_type: 'inbox', project_id: null, scheduled_date: dateStr, parent_id: null, position, completed_at };
+      }
+      if (destination.type === 'day_after_tomorrow') {
+        const date = new Date();
+        date.setDate(date.getDate() + 2);
+        const dateStr = toLocalDateString(date);
+        const containerId = getContainerId(dateStr, null, !!completed_at);
+        const targetList = getTasksInContainer(tasks, containerId);
+        const position = targetList.length ? Math.max(...targetList.map((t) => t.position ?? 0)) + 1 : 0;
+        return { list_type: 'inbox', project_id: null, scheduled_date: dateStr, parent_id: null, position, completed_at };
       }
       if (destination.type === 'plans' || destination.type === 'no_date') {
         const containerId = getContainerId(null, null, !!completed_at);
@@ -350,6 +391,12 @@ export default function Dashboard() {
     deleteTask(contextMenu.task.id);
     setContextMenu(null);
   }, [contextMenu, deleteTask]);
+
+  const handleContextMenuColor = useCallback((textColor) => {
+    if (!contextMenu?.task) return;
+    updateTask(contextMenu.task.id, { text_color: textColor });
+    setContextMenu(null);
+  }, [contextMenu, updateTask]);
 
 
   const today = new Date();
@@ -428,6 +475,76 @@ export default function Dashboard() {
       });
     },
     [tasks, addTask]
+  );
+
+  const handleCreateSubtaskAndEdit = useCallback(
+    async (task) => {
+      if (!task || task.parent_id) return;
+      const siblings = tasks.filter((t) => t.parent_id === task.id);
+      const maxPos = siblings.reduce((acc, t) => Math.max(acc, t.position ?? 0), 0);
+      const created = await addTask({
+        title: '',
+        parent_id: task.id,
+        scheduled_date: task.scheduled_date ?? null,
+        list_type: task.list_type || 'inbox',
+        project_id: task.project_id ?? null,
+        text_color: task.text_color || '#ffffff',
+        completed_at: null,
+        position: maxPos + 1,
+      });
+      if (created?.id) setEditingTaskId(created.id);
+    },
+    [tasks, addTask]
+  );
+
+  const handleCreateSiblingTask = useCallback(
+    async (task) => {
+      if (!task) return;
+      const siblings = tasks
+        .filter((t) => !t.parent_id && (t.list_type || 'inbox') === (task.list_type || 'inbox') && (t.project_id ?? null) === (task.project_id ?? null) && normDate(t.scheduled_date) === normDate(task.scheduled_date))
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      const insertPosition = (task.position ?? 0) + 1;
+      siblings
+        .filter((t) => (t.position ?? 0) >= insertPosition)
+        .forEach((t) => updateTask(t.id, { position: (t.position ?? 0) + 1 }));
+      const created = await addTask({
+        title: '',
+        scheduled_date: task.scheduled_date ?? null,
+        list_type: task.list_type || 'inbox',
+        project_id: task.project_id ?? null,
+        parent_id: null,
+        text_color: task.text_color || '#ffffff',
+        completed_at: null,
+        position: insertPosition,
+      });
+      if (created?.id) setEditingTaskId(created.id);
+    },
+    [tasks, addTask, updateTask]
+  );
+
+  const handleCreateSiblingSubtask = useCallback(
+    async (task) => {
+      if (!task?.parent_id) return;
+      const parent = tasks.find((t) => t.id === task.parent_id);
+      if (!parent) return;
+      const siblings = tasks.filter((t) => t.parent_id === task.parent_id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      const insertPosition = (task.position ?? 0) + 1;
+      siblings
+        .filter((t) => (t.position ?? 0) >= insertPosition)
+        .forEach((t) => updateTask(t.id, { position: (t.position ?? 0) + 1 }));
+      const created = await addTask({
+        title: '',
+        parent_id: task.parent_id,
+        scheduled_date: parent.scheduled_date ?? null,
+        list_type: parent.list_type || 'inbox',
+        project_id: parent.project_id ?? null,
+        text_color: task.text_color || parent.text_color || '#ffffff',
+        completed_at: null,
+        position: insertPosition,
+      });
+      if (created?.id) setEditingTaskId(created.id);
+    },
+    [tasks, addTask, updateTask]
   );
 
   const handleDragEnd = useCallback(
@@ -797,14 +914,42 @@ export default function Dashboard() {
         <>
           <div className="dashboard__context-menu-backdrop" aria-hidden onClick={() => setContextMenu(null)} />
           <div
+            ref={contextMenuRef}
             className="dashboard__context-menu"
             style={{ left: contextMenu.x, top: contextMenu.y }}
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="dashboard__context-menu-colors">
+              {[
+                '#ffffff',
+                '#f33737',
+                '#666666',
+                '#5a86ee',
+                '#15c466',
+              ].map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="dashboard__context-menu-color"
+                  style={{ background: c }}
+                  onClick={() => handleContextMenuColor(c)}
+                  aria-label={`Цвет ${c}`}
+                />
+              ))}
+            </div>
             <button type="button" className="dashboard__context-menu-item" onClick={() => handleMoveTaskToDestination({ type: 'today' })}>
               <img src={starIcon} alt="" className="dashboard__context-menu-item-icon" />
               <span>Сегодня</span>
             </button>
+            <button type="button" className="dashboard__context-menu-item" onClick={() => handleMoveTaskToDestination({ type: 'tomorrow' })}>
+              <img src={zavtraIcon} alt="" className="dashboard__context-menu-item-icon" />
+              <span>Завтра</span>
+            </button>
+            <button type="button" className="dashboard__context-menu-item" onClick={() => handleMoveTaskToDestination({ type: 'day_after_tomorrow' })}>
+              <img src={poslezavtraIcon} alt="" className="dashboard__context-menu-item-icon" />
+              <span>Послезавтра</span>
+            </button>
+            <div className="dashboard__context-menu-separator" aria-hidden />
             <button type="button" className="dashboard__context-menu-item" onClick={() => handleMoveTaskToDestination({ type: 'no_date' })}>
               <img src={layersIcon} alt="" className="dashboard__context-menu-item-icon" />
               <span>Задачи без даты</span>
@@ -860,6 +1005,11 @@ export default function Dashboard() {
               onAddSubtask={handleAddSubtask}
               onAddAtStart={handleAddTaskAt}
               onTaskContextMenu={handleTaskContextMenu}
+              editingTaskId={editingTaskId}
+              onEditingTaskConsumed={() => setEditingTaskId(null)}
+              onCreateSiblingTask={handleCreateSiblingTask}
+              onCreateSiblingSubtask={handleCreateSiblingSubtask}
+              onCreateSubtaskAndEdit={handleCreateSubtaskAndEdit}
               recentCompletedIds={recentCompletedIds}
               completedVisible={completedVisible}
               getListCollapsed={getListCollapsed}
@@ -879,6 +1029,11 @@ export default function Dashboard() {
           onAddSubtask={handleAddSubtask}
           onAddAtStart={handleAddTaskAt}
           onTaskContextMenu={handleTaskContextMenu}
+          editingTaskId={editingTaskId}
+          onEditingTaskConsumed={() => setEditingTaskId(null)}
+          onCreateSiblingTask={handleCreateSiblingTask}
+          onCreateSiblingSubtask={handleCreateSiblingSubtask}
+          onCreateSubtaskAndEdit={handleCreateSubtaskAndEdit}
           visible
           completedVisible={completedVisible}
           getListCollapsed={getListCollapsed}
@@ -895,6 +1050,11 @@ export default function Dashboard() {
           onAddSubtask={handleAddSubtask}
           onAddAtStart={handleAddTaskAt}
           onTaskContextMenu={handleTaskContextMenu}
+          editingTaskId={editingTaskId}
+          onEditingTaskConsumed={() => setEditingTaskId(null)}
+          onCreateSiblingTask={handleCreateSiblingTask}
+          onCreateSiblingSubtask={handleCreateSiblingSubtask}
+          onCreateSubtaskAndEdit={handleCreateSubtaskAndEdit}
           completedVisible={completedVisible}
           getListCollapsed={getListCollapsed}
           setListCollapsed={setListCollapsed}
@@ -912,6 +1072,11 @@ export default function Dashboard() {
           onAddSubtask={handleAddSubtask}
           onAddAtStart={handleAddTaskAt}
           onTaskContextMenu={handleTaskContextMenu}
+          editingTaskId={editingTaskId}
+          onEditingTaskConsumed={() => setEditingTaskId(null)}
+          onCreateSiblingTask={handleCreateSiblingTask}
+          onCreateSiblingSubtask={handleCreateSiblingSubtask}
+          onCreateSubtaskAndEdit={handleCreateSubtaskAndEdit}
           onOpenEditProject={handleOpenEditProject}
           completedVisible={completedVisible}
           getListCollapsed={getListCollapsed}

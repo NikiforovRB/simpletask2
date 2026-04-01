@@ -11,7 +11,7 @@ import editIcon from '../assets/edit.svg';
 import editNavIcon from '../assets/edit-nav.svg';
 import './NoDateList.css';
 
-export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onOpenEditProject, onTaskContextMenu, completedVisible, getListCollapsed, setListCollapsed }) {
+export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onOpenEditProject, onTaskContextMenu, editingTaskId, onEditingTaskConsumed, onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit, completedVisible, getListCollapsed, setListCollapsed }) {
   const PROJECT_COMPLETED_KEY = `completed_project_${projectId}`;
   const completedOpen = getListCollapsed ? !getListCollapsed(PROJECT_COMPLETED_KEY) : true;
   const [plusHover, setPlusHover] = useState(false);
@@ -78,6 +78,11 @@ export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate
                     onDelete={onDelete}
                   onAddSubtask={onAddSubtask}
                   onTaskContextMenu={onTaskContextMenu}
+                  editingTaskId={editingTaskId}
+                  onEditingTaskConsumed={onEditingTaskConsumed}
+                  onCreateSiblingTask={onCreateSiblingTask}
+                  onCreateSiblingSubtask={onCreateSiblingSubtask}
+                  onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
                 />
               </li>
             ))}
@@ -104,6 +109,11 @@ export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate
                         onDelete={onDelete}
                         onAddSubtask={onAddSubtask}
                         onTaskContextMenu={onTaskContextMenu}
+                        editingTaskId={editingTaskId}
+                        onEditingTaskConsumed={onEditingTaskConsumed}
+                        onCreateSiblingTask={onCreateSiblingTask}
+                        onCreateSiblingSubtask={onCreateSiblingSubtask}
+                        onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
                       />
                     </li>
                   ))}

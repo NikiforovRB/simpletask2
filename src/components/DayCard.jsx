@@ -19,6 +19,11 @@ export function DayCard({
   onAddTask,
   onAddSubtask,
   onTaskContextMenu,
+  editingTaskId,
+  onEditingTaskConsumed,
+  onCreateSiblingTask,
+  onCreateSiblingSubtask,
+  onCreateSubtaskAndEdit,
   recentCompletedIds,
   onAddAtStart,
   completedVisible,
@@ -104,6 +109,11 @@ export function DayCard({
                       onDelete={onDelete}
                       onAddSubtask={onAddSubtask}
                       onTaskContextMenu={onTaskContextMenu}
+                      editingTaskId={editingTaskId}
+                      onEditingTaskConsumed={onEditingTaskConsumed}
+                      onCreateSiblingTask={onCreateSiblingTask}
+                      onCreateSiblingSubtask={onCreateSiblingSubtask}
+                      onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
                     />
                   </li>
                 ))}
@@ -134,6 +144,11 @@ export function DayCard({
                     onDelete={onDelete}
                     onAddSubtask={onAddSubtask}
                     onTaskContextMenu={onTaskContextMenu}
+                    editingTaskId={editingTaskId}
+                    onEditingTaskConsumed={onEditingTaskConsumed}
+                    onCreateSiblingTask={onCreateSiblingTask}
+                    onCreateSiblingSubtask={onCreateSiblingSubtask}
+                    onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
                     isRecentlyCompleted={recentCompletedIds.has(task.id)}
                   />
                 </li>

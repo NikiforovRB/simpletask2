@@ -43,6 +43,11 @@ export function TaskItem({
   onDelete,
   onAddSubtask,
   onTaskContextMenu,
+  editingTaskId,
+  onEditingTaskConsumed,
+  onCreateSiblingTask,
+  onCreateSiblingSubtask,
+  onCreateSubtaskAndEdit,
   isRecentlyCompleted,
   getSubtasks,
   dragHandleProps,
@@ -64,11 +69,21 @@ export function TaskItem({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       e.target.blur();
+      if (task.parent_id) onCreateSiblingSubtask?.(task);
+      else onCreateSiblingTask?.(task);
+      return;
+    }
+    if (e.key === 'Tab' && !e.shiftKey && !task.parent_id) {
+      e.preventDefault();
+      e.target.blur();
+      onCreateSubtaskAndEdit?.(task);
     }
   };
 
   const inputRef = useRef(null);
   const pendingCaretOffsetRef = useRef(null);
+  const colorPickerRef = useRef(null);
+  const colorButtonRef = useRef(null);
 
   const resizeInput = () => {
     const el = inputRef.current;
@@ -93,6 +108,25 @@ export function TaskItem({
       pendingCaretOffsetRef.current = null;
     }
   }, [editing, editTitle]);
+
+  useEffect(() => {
+    if (editingTaskId !== task.id) return;
+    pendingCaretOffsetRef.current = 0;
+    setEditTitle('');
+    setEditing(true);
+    onEditingTaskConsumed?.();
+  }, [editingTaskId, task.id, onEditingTaskConsumed]);
+
+  useEffect(() => {
+    if (!showColorPicker) return;
+    const handleOutside = (event) => {
+      if (colorPickerRef.current?.contains(event.target)) return;
+      if (colorButtonRef.current?.contains(event.target)) return;
+      setShowColorPicker(false);
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [showColorPicker]);
 
   const handleInputResize = (e) => {
     const el = e.target;
@@ -275,6 +309,7 @@ export function TaskItem({
               <button
                 type="button"
                 className="task-item__color-btn"
+                ref={colorButtonRef}
                 style={{ background: color }}
                 onClick={() => setShowColorPicker((v) => !v)}
                 aria-label="Цвет текста"
@@ -360,7 +395,7 @@ export function TaskItem({
         </div>
       </div>
       {showColorPicker && (
-        <div className="task-item__colors">
+        <div className="task-item__colors" ref={colorPickerRef}>
           {TASK_COLORS.map((c) => (
             <button
               key={c}
@@ -390,6 +425,11 @@ export function TaskItem({
                 onDelete={onDelete}
                 onAddSubtask={onAddSubtask}
                 onTaskContextMenu={onTaskContextMenu}
+                editingTaskId={editingTaskId}
+                onEditingTaskConsumed={onEditingTaskConsumed}
+                onCreateSiblingTask={onCreateSiblingTask}
+                onCreateSiblingSubtask={onCreateSiblingSubtask}
+                onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
                 getSubtasks={getSubtasks}
               />
             </li>

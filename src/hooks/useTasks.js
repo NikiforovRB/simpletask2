@@ -38,7 +38,9 @@ export function useTasks() {
     const { data, error } = await supabase.from('tasks').insert({ user_id: user.id, ...payload }).select().single();
     if (!error && data) {
       setTasks((prev) => [...prev, data].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
+      return data;
     } else if (!error) await fetchTasks();
+    return null;
   };
 
   const updateTask = async (id, payload) => {
