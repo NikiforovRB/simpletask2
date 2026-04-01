@@ -98,10 +98,11 @@ export function TaskItem({
       resizeInput();
       const el = inputRef.current;
       const pending = pendingCaretOffsetRef.current;
-      if (el && pending != null) {
-        const safe = Math.max(0, Math.min(pending, editTitle.length));
+      if (el) {
+        const safe = Math.max(0, Math.min(pending ?? editTitle.length, editTitle.length));
         requestAnimationFrame(() => {
           if (!inputRef.current) return;
+          inputRef.current.focus();
           inputRef.current.setSelectionRange(safe, safe);
         });
       }
