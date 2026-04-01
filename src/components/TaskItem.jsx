@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { DraggableTask } from './DraggableTask';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
 import { TASK_COLORS, DEFAULT_TASK_COLOR } from '../constants';
 import kvIcon from '../assets/kv.svg';
@@ -58,24 +59,28 @@ export function TaskItem({
   const color = task.text_color || DEFAULT_TASK_COLOR;
   const displayTitle = editing ? editTitle : task.title;
 
-  const handleBlur = () => {
+  const commitEditing = () => {
     setEditing(false);
     if (editTitle.trim() && editTitle !== task.title) {
       onUpdate(task.id, { title: editTitle.trim() });
     }
   };
 
+  const handleBlur = () => {
+    commitEditing();
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      e.target.blur();
+      commitEditing();
       if (task.parent_id) onCreateSiblingSubtask?.(task);
       else onCreateSiblingTask?.(task);
       return;
     }
     if (e.key === 'Tab' && !e.shiftKey && !task.parent_id) {
       e.preventDefault();
-      e.target.blur();
+      commitEditing();
       onCreateSubtaskAndEdit?.(task);
     }
   };
@@ -94,21 +99,20 @@ export function TaskItem({
   };
 
   useEffect(() => {
-    if (editing) {
-      resizeInput();
-      const el = inputRef.current;
-      const pending = pendingCaretOffsetRef.current;
-      if (el) {
-        const safe = Math.max(0, Math.min(pending ?? editTitle.length, editTitle.length));
-        requestAnimationFrame(() => {
-          if (!inputRef.current) return;
-          inputRef.current.focus();
-          inputRef.current.setSelectionRange(safe, safe);
-        });
-      }
-      pendingCaretOffsetRef.current = null;
+    if (!editing) return;
+    resizeInput();
+    const el = inputRef.current;
+    const pending = pendingCaretOffsetRef.current;
+    if (el && pending != null) {
+      const safe = Math.max(0, Math.min(pending, editTitle.length));
+      setTimeout(() => {
+        if (!inputRef.current) return;
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(safe, safe);
+      }, 30);
     }
-  }, [editing, editTitle]);
+    pendingCaretOffsetRef.current = null;
+  }, [editing]);
 
   useEffect(() => {
     if (editingTaskId !== task.id) return;
@@ -413,29 +417,31 @@ export function TaskItem({
       )}
       {(isParent && subtasks.length > 0) && (
         <ul className={`task-item__subtasks ${subtasksCollapsed ? 'task-item__subtasks--collapsed' : ''}`}>
-          {subtasks.map((st, i) => (
-            <li key={st.id}>
-              <DropSlot id={`sub-${task.id}`} index={i} />
-              <DraggableTask
-                task={st}
-                containerId={`sub-${task.id}`}
-                subtasks={getSubtasks ? getSubtasks(st.id) : []}
-                isCompleted={!!st.completed_at}
-                onToggle={onToggle}
-                onUpdate={onUpdate}
-                onDelete={onDelete}
-                onAddSubtask={onAddSubtask}
-                onTaskContextMenu={onTaskContextMenu}
-                editingTaskId={editingTaskId}
-                onEditingTaskConsumed={onEditingTaskConsumed}
-                onCreateSiblingTask={onCreateSiblingTask}
-                onCreateSiblingSubtask={onCreateSiblingSubtask}
-                onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
-                getSubtasks={getSubtasks}
-              />
-            </li>
-          ))}
-          <li><DropSlot id={`sub-${task.id}`} index={subtasks.length} /></li>
+          <SortableContext items={subtasks.map((st) => st.id)} strategy={verticalListSortingStrategy}>
+            {subtasks.map((st, i) => (
+              <li key={st.id}>
+                <DropSlot id={`sub-${task.id}`} index={i} />
+                <SortableTask
+                  task={st}
+                  containerId={`sub-${task.id}`}
+                  subtasks={getSubtasks ? getSubtasks(st.id) : []}
+                  isCompleted={!!st.completed_at}
+                  onToggle={onToggle}
+                  onUpdate={onUpdate}
+                  onDelete={onDelete}
+                  onAddSubtask={onAddSubtask}
+                  onTaskContextMenu={onTaskContextMenu}
+                  editingTaskId={editingTaskId}
+                  onEditingTaskConsumed={onEditingTaskConsumed}
+                  onCreateSiblingTask={onCreateSiblingTask}
+                  onCreateSiblingSubtask={onCreateSiblingSubtask}
+                  onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
+                  getSubtasks={getSubtasks}
+                />
+              </li>
+            ))}
+            <li><DropSlot id={`sub-${task.id}`} index={subtasks.length} /></li>
+          </SortableContext>
         </ul>
       )}
     </div>

@@ -135,6 +135,10 @@
   padding: 0;
 }
 
+.day-card__list li + li {
+  margin-top: 12px;
+}
+
 .day-card__list--completed .task-item__title {
   color: #666;
 }

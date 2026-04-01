@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../contexts/AuthContext';
@@ -572,7 +572,10 @@ export default function Dashboard() {
         const list = getTasksInContainer(tasks, containerId);
         const idx = list.findIndex((t) => t.id === over.id);
         if (idx < 0) return;
-        index = idx;
+        const translated = active.rect.current.translated;
+        const overMiddleY = over.rect.top + over.rect.height / 2;
+        const pointerY = translated ? translated.top + translated.height / 2 : overMiddleY;
+        index = idx + (pointerY > overMiddleY ? 1 : 0);
       }
       const movedTask = tasks.find((t) => t.id === active.id);
       if (!movedTask) return;
@@ -639,7 +642,7 @@ export default function Dashboard() {
   const activeTask = activeDragId ? tasks.find((t) => t.id === activeDragId) : null;
 
   return (
-    <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
     <div className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''}`}>
       <header className="dashboard__header">
         <div className="dashboard__header-row">

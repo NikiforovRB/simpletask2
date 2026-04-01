@@ -1,13 +1,12 @@
 .drop-slot {
-  min-height: 8px;
-  padding: 6px 0;
+  min-height: 0;
+  padding: 0;
   position: relative;
-  transition: background 0.2s ease, min-height 0.2s ease;
+  transition: min-height 0.2s ease;
   border-radius: 6px;
 }
 
 .drop-slot--over {
   outline: none;
-  background: #17223c;
-  min-height: 48px;
+  min-height: 18px;
 }

@@ -176,6 +176,10 @@
   padding: 0;
 }
 
+.no-date-list__list li + li {
+  margin-top: 12px;
+}
+
 .no-date-list__list--completed .task-item__title {
   color: #666;
 }
