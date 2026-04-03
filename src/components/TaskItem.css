@@ -216,6 +216,13 @@
   word-wrap: break-word;
 }
 
+@media (max-width: 499px) {
+  .task-item--editing .task-item__input--multiline {
+    scroll-margin-top: 12px;
+    scroll-margin-bottom: min(45vh, 280px);
+  }
+}
+
 .task-item__input:focus {
   outline: none;
   border: none;

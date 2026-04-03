@@ -30,6 +30,7 @@ import molniaredIcon from '../assets/molniared.svg';
 import molnianavIcon from '../assets/molnianav.svg';
 import molniacompleteIcon from '../assets/molniacomplete.svg';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useMobileTaskEditViewportScroll } from '../hooks/useMobileTaskEditViewportScroll';
 import { CalendarPopover } from './CalendarPopover';
 import './TaskItem.css';
 
@@ -92,6 +93,7 @@ export function TaskItem({
   };
 
   const inputRef = useRef(null);
+  const taskRootRef = useRef(null);
   const pendingCaretOffsetRef = useRef(null);
   const colorPickerRef = useRef(null);
   const colorButtonRef = useRef(null);
@@ -103,6 +105,8 @@ export function TaskItem({
     const lineHeight = parseFloat(window.getComputedStyle(el).lineHeight) || 24;
     el.style.height = `${Math.max(el.scrollHeight, lineHeight)}px`;
   };
+
+  useMobileTaskEditViewportScroll(editing && isNarrowActions, inputRef, taskRootRef);
 
   useEffect(() => {
     if (!editing) return;
@@ -222,6 +226,7 @@ export function TaskItem({
 
   return (
     <div
+      ref={taskRootRef}
       className={`task-item ${isCompleted ? 'task-item--completed' : ''} ${isRecentlyCompleted ? 'task-item--entering' : ''} task-item--top-${topStyle} ${editing ? 'task-item--editing' : ''}`}
       data-task-id={task.id}
       onContextMenu={handleContextMenu}
