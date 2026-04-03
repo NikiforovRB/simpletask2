@@ -151,6 +151,22 @@
   padding: 0.5rem 0.75rem 0.4rem;
 }
 
+.dashboard__context-menu-color-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 1px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  box-sizing: content-box;
+}
+
+.dashboard__context-menu-color-wrap:hover,
+.dashboard__context-menu-color-wrap--selected {
+  border-color: var(--swatch-color);
+}
+
 .dashboard__context-menu-color {
   width: 1rem;
   height: 1rem;
@@ -159,6 +175,7 @@
   padding: 0;
   cursor: pointer;
   flex-shrink: 0;
+  display: block;
 }
 
 .dashboard__context-menu-separator {

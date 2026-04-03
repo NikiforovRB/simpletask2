@@ -58,6 +58,8 @@ export function TaskItem({
   const [editTitle, setEditTitle] = useState(task.title);
   const color = task.text_color || DEFAULT_TASK_COLOR;
   const displayTitle = editing ? editTitle : task.title;
+  const hasHover = useMediaQuery('(hover: hover)');
+  const isNarrowActions = useMediaQuery('(max-width: 499px)');
 
   const commitEditing = () => {
     setEditing(false);
@@ -74,11 +76,15 @@ export function TaskItem({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       commitEditing();
-      if (task.parent_id) onCreateSiblingSubtask?.(task);
-      else onCreateSiblingTask?.(task);
+      const run = () => {
+        if (task.parent_id) onCreateSiblingSubtask?.(task);
+        else onCreateSiblingTask?.(task);
+      };
+      if (isNarrowActions) setTimeout(run, 0);
+      else run();
       return;
     }
-    if (e.key === 'Tab' && !e.shiftKey && !task.parent_id) {
+    if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
       commitEditing();
       onCreateSubtaskAndEdit?.(task);
@@ -174,8 +180,6 @@ export function TaskItem({
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [lightningHover, setLightningHover] = useState(false);
 
-  const hasHover = useMediaQuery('(hover: hover)');
-  const isNarrowActions = useMediaQuery('(max-width: 499px)');
   const [ctxHover, setCtxHover] = useState(false);
   const showLightning = (isCompleted && color === RED_COLOR) || (!isCompleted && color === RED_COLOR);
   const isParentTask = !task.parent_id;
@@ -311,14 +315,16 @@ export function TaskItem({
                   <img src={hasHover && ctxHover ? editNavIcon : editIcon} alt="" />
                 </button>
               )}
-              <button
-                type="button"
-                className="task-item__color-btn"
-                ref={colorButtonRef}
-                style={{ background: color }}
-                onClick={() => setShowColorPicker((v) => !v)}
-                aria-label="Цвет текста"
-              />
+              <span className="task-item__color-btn-wrap">
+                <button
+                  type="button"
+                  className="task-item__color-btn"
+                  ref={colorButtonRef}
+                  style={{ background: color }}
+                  onClick={() => setShowColorPicker((v) => !v)}
+                  aria-label="Цвет текста"
+                />
+              </span>
               <button
                 type="button"
                 className="task-item__action-btn"
@@ -401,18 +407,26 @@ export function TaskItem({
       </div>
       {showColorPicker && (
         <div className="task-item__colors" ref={colorPickerRef}>
-          {TASK_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className="task-item__color-option"
-              style={{ background: c }}
-              onClick={() => {
-                onUpdate(task.id, { text_color: c });
-                setShowColorPicker(false);
-              }}
-            />
-          ))}
+          {TASK_COLORS.map((c) => {
+            const selected = color.toLowerCase() === c.toLowerCase();
+            return (
+              <span
+                key={c}
+                className={`task-item__color-option-wrap${selected ? ' task-item__color-option-wrap--selected' : ''}`}
+                style={{ '--swatch-color': c }}
+              >
+                <button
+                  type="button"
+                  className="task-item__color-option"
+                  style={{ background: c }}
+                  onClick={() => {
+                    onUpdate(task.id, { text_color: c });
+                    setShowColorPicker(false);
+                  }}
+                />
+              </span>
+            );
+          })}
         </div>
       )}
       {(isParent && subtasks.length > 0) && (

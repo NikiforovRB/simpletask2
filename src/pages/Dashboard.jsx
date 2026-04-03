@@ -1,4 +1,28 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+
+function loadCompletedVisibleByList() {
+  try {
+    const raw = localStorage.getItem('dashboard_completed_visible_by_list');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return {};
+}
+
+function inheritBucketFromTask(task, tasks) {
+  let root = task;
+  const seen = new Set();
+  while (root?.parent_id && !seen.has(root.id)) {
+    seen.add(root.id);
+    const p = tasks.find((t) => t.id === root.parent_id);
+    if (!p) break;
+    root = p;
+  }
+  return {
+    scheduled_date: task.scheduled_date ?? root?.scheduled_date ?? null,
+    list_type: task.list_type || root?.list_type || 'inbox',
+    project_id: task.project_id ?? root?.project_id ?? null,
+  };
+}
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -36,6 +60,8 @@ import exitIcon from '../assets/exit.svg';
 import exitNavIcon from '../assets/exit-nav.svg';
 import eyeIcon from '../assets/eye.svg';
 import eyeNavIcon from '../assets/eye-nav.svg';
+import eyeoffIcon from '../assets/eyeoff.svg';
+import eyeoffNavIcon from '../assets/eyeoff-nav.svg';
 import settingsIcon from '../assets/settings.svg';
 import settingsNavIcon from '../assets/settings-nav.svg';
 import refreshIcon from '../assets/refresh.svg';
@@ -123,7 +149,7 @@ function SortableProjectItem({ project, isActive, isHover, folderIcon, folderNav
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const { tasks, addTask, updateTask, deleteTask, toggleComplete, moveTask } = useTasks();
-  const { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible, setCompletedVisible } = useSettings();
+  const { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const { projects, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const [dateOffset, setDateOffset] = useState(() => {
@@ -142,7 +168,6 @@ export default function Dashboard() {
   }, [dateOffset]);
   const [recentCompletedIds, setRecentCompletedIds] = useState(new Set());
   const noDateListVisible = settings.no_date_list_visible !== false;
-  const completedVisible = settings.completed_visible !== false;
   const [viewMode, setViewMode] = useState(() => {
     try {
       const raw = localStorage.getItem('dashboard_view_state');
@@ -167,6 +192,26 @@ export default function Dashboard() {
       return null;
     }
   });
+  const [completedVisibleByList, setCompletedVisibleByList] = useState(loadCompletedVisibleByList);
+  const completedVisibleListKey = useMemo(() => {
+    if (viewMode === 'today') return 'today';
+    if (viewMode === 'plans') return 'plans';
+    if (viewMode === 'no_date') return 'no_date';
+    if (viewMode === 'someday') return 'someday';
+    if (viewMode === 'project' && activeProjectId) return `project:${activeProjectId}`;
+    return null;
+  }, [viewMode, activeProjectId]);
+  const completedVisible = completedVisibleListKey == null ? true : completedVisibleByList[completedVisibleListKey] !== false;
+  const toggleCompletedVisibleForList = () => {
+    if (completedVisibleListKey == null) return;
+    setCompletedVisibleByList((prev) => {
+      const next = { ...prev, [completedVisibleListKey]: !(prev[completedVisibleListKey] !== false) };
+      try {
+        localStorage.setItem('dashboard_completed_visible_by_list', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dateLeftHover, setDateLeftHover] = useState(false);
   const [dateRightHover, setDateRightHover] = useState(false);
@@ -479,15 +524,16 @@ export default function Dashboard() {
 
   const handleCreateSubtaskAndEdit = useCallback(
     async (task) => {
-      if (!task || task.parent_id) return;
+      if (!task) return;
+      const bucket = inheritBucketFromTask(task, tasks);
       const siblings = tasks.filter((t) => t.parent_id === task.id);
       const maxPos = siblings.reduce((acc, t) => Math.max(acc, t.position ?? 0), 0);
       const created = await addTask({
         title: '',
         parent_id: task.id,
-        scheduled_date: task.scheduled_date ?? null,
-        list_type: task.list_type || 'inbox',
-        project_id: task.project_id ?? null,
+        scheduled_date: bucket.scheduled_date,
+        list_type: bucket.list_type,
+        project_id: bucket.project_id,
         text_color: task.text_color || '#ffffff',
         completed_at: null,
         position: maxPos + 1,
@@ -679,8 +725,8 @@ export default function Dashboard() {
             )}
           </div>
           <div className="dashboard__header-actions">
-            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={() => setCompletedVisible(!completedVisible)} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
-              <img src={hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
+            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
+              <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setSettingsHover(true)} onMouseLeave={() => hasHover && setSettingsHover(false)} onClick={() => setSettingsOpen((v) => !v)} aria-label="Настройки">
               <img src={hasHover && settingsHover ? settingsNavIcon : settingsIcon} alt="" />
@@ -929,16 +975,25 @@ export default function Dashboard() {
                 '#666666',
                 '#5a86ee',
                 '#15c466',
-              ].map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className="dashboard__context-menu-color"
-                  style={{ background: c }}
-                  onClick={() => handleContextMenuColor(c)}
-                  aria-label={`Цвет ${c}`}
-                />
-              ))}
+              ].map((c) => {
+                const cur = (contextMenu.task.text_color || '#ffffff').toLowerCase();
+                const selected = cur === c.toLowerCase();
+                return (
+                  <span
+                    key={c}
+                    className={`dashboard__context-menu-color-wrap${selected ? ' dashboard__context-menu-color-wrap--selected' : ''}`}
+                    style={{ '--swatch-color': c }}
+                  >
+                    <button
+                      type="button"
+                      className="dashboard__context-menu-color"
+                      style={{ background: c }}
+                      onClick={() => handleContextMenuColor(c)}
+                      aria-label={`Цвет ${c}`}
+                    />
+                  </span>
+                );
+              })}
             </div>
             <button type="button" className="dashboard__context-menu-item" onClick={() => handleMoveTaskToDestination({ type: 'today' })}>
               <img src={starIcon} alt="" className="dashboard__context-menu-item-icon" />

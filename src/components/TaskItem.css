@@ -221,6 +221,17 @@
   border: none;
 }
 
+.task-item__color-btn-wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 1px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  box-sizing: content-box;
+}
+
 .task-item__color-btn {
   flex-shrink: 0;
   width: 1rem;
@@ -229,6 +240,22 @@
   border-radius: 50%;
   cursor: pointer;
   padding: 0;
+  display: block;
+}
+
+.task-item__color-option-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  box-sizing: content-box;
+}
+
+.task-item__color-option-wrap:hover,
+.task-item__color-option-wrap--selected {
+  border-color: var(--swatch-color);
 }
 
 .task-item__color-option {
@@ -238,6 +265,7 @@
   border-radius: 50%;
   cursor: pointer;
   padding: 0;
+  display: block;
 }
 
 .task-item__colors {
