@@ -2,6 +2,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
+/** All task ids removed when deleting id (includes nested subtasks; matches ON DELETE CASCADE). */
+function idsRemovedWithCascade(id, list) {
+  const remove = new Set([id]);
+  for (;;) {
+    const before = remove.size;
+    for (const t of list) {
+      if (t.parent_id && remove.has(t.parent_id)) remove.add(t.id);
+    }
+    if (remove.size === before) break;
+  }
+  return remove;
+}
+
 export function useTasks() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
@@ -50,7 +63,10 @@ export function useTasks() {
   };
 
   const deleteTask = async (id) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    setTasks((prev) => {
+      const remove = idsRemovedWithCascade(id, prev);
+      return prev.filter((t) => !remove.has(t.id));
+    });
     const { error } = await supabase.from('tasks').delete().eq('id', id);
     if (error) await fetchTasks();
   };
