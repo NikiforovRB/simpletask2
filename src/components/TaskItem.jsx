@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
@@ -69,26 +69,47 @@ export function TaskItem({
     }
   };
 
+  const suppressBlurCommitRef = useRef(false);
+
   const handleBlur = () => {
+    if (suppressBlurCommitRef.current) return;
     commitEditing();
   };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      commitEditing();
-      const run = () => {
-        if (task.parent_id) onCreateSiblingSubtask?.(task);
-        else onCreateSiblingTask?.(task);
-      };
-      if (isNarrowActions) setTimeout(run, 0);
-      else run();
+      suppressBlurCommitRef.current = true;
+      void (async () => {
+        try {
+          const trimmed = editTitle.trim();
+          if (trimmed && trimmed !== task.title) {
+            onUpdate(task.id, { title: trimmed });
+          }
+          if (task.parent_id) await onCreateSiblingSubtask?.(task);
+          else await onCreateSiblingTask?.(task);
+        } finally {
+          suppressBlurCommitRef.current = false;
+          setEditing(false);
+        }
+      })();
       return;
     }
     if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
-      commitEditing();
-      onCreateSubtaskAndEdit?.(task);
+      suppressBlurCommitRef.current = true;
+      void (async () => {
+        try {
+          const trimmed = editTitle.trim();
+          if (trimmed && trimmed !== task.title) {
+            onUpdate(task.id, { title: trimmed });
+          }
+          await onCreateSubtaskAndEdit?.(task);
+        } finally {
+          suppressBlurCommitRef.current = false;
+          setEditing(false);
+        }
+      })();
     }
   };
 
@@ -108,29 +129,27 @@ export function TaskItem({
 
   useMobileTaskEditViewportScroll(editing && isNarrowActions, inputRef, taskRootRef);
 
-  useEffect(() => {
-    if (!editing) return;
-    resizeInput();
-    const el = inputRef.current;
-    const pending = pendingCaretOffsetRef.current;
-    if (el && pending != null) {
-      const safe = Math.max(0, Math.min(pending, editTitle.length));
-      setTimeout(() => {
-        if (!inputRef.current) return;
-        inputRef.current.focus();
-        inputRef.current.setSelectionRange(safe, safe);
-      }, 30);
-    }
-    pendingCaretOffsetRef.current = null;
-  }, [editing]);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (editingTaskId !== task.id) return;
     pendingCaretOffsetRef.current = 0;
     setEditTitle('');
     setEditing(true);
     onEditingTaskConsumed?.();
   }, [editingTaskId, task.id, onEditingTaskConsumed]);
+
+  useLayoutEffect(() => {
+    if (!editing) return;
+    resizeInput();
+    const el = inputRef.current;
+    const pending = pendingCaretOffsetRef.current;
+    if (el && pending != null) {
+      const len = el.value.length;
+      const safe = Math.max(0, Math.min(pending, len));
+      el.focus();
+      el.setSelectionRange(safe, safe);
+    }
+    pendingCaretOffsetRef.current = null;
+  }, [editing]);
 
   useEffect(() => {
     if (!showColorPicker) return;
