@@ -179,7 +179,16 @@ export default function Dashboard() {
       return 'plans';
     }
   }); // 'today' | 'plans' | 'no_date' | 'someday' | 'project'
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dashboard_view_state');
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      return parsed?.menuOpen === true;
+    } catch {
+      return false;
+    }
+  });
   const [mobileMenuClosing, setMobileMenuClosing] = useState(false);
   const mobileMenuCloseTimeoutRef = useRef(null);
   const [activeProjectId, setActiveProjectId] = useState(() => {
@@ -267,9 +276,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('dashboard_view_state', JSON.stringify({ viewMode, activeProjectId }));
+      localStorage.setItem('dashboard_view_state', JSON.stringify({ viewMode, activeProjectId, menuOpen }));
     } catch {}
-  }, [viewMode, activeProjectId]);
+  }, [viewMode, activeProjectId, menuOpen]);
 
   useEffect(() => {
     if (viewMode !== 'project') return;
