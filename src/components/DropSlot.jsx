@@ -17,6 +17,7 @@ export function DropSlot({ id, index, children }) {
 
   return (
     <div ref={setNodeRef} className={`drop-slot ${isOver ? 'drop-slot--over' : ''}`} data-slot-index={index} data-container-id={id}>
+      <div className="drop-slot__line" aria-hidden />
       {children}
     </div>
   );

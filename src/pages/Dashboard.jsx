@@ -1,5 +1,11 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 
+function clampSidebarWidthPx(n) {
+  const v = Number(n);
+  if (Number.isFinite(v)) return Math.max(100, Math.min(400, Math.round(v)));
+  return 220;
+}
+
 function loadCompletedVisibleByList() {
   try {
     const raw = localStorage.getItem('dashboard_completed_visible_by_list');
@@ -56,6 +62,8 @@ import archiveNavIcon from '../assets/archive-nav.svg';
 import folderIcon from '../assets/folder.svg';
 import folderNavIcon from '../assets/folder-nav.svg';
 import dragIcon from '../assets/drag.svg';
+import spacingIcon from '../assets/spacing.svg';
+import spacingNavIcon from '../assets/spacing-nav.svg';
 import exitIcon from '../assets/exit.svg';
 import exitNavIcon from '../assets/exit-nav.svg';
 import eyeIcon from '../assets/eye.svg';
@@ -121,10 +129,15 @@ function getTasksInContainer(tasks, containerId) {
 function SortableProjectItem({ project, isActive, isHover, folderIcon, folderNavIcon, dragIcon, onClick, onMouseEnter, onMouseLeave, disableDrag }) {
   const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: project.id, disabled: !!disableDrag });
   const icon = (isActive || isHover) ? folderNavIcon : folderIcon;
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const smoothTransition = transition
+    ? transition.replace(/(\d+)ms/g, (_, ms) => `${Math.round(Number(ms) * 1.85)}ms`)
+    : 'transform 400ms cubic-bezier(0.2, 0.8, 0.2, 1)';
+  const style = isDragging
+    ? { opacity: 0, transition: smoothTransition }
+    : {
+        transform: CSS.Transform.toString(transform),
+        transition: smoothTransition,
+      };
   return (
     <div ref={setNodeRef} style={style} className={`dashboard-menu__project-row ${isDragging ? 'dashboard-menu__project-row--dragging' : ''}`}>
       <button
@@ -149,7 +162,7 @@ function SortableProjectItem({ project, isActive, isHover, folderIcon, folderNav
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const { tasks, addTask, updateTask, deleteTask, toggleComplete, moveTask } = useTasks();
-  const { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible } = useSettings();
+  const { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible, setSidebarWidthPx } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const { projects, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const [dateOffset, setDateOffset] = useState(() => {
@@ -242,9 +255,22 @@ export default function Dashboard() {
   const [activeDragId, setActiveDragId] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [editingTaskId, setEditingTaskId] = useState(null);
+  const [activeProjectDragId, setActiveProjectDragId] = useState(null);
+  const [menuWidthModalOpen, setMenuWidthModalOpen] = useState(false);
+  const [menuWidthDraft, setMenuWidthDraft] = useState(220);
+  const [spacingBtnHover, setSpacingBtnHover] = useState(false);
   const contextMenuRef = useRef(null);
   const hasHover = useMediaQuery('(hover: hover)');
   const isWideMenu = useMediaQuery('(min-width: 600px)');
+  const sidebarWidthPx = useMemo(() => clampSidebarWidthPx(settings.sidebar_width_px), [settings.sidebar_width_px]);
+  const liveMenuWidth = useMemo(
+    () => (menuWidthModalOpen ? clampSidebarWidthPx(menuWidthDraft) : sidebarWidthPx),
+    [menuWidthModalOpen, menuWidthDraft, sidebarWidthPx]
+  );
+  const activeProjectDrag = useMemo(
+    () => (activeProjectDragId ? projects.find((p) => p.id === activeProjectDragId) : null),
+    [activeProjectDragId, projects]
+  );
 
   const closeMenu = useCallback(() => {
     if (mobileMenuCloseTimeoutRef.current) {
@@ -679,26 +705,53 @@ export default function Dashboard() {
   );
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
 
-  const handleDragStart = useCallback((event) => {
-    setActiveDragId(event.active.id);
-  }, []);
+  const handleDragStart = useCallback(
+    (event) => {
+      if (projects.some((p) => p.id === event.active.id)) {
+        setActiveProjectDragId(event.active.id);
+        setActiveDragId(null);
+      } else {
+        setActiveDragId(event.active.id);
+        setActiveProjectDragId(null);
+      }
+    },
+    [projects]
+  );
 
   const handleDragEndWithClear = useCallback(
     async (event) => {
       await handleDragEnd(event);
       setActiveDragId(null);
+      setActiveProjectDragId(null);
     },
     [handleDragEnd]
   );
 
   const activeTask = activeDragId ? tasks.find((t) => t.id === activeDragId) : null;
 
+  const openMenuWidthModal = useCallback(() => {
+    setMenuWidthDraft(sidebarWidthPx);
+    setMenuWidthModalOpen(true);
+  }, [sidebarWidthPx]);
+
+  const applyMenuWidthStep = useCallback((delta) => {
+    setMenuWidthDraft((w) => clampSidebarWidthPx(w + delta));
+  }, []);
+
+  const saveMenuWidth = useCallback(async () => {
+    await setSidebarWidthPx(menuWidthDraft);
+    setMenuWidthModalOpen(false);
+  }, [menuWidthDraft, setSidebarWidthPx]);
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
-    <div className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''}`}>
+    <div
+      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''}`}
+      style={{ '--sidebar-width': `${liveMenuWidth}px` }}
+    >
       <header className="dashboard__header">
         <div className="dashboard__header-row">
           <div className="dashboard__top-left">
@@ -751,72 +804,86 @@ export default function Dashboard() {
         isWideMenu ? (
           <nav
             className={`dashboard-menu dashboard-menu--side ${!menuOpen && mobileMenuClosing ? 'dashboard-menu--closing' : ''}`}
-            style={{ width: '220px' }}
+            style={{ width: `${liveMenuWidth}px` }}
           >
-            <button
-              type="button"
-              className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
-              onMouseEnter={() => hasHover && setTodayHover(true)}
-              onMouseLeave={() => hasHover && setTodayHover(false)}
-              onClick={() => handleMenuSelect('today')}
-            >
-              <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
-              <span>Сегодня</span>
-            </button>
-            <button
-              type="button"
-              className={`dashboard-menu__item ${viewMode === 'plans' ? 'dashboard-menu__item--active' : ''}`}
-              onMouseEnter={() => hasHover && setPlansHover(true)}
-              onMouseLeave={() => hasHover && setPlansHover(false)}
-              onClick={() => handleMenuSelect('plans')}
-            >
-              <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
-              <span>Планы</span>
-            </button>
-            <button
-              type="button"
-              className={`dashboard-menu__item ${viewMode === 'no_date' ? 'dashboard-menu__item--active' : ''}`}
-              onMouseEnter={() => hasHover && setNoDateHover(true)}
-              onMouseLeave={() => hasHover && setNoDateHover(false)}
-              onClick={() => handleMenuSelect('no_date')}
-            >
-              <img src={viewMode === 'no_date' || (hasHover && noDateHover) ? layersNavIcon : layersIcon} alt="" />
-              <span>Задачи без даты</span>
-            </button>
-            <button
-              type="button"
-              className={`dashboard-menu__item ${viewMode === 'someday' ? 'dashboard-menu__item--active' : ''}`}
-              onMouseEnter={() => hasHover && setSomedayHover(true)}
-              onMouseLeave={() => hasHover && setSomedayHover(false)}
-              onClick={() => handleMenuSelect('someday')}
-            >
-              <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
-              <span>Когда-нибудь</span>
-            </button>
-            <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-              {projects.map((p) => (
-                <SortableProjectItem
-                  key={p.id}
-                  project={p}
-                  isActive={viewMode === 'project' && activeProjectId === p.id}
-                  isHover={hasHover && projectHoverId === p.id}
-                  folderIcon={folderIcon}
-                  folderNavIcon={folderNavIcon}
-                  dragIcon={dragIcon}
-                  onClick={() => handleMenuSelect(p.id)}
-                  onMouseEnter={() => setProjectHoverId(p.id)}
-                  onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
-                />
-              ))}
-            </SortableContext>
-            <button
-              type="button"
-              className="dashboard-menu__add-project"
-              onClick={() => setAddProjectModalOpen(true)}
-              aria-label="Добавить проект"
-            >
-              +
-            </button>
+            <div className="dashboard-menu__body">
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setTodayHover(true)}
+                onMouseLeave={() => hasHover && setTodayHover(false)}
+                onClick={() => handleMenuSelect('today')}
+              >
+                <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
+                <span>Сегодня</span>
+              </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'plans' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setPlansHover(true)}
+                onMouseLeave={() => hasHover && setPlansHover(false)}
+                onClick={() => handleMenuSelect('plans')}
+              >
+                <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
+                <span>Планы</span>
+              </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'no_date' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setNoDateHover(true)}
+                onMouseLeave={() => hasHover && setNoDateHover(false)}
+                onClick={() => handleMenuSelect('no_date')}
+              >
+                <img src={viewMode === 'no_date' || (hasHover && noDateHover) ? layersNavIcon : layersIcon} alt="" />
+                <span>Задачи без даты</span>
+              </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'someday' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setSomedayHover(true)}
+                onMouseLeave={() => hasHover && setSomedayHover(false)}
+                onClick={() => handleMenuSelect('someday')}
+              >
+                <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
+                <span>Когда-нибудь</span>
+              </button>
+              <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+                {projects.map((p) => (
+                  <SortableProjectItem
+                    key={p.id}
+                    project={p}
+                    isActive={viewMode === 'project' && activeProjectId === p.id}
+                    isHover={hasHover && projectHoverId === p.id}
+                    folderIcon={folderIcon}
+                    folderNavIcon={folderNavIcon}
+                    dragIcon={dragIcon}
+                    onClick={() => handleMenuSelect(p.id)}
+                    onMouseEnter={() => setProjectHoverId(p.id)}
+                    onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
+                  />
+                ))}
+              </SortableContext>
+            </div>
+            <div className="dashboard-menu__bottom-tools">
+              <button
+                type="button"
+                className="dashboard-menu__add-project dashboard-menu__add-project--in-bottom"
+                onClick={() => setAddProjectModalOpen(true)}
+                aria-label="Добавить проект"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                className="dashboard-menu__width-btn"
+                onMouseEnter={() => hasHover && setSpacingBtnHover(true)}
+                onMouseLeave={() => hasHover && setSpacingBtnHover(false)}
+                onClick={openMenuWidthModal}
+                aria-label="Изменить ширину меню для ПК"
+              >
+                <img src={hasHover && spacingBtnHover ? spacingNavIcon : spacingIcon} alt="" />
+              </button>
+            </div>
           </nav>
         ) : (
           <div className={`dashboard-menu-overlay ${mobileMenuClosing ? 'dashboard-menu-overlay--closing' : ''}`} onClick={closeMenu}>
@@ -1058,6 +1125,31 @@ export default function Dashboard() {
         </div>
       )}
 
+      {menuWidthModalOpen && (
+        <div className="dashboard__settings-overlay" onClick={() => setMenuWidthModalOpen(false)}>
+          <div className="dashboard__settings-popup dashboard__menu-width-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="dashboard__settings-title">Ширина меню</div>
+            <div className="dashboard__menu-width-controls">
+              <button type="button" className="dashboard__menu-width-step" onClick={() => applyMenuWidthStep(-10)} aria-label="Уменьшить на 10 пикселей">
+                <span className="dashboard__menu-width-step-inner">−</span>
+              </button>
+              <span className="dashboard__menu-width-value">{liveMenuWidth}px</span>
+              <button type="button" className="dashboard__menu-width-step" onClick={() => applyMenuWidthStep(10)} aria-label="Увеличить на 10 пикселей">
+                <span className="dashboard__menu-width-step-inner">+</span>
+              </button>
+            </div>
+            <div className="dashboard__settings-edit-actions">
+              <button type="button" className="dashboard__settings-submit" onClick={() => setMenuWidthModalOpen(false)}>
+                Отмена
+              </button>
+              <button type="button" className="dashboard__settings-submit" onClick={saveMenuWidth}>
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {(viewMode === 'plans' || viewMode === 'today') && (
         <div className="dashboard__days">
           {days.map((date) => (
@@ -1155,7 +1247,12 @@ export default function Dashboard() {
         <img src={hasHover && refreshHover ? refreshNavIcon : refreshIcon} alt="" />
       </button>
 
-      <DragOverlay dropAnimation={null}>
+      <DragOverlay
+        dropAnimation={{
+          duration: 280,
+          easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+        }}
+      >
         {activeTask ? (
           <div className="draggable-task draggable-task--overlay" style={{ cursor: 'grabbing', pointerEvents: 'none' }}>
             <div className="task-item task-item--overlay">
@@ -1164,6 +1261,11 @@ export default function Dashboard() {
                 <span className="task-item__title" style={{ color: activeTask.text_color || '#e0e0e0' }}>{activeTask.title}</span>
               </div>
             </div>
+          </div>
+        ) : activeProjectDrag ? (
+          <div className="dashboard-menu__project-drag-overlay" style={{ cursor: 'grabbing', pointerEvents: 'none' }}>
+            <img src={folderIcon} alt="" />
+            <span>{activeProjectDrag.title}</span>
           </div>
         ) : null}
       </DragOverlay>

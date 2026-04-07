@@ -1,4 +1,5 @@
 .dashboard {
+  --sidebar-width: 220px;
   min-height: 100vh;
   background: #000000;
   color: #e0e0e0;
@@ -353,11 +354,7 @@
 
 @media (min-width: 600px) {
   .dashboard--menu-open {
-    padding-left: calc(220px + 18px);
-  }
-
-  .dashboard-menu--side {
-    width: 220px;
+    padding-left: calc(var(--sidebar-width, 220px) + 18px);
   }
 }
 
@@ -425,6 +422,151 @@
   bottom: 0;
   z-index: 90;
   animation: dashboardMenuSlideIn 360ms ease both;
+  padding-bottom: 0.5rem;
+  box-sizing: border-box;
+}
+
+.dashboard-menu--side .dashboard-menu__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.dashboard-menu__bottom-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem 0.25rem;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dashboard-menu__add-project--in-bottom {
+  position: static;
+  left: auto;
+  bottom: auto;
+  margin: 0;
+}
+
+.dashboard-menu__bottom-tools .dashboard-menu__add-project {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.dashboard-menu__bottom-tools .dashboard-menu__add-project:hover {
+  color: #5a86ee;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dashboard-menu__width-btn {
+  width: 2rem;
+  height: 2rem;
+  margin-left: 25px;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #666666;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.dashboard-menu__width-btn:hover {
+  color: #5a86ee;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dashboard-menu__width-btn img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+}
+
+.dashboard__menu-width-popup {
+  max-width: 320px;
+}
+
+.dashboard__menu-width-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.dashboard__menu-width-value {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  color: #e0e0e0;
+  min-width: 5.5rem;
+  text-align: center;
+}
+
+.dashboard__menu-width-step {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 12px;
+  border: 1px solid #333;
+  background: #1e1e1e;
+  color: #5a86ee;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.dashboard__menu-width-step:hover {
+  background: rgba(90, 134, 238, 0.12);
+  border-color: #5a86ee;
+}
+
+.dashboard__menu-width-step:active {
+  transform: scale(0.96);
+}
+
+.dashboard__menu-width-step-inner {
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.dashboard-menu__project-drag-overlay {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  background: #1e1e1e;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  color: #e0e0e0;
+  font-size: 0.9375rem;
+  max-width: 240px;
+}
+
+.dashboard-menu__project-drag-overlay img {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.dashboard-menu__project-drag-overlay span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-menu--side.dashboard-menu--closing {

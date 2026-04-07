@@ -2,9 +2,21 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
+function clampSidebarWidth(n) {
+  const v = Number(n);
+  if (Number.isFinite(v)) return Math.max(100, Math.min(400, Math.round(v)));
+  return 220;
+}
+
 export function useSettings() {
   const { user } = useAuth();
-  const [settings, setSettings] = useState({ days_count: 3, new_tasks_position: 'start', no_date_list_visible: true, completed_visible: true });
+  const [settings, setSettings] = useState({
+    days_count: 3,
+    new_tasks_position: 'start',
+    no_date_list_visible: true,
+    completed_visible: true,
+    sidebar_width_px: 220,
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -15,7 +27,7 @@ export function useSettings() {
     const fetch = async () => {
       const { data, error } = await supabase
         .from('user_settings')
-        .select('days_count, new_tasks_position, no_date_list_visible, completed_visible')
+        .select('days_count, new_tasks_position, no_date_list_visible, completed_visible, sidebar_width_px')
         .eq('user_id', user.id)
         .maybeSingle();
       if (!error && data) {
@@ -24,10 +36,18 @@ export function useSettings() {
           new_tasks_position: data.new_tasks_position || 'start',
           no_date_list_visible: data.no_date_list_visible !== false,
           completed_visible: data.completed_visible !== false,
+          sidebar_width_px: clampSidebarWidth(data.sidebar_width_px),
         });
       } else if (!error && !data) {
-        await supabase.from('user_settings').insert({ user_id: user.id, days_count: 3, new_tasks_position: 'start', no_date_list_visible: true, completed_visible: true });
-        setSettings({ days_count: 3, new_tasks_position: 'start', no_date_list_visible: true, completed_visible: true });
+        await supabase.from('user_settings').insert({
+          user_id: user.id,
+          days_count: 3,
+          new_tasks_position: 'start',
+          no_date_list_visible: true,
+          completed_visible: true,
+          sidebar_width_px: 220,
+        });
+        setSettings({ days_count: 3, new_tasks_position: 'start', no_date_list_visible: true, completed_visible: true, sidebar_width_px: 220 });
       }
       setLoading(false);
     };
@@ -60,5 +80,12 @@ export function useSettings() {
     setSettings((s) => ({ ...s, completed_visible }));
   };
 
-  return { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible, setCompletedVisible, loading };
+  const setSidebarWidthPx = async (sidebar_width_px) => {
+    if (!user) return;
+    const w = clampSidebarWidth(sidebar_width_px);
+    await supabase.from('user_settings').update({ sidebar_width_px: w }).eq('user_id', user.id);
+    setSettings((s) => ({ ...s, sidebar_width_px: w }));
+  };
+
+  return { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible, setCompletedVisible, setSidebarWidthPx, loading };
 }

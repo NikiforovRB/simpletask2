@@ -10,8 +10,8 @@ export function SortableTask({ task, containerId, ...taskItemProps }) {
   });
 
   const slowTransition = transition
-    ? transition.replace(/(\d+)ms/g, (_, ms) => `${Math.round(Number(ms) * 1.9)}ms`)
-    : 'transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1)';
+    ? transition.replace(/(\d+)ms/g, (_, ms) => `${Math.round(Number(ms) * 2)}ms`)
+    : 'transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1)';
 
   const style = isDragging
     ? { opacity: 0, transition: slowTransition }

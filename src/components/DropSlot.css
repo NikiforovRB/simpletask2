@@ -6,6 +6,20 @@
   border-radius: 6px;
 }
 
+.drop-slot__line {
+  height: 1px;
+  background: #5a86ee;
+  border-radius: 1px;
+  margin: 0 0 2px;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+.drop-slot--over .drop-slot__line {
+  opacity: 1;
+}
+
 .drop-slot--over {
   outline: none;
   min-height: 18px;
