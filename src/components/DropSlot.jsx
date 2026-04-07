@@ -16,8 +16,15 @@ export function DropSlot({ id, index, children }) {
   const { isOver, setNodeRef } = useDroppable({ id: slotId(id, index) });
 
   return (
-    <div ref={setNodeRef} className={`drop-slot ${isOver ? 'drop-slot--over' : ''}`} data-slot-index={index} data-container-id={id}>
-      <div className="drop-slot__line" aria-hidden />
+    <div className="drop-slot__anchor" data-slot-index={index} data-container-id={id}>
+      <div
+        ref={setNodeRef}
+        className={`drop-slot__hit ${isOver ? 'drop-slot__hit--over' : ''}`}
+        data-slot-index={index}
+        data-container-id={id}
+      >
+        <div className="drop-slot__line" aria-hidden />
+      </div>
       {children}
     </div>
   );
