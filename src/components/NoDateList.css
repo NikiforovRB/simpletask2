@@ -86,23 +86,6 @@
   margin-top: 0.5rem;
 }
 
-.no-date-list__footer {
-  margin-top: 1rem;
-}
-
-/* Fixed to bottom when inside project list */
-.dashboard .no-date-list__footer {
-  position: fixed;
-  bottom: 20px;
-  left: 1rem;
-  margin-top: 0;
-  z-index: 5;
-}
-
-.dashboard--menu-open .no-date-list__footer {
-  left: calc(220px + 18px + 1rem);
-}
-
 .no-date-list__delete-project {
   background: none;
   border: none;
@@ -115,34 +98,6 @@
 
 .no-date-list__delete-project:hover {
   color: #5a86ee;
-}
-
-.no-date-list__edit-project-btn {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  background: #1e1e1e;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 200ms ease, transform 200ms ease;
-}
-
-.no-date-list__edit-project-btn img {
-  width: 1.25rem;
-  height: 1.25rem;
-  object-fit: contain;
-}
-
-.no-date-list__edit-project-btn:hover {
-  background: #141414;
-}
-
-.no-date-list__edit-project-btn:active {
-  transform: translateY(1px);
 }
 
 .no-date-list__completed-toggle {

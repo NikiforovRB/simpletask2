@@ -74,6 +74,8 @@ import settingsIcon from '../assets/settings.svg';
 import settingsNavIcon from '../assets/settings-nav.svg';
 import refreshIcon from '../assets/refresh.svg';
 import refreshNavIcon from '../assets/refresh-nav.svg';
+import editIcon from '../assets/edit.svg';
+import editNavIcon from '../assets/edit-nav.svg';
 import deleteNavIcon from '../assets/delete-nav2.svg';
 import zavtraIcon from '../assets/zavtra.svg';
 import poslezavtraIcon from '../assets/poslezavtra.svg';
@@ -247,6 +249,7 @@ export default function Dashboard() {
   const [settingsHover, setSettingsHover] = useState(false);
   const [exitHover, setExitHover] = useState(false);
   const [refreshHover, setRefreshHover] = useState(false);
+  const [editProjectFabHover, setEditProjectFabHover] = useState(false);
   const [addProjectModalOpen, setAddProjectModalOpen] = useState(false);
   const [addProjectTitle, setAddProjectTitle] = useState('');
   const [editProjectOpen, setEditProjectOpen] = useState(false);
@@ -1236,11 +1239,28 @@ export default function Dashboard() {
           onCreateSiblingTask={handleCreateSiblingTask}
           onCreateSiblingSubtask={handleCreateSiblingSubtask}
           onCreateSubtaskAndEdit={handleCreateSubtaskAndEdit}
-          onOpenEditProject={handleOpenEditProject}
           completedVisible={completedVisible}
           getListCollapsed={getListCollapsed}
           setListCollapsed={setListCollapsed}
         />
+      )}
+
+      {viewMode === 'project' && activeProjectId && (
+        <button
+          type="button"
+          className="dashboard__edit-project-fab"
+          onMouseEnter={() => hasHover && setEditProjectFabHover(true)}
+          onMouseLeave={() => hasHover && setEditProjectFabHover(false)}
+          onClick={() =>
+            handleOpenEditProject(
+              activeProjectId,
+              projects.find((p) => p.id === activeProjectId)?.title ?? ''
+            )
+          }
+          aria-label="Редактировать проект"
+        >
+          <img src={hasHover && editProjectFabHover ? editNavIcon : editIcon} alt="" />
+        </button>
       )}
 
       <button type="button" className="dashboard__refresh" onMouseEnter={() => hasHover && setRefreshHover(true)} onMouseLeave={() => hasHover && setRefreshHover(false)} onClick={() => window.location.reload()} aria-label="Обновить">

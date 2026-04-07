@@ -7,15 +7,12 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DEFAULT_TASK_COLOR } from '../constants';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
-import editIcon from '../assets/edit.svg';
-import editNavIcon from '../assets/edit-nav.svg';
 import './NoDateList.css';
 
-export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onOpenEditProject, onTaskContextMenu, editingTaskId, onEditingTaskConsumed, onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit, completedVisible, getListCollapsed, setListCollapsed }) {
+export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, editingTaskId, onEditingTaskConsumed, onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit, completedVisible, getListCollapsed, setListCollapsed }) {
   const PROJECT_COMPLETED_KEY = `completed_project_${projectId}`;
   const completedOpen = getListCollapsed ? !getListCollapsed(PROJECT_COMPLETED_KEY) : true;
   const [plusHover, setPlusHover] = useState(false);
-  const [editHover, setEditHover] = useState(false);
   const hasHover = useMediaQuery('(hover: hover)');
 
   const toggleCompleted = () => setListCollapsed?.(PROJECT_COMPLETED_KEY, !getListCollapsed(PROJECT_COMPLETED_KEY));
@@ -47,10 +44,6 @@ export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate
 
   const handleAddAtStart = () => {
     onAddAtStart?.({ list_type: 'project', project_id: projectId, text_color: DEFAULT_TASK_COLOR });
-  };
-
-  const handleOpenEdit = () => {
-    onOpenEditProject?.(projectId, projectTitle);
   };
 
   return (
@@ -124,18 +117,6 @@ export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate
             </>
           )}
         </div>
-      <div className="no-date-list__footer">
-        <button
-          type="button"
-          className="no-date-list__edit-project-btn"
-          onMouseEnter={() => hasHover && setEditHover(true)}
-          onMouseLeave={() => hasHover && setEditHover(false)}
-          onClick={handleOpenEdit}
-          aria-label="Редактировать проект"
-        >
-          <img src={hasHover && editHover ? editNavIcon : editIcon} alt="" />
-        </button>
-      </div>
     </section>
   );
 }
