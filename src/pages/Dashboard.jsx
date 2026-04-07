@@ -45,6 +45,14 @@ import { ProjectList } from '../components/ProjectList';
 import { getContainerId, getContainerIdForBucket, getContainerIdFromTask, parseContainerId } from '../lib/dnd';
 import { toLocalDateString } from '../constants';
 import { parseSlotId } from '../components/DropSlot';
+import {
+  TASK_FONT_SCALE_OPTIONS,
+  TASK_FONT_WEIGHT_OPTIONS,
+  formatTaskScaleLabel,
+  normalizeTaskFontScale,
+  normalizeTaskFontWeight,
+  taskFontWeightToCssNumber,
+} from '../lib/taskFontSettings';
 import menuIcon from '../assets/menu.svg';
 import menuNavIcon from '../assets/menu-nav.svg';
 import leftIcon from '../assets/left.svg';
@@ -64,6 +72,8 @@ import folderNavIcon from '../assets/folder-nav.svg';
 import dragIcon from '../assets/drag.svg';
 import spacingIcon from '../assets/spacing.svg';
 import spacingNavIcon from '../assets/spacing-nav.svg';
+import textIcon from '../assets/text.svg';
+import textNavIcon from '../assets/text-nav.svg';
 import exitIcon from '../assets/exit.svg';
 import exitNavIcon from '../assets/exit-nav.svg';
 import eyeIcon from '../assets/eye.svg';
@@ -164,7 +174,15 @@ function SortableProjectItem({ project, isActive, isHover, folderIcon, folderNav
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const { tasks, addTask, updateTask, deleteTask, toggleComplete, moveTask } = useTasks();
-  const { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible, setSidebarWidthPx } = useSettings();
+  const {
+    settings,
+    setDaysCount,
+    setNewTasksPosition,
+    setNoDateListVisible,
+    setSidebarWidthPx,
+    setTaskFontWeight,
+    setTaskFontScale,
+  } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const { projects, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const [dateOffset, setDateOffset] = useState(() => {
@@ -262,6 +280,10 @@ export default function Dashboard() {
   const [menuWidthModalOpen, setMenuWidthModalOpen] = useState(false);
   const [menuWidthDraft, setMenuWidthDraft] = useState(220);
   const [spacingBtnHover, setSpacingBtnHover] = useState(false);
+  const [fontModalOpen, setFontModalOpen] = useState(false);
+  const [fontWeightDraft, setFontWeightDraft] = useState('medium');
+  const [fontScaleDraft, setFontScaleDraft] = useState(1);
+  const [textFontBtnHover, setTextFontBtnHover] = useState(false);
   const contextMenuRef = useRef(null);
   const hasHover = useMediaQuery('(hover: hover)');
   const isWideMenu = useMediaQuery('(min-width: 600px)');
@@ -749,11 +771,50 @@ export default function Dashboard() {
     setMenuWidthModalOpen(false);
   }, [menuWidthDraft, setSidebarWidthPx]);
 
+  const liveTaskFontWeight = fontModalOpen ? fontWeightDraft : settings.task_font_weight;
+  const liveTaskFontScale = fontModalOpen ? fontScaleDraft : settings.task_font_scale;
+
+  useEffect(() => {
+    const w = taskFontWeightToCssNumber(normalizeTaskFontWeight(liveTaskFontWeight));
+    const s = normalizeTaskFontScale(liveTaskFontScale);
+    document.documentElement.style.setProperty('--task-font-weight', String(w));
+    document.documentElement.style.setProperty('--task-font-scale', String(s));
+  }, [liveTaskFontWeight, liveTaskFontScale]);
+
+  const openFontModal = useCallback(() => {
+    setFontWeightDraft(normalizeTaskFontWeight(settings.task_font_weight));
+    setFontScaleDraft(normalizeTaskFontScale(settings.task_font_scale));
+    setFontModalOpen(true);
+  }, [settings.task_font_weight, settings.task_font_scale]);
+
+  const saveFontModal = useCallback(async () => {
+    await setTaskFontWeight(fontWeightDraft);
+    await setTaskFontScale(fontScaleDraft);
+    setFontModalOpen(false);
+  }, [fontWeightDraft, fontScaleDraft, setTaskFontWeight, setTaskFontScale]);
+
+  const renderFontMenuButton = () => (
+    <button
+      type="button"
+      className="dashboard-menu__font-btn"
+      onMouseEnter={() => hasHover && setTextFontBtnHover(true)}
+      onMouseLeave={() => hasHover && setTextFontBtnHover(false)}
+      onClick={openFontModal}
+      aria-label="Изменить размер шрифта"
+    >
+      <img src={hasHover && textFontBtnHover ? textNavIcon : textIcon} alt="" />
+    </button>
+  );
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
     <div
       className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''}`}
-      style={{ '--sidebar-width': `${liveMenuWidth}px` }}
+      style={{
+        '--sidebar-width': `${liveMenuWidth}px`,
+        '--task-font-weight': String(taskFontWeightToCssNumber(normalizeTaskFontWeight(liveTaskFontWeight))),
+        '--task-font-scale': String(normalizeTaskFontScale(liveTaskFontScale)),
+      }}
     >
       <header className="dashboard__header">
         <div className="dashboard__header-row">
@@ -886,6 +947,7 @@ export default function Dashboard() {
               >
                 <img src={hasHover && spacingBtnHover ? spacingNavIcon : spacingIcon} alt="" />
               </button>
+              {renderFontMenuButton()}
             </div>
           </nav>
         ) : (
@@ -971,6 +1033,7 @@ export default function Dashboard() {
                 +
                 <span className="dashboard-menu__add-project-text">Добавить проект</span>
               </button>
+              <div className="dashboard-menu__mobile-font-row">{renderFontMenuButton()}</div>
             </nav>
           </div>
         )
@@ -1146,6 +1209,47 @@ export default function Dashboard() {
                 Отмена
               </button>
               <button type="button" className="dashboard__settings-submit" onClick={saveMenuWidth}>
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {fontModalOpen && (
+        <div className="dashboard__settings-overlay" onClick={() => setFontModalOpen(false)}>
+          <div className="dashboard__settings-popup dashboard__font-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="dashboard__settings-title">Толщина шрифта</div>
+            <div className="dashboard__font-options">
+              {TASK_FONT_WEIGHT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`dashboard__font-chip ${normalizeTaskFontWeight(fontWeightDraft) === opt.id ? 'dashboard__font-chip--active' : ''}`}
+                  onClick={() => setFontWeightDraft(opt.id)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="dashboard__settings-title dashboard__font-popup__subtitle">Размер шрифта</div>
+            <div className="dashboard__font-options">
+              {TASK_FONT_SCALE_OPTIONS.map((sc) => (
+                <button
+                  key={sc}
+                  type="button"
+                  className={`dashboard__font-chip ${Math.abs(normalizeTaskFontScale(fontScaleDraft) - sc) < 0.051 ? 'dashboard__font-chip--active' : ''}`}
+                  onClick={() => setFontScaleDraft(sc)}
+                >
+                  {formatTaskScaleLabel(sc)}
+                </button>
+              ))}
+            </div>
+            <div className="dashboard__settings-edit-actions">
+              <button type="button" className="dashboard__settings-submit" onClick={() => setFontModalOpen(false)}>
+                Отмена
+              </button>
+              <button type="button" className="dashboard__settings-submit" onClick={saveFontModal}>
                 Сохранить
               </button>
             </div>

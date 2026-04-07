@@ -525,6 +525,110 @@
   object-fit: contain;
 }
 
+.dashboard-menu__font-btn {
+  width: 2rem;
+  height: 2rem;
+  margin-left: 5px;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #666666;
+  transition: color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.dashboard-menu__font-btn:hover {
+  color: #5a86ee;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dashboard-menu__font-btn img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+}
+
+/* Мобильное меню: иконка шрифта под «Добавить проект» (в т.ч. при ширине &lt; 500px) */
+.dashboard-menu__mobile-font-row {
+  display: none;
+}
+
+@media (max-width: 599px) {
+  .dashboard-menu--mobile .dashboard-menu__mobile-font-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0.75rem 0 0;
+  }
+
+  .dashboard-menu--mobile .dashboard-menu__mobile-font-row .dashboard-menu__font-btn {
+    margin-left: 0;
+  }
+}
+
+.dashboard__font-popup {
+  max-width: min(520px, calc(100vw - 2rem));
+  min-width: min(400px, calc(100vw - 2rem));
+  width: 100%;
+}
+
+.dashboard__font-popup .dashboard__settings-edit-actions {
+  margin-top: 20px;
+}
+
+.dashboard__font-popup__subtitle {
+  margin-top: 1rem;
+}
+
+.dashboard__font-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.dashboard__font-chip {
+  min-width: 4.5rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #1e1e1e;
+  color: #e0e0e0;
+  font-size: 0.875rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.dashboard__font-chip:hover {
+  border-color: #5a86ee;
+  color: #5a86ee;
+}
+
+.dashboard__font-chip--active {
+  border-color: #5a86ee;
+  background: rgba(90, 134, 238, 0.15);
+  color: #5a86ee;
+}
+
+/* «Размер шрифта»: квадратные кнопки (ширина = высота, высота как у ряда «Толщина») */
+.dashboard__font-popup__subtitle + .dashboard__font-options .dashboard__font-chip {
+  min-width: unset;
+  width: calc(0.45rem * 2 + 1.25 * 0.875rem);
+  height: calc(0.45rem * 2 + 1.25 * 0.875rem);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  line-height: 1.25;
+}
+
 .dashboard__menu-width-popup {
   max-width: 320px;
 }

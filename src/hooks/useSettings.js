@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { normalizeTaskFontScale, normalizeTaskFontWeight } from '../lib/taskFontSettings';
 
 function clampSidebarWidth(n) {
   const v = Number(n);
@@ -16,6 +17,8 @@ export function useSettings() {
     no_date_list_visible: true,
     completed_visible: true,
     sidebar_width_px: 220,
+    task_font_weight: 'medium',
+    task_font_scale: 1,
   });
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +30,9 @@ export function useSettings() {
     const fetch = async () => {
       const { data, error } = await supabase
         .from('user_settings')
-        .select('days_count, new_tasks_position, no_date_list_visible, completed_visible, sidebar_width_px')
+        .select(
+          'days_count, new_tasks_position, no_date_list_visible, completed_visible, sidebar_width_px, task_font_weight, task_font_scale'
+        )
         .eq('user_id', user.id)
         .maybeSingle();
       if (!error && data) {
@@ -37,6 +42,8 @@ export function useSettings() {
           no_date_list_visible: data.no_date_list_visible !== false,
           completed_visible: data.completed_visible !== false,
           sidebar_width_px: clampSidebarWidth(data.sidebar_width_px),
+          task_font_weight: normalizeTaskFontWeight(data.task_font_weight),
+          task_font_scale: normalizeTaskFontScale(data.task_font_scale),
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -46,8 +53,18 @@ export function useSettings() {
           no_date_list_visible: true,
           completed_visible: true,
           sidebar_width_px: 220,
+          task_font_weight: 'medium',
+          task_font_scale: 1,
         });
-        setSettings({ days_count: 3, new_tasks_position: 'start', no_date_list_visible: true, completed_visible: true, sidebar_width_px: 220 });
+        setSettings({
+          days_count: 3,
+          new_tasks_position: 'start',
+          no_date_list_visible: true,
+          completed_visible: true,
+          sidebar_width_px: 220,
+          task_font_weight: 'medium',
+          task_font_scale: 1,
+        });
       }
       setLoading(false);
     };
@@ -87,5 +104,29 @@ export function useSettings() {
     setSettings((s) => ({ ...s, sidebar_width_px: w }));
   };
 
-  return { settings, setDaysCount, setNewTasksPosition, setNoDateListVisible, setCompletedVisible, setSidebarWidthPx, loading };
+  const setTaskFontWeight = async (task_font_weight) => {
+    if (!user) return;
+    const w = normalizeTaskFontWeight(task_font_weight);
+    await supabase.from('user_settings').update({ task_font_weight: w }).eq('user_id', user.id);
+    setSettings((s) => ({ ...s, task_font_weight: w }));
+  };
+
+  const setTaskFontScale = async (task_font_scale) => {
+    if (!user) return;
+    const sc = normalizeTaskFontScale(task_font_scale);
+    await supabase.from('user_settings').update({ task_font_scale: sc }).eq('user_id', user.id);
+    setSettings((s) => ({ ...s, task_font_scale: sc }));
+  };
+
+  return {
+    settings,
+    setDaysCount,
+    setNewTasksPosition,
+    setNoDateListVisible,
+    setCompletedVisible,
+    setSidebarWidthPx,
+    setTaskFontWeight,
+    setTaskFontScale,
+    loading,
+  };
 }
