@@ -212,6 +212,8 @@ export default function Dashboard() {
       return 'plans';
     }
   }); // 'today' | 'plans' | 'no_date' | 'someday' | 'project'
+  const [dateTodayHover, setDateTodayHover] = useState(false);
+
   const [menuOpen, setMenuOpen] = useState(() => {
     try {
       const raw = localStorage.getItem('dashboard_view_state');
@@ -843,6 +845,16 @@ export default function Dashboard() {
                 </select>
                 <button type="button" className="dashboard__shift-btn" onMouseEnter={() => hasHover && setDateLeftHover(true)} onMouseLeave={() => hasHover && setDateLeftHover(false)} onClick={() => setDateOffset((o) => o - 1)} aria-label="Назад">
                   <img src={hasHover && dateLeftHover ? leftNavIcon : leftIcon} alt="" />
+                </button>
+                <button
+                  type="button"
+                  className="dashboard__shift-btn dashboard__shift-btn--today"
+                  onMouseEnter={() => hasHover && setDateTodayHover(true)}
+                  onMouseLeave={() => hasHover && setDateTodayHover(false)}
+                  onClick={() => setDateOffset(0)}
+                  aria-label="Сегодня"
+                >
+                  <span className={`dashboard__shift-today-dot ${hasHover && dateTodayHover ? 'dashboard__shift-today-dot--hover' : ''}`} aria-hidden />
                 </button>
                 <button type="button" className="dashboard__shift-btn" onMouseEnter={() => hasHover && setDateRightHover(true)} onMouseLeave={() => hasHover && setDateRightHover(false)} onClick={() => setDateOffset((o) => o + 1)} aria-label="Вперёд">
                   <img src={hasHover && dateRightHover ? rightNavIcon : rightIcon} alt="" />

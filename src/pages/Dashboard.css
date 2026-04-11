@@ -86,6 +86,23 @@
   object-fit: contain;
 }
 
+.dashboard__shift-btn--today .dashboard__shift-today-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #888;
+  display: block;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.dashboard__shift-btn--today .dashboard__shift-today-dot--hover {
+  background: #5a86ee;
+}
+
+.dashboard__shift-btn--today:active .dashboard__shift-today-dot {
+  transform: scale(0.92);
+}
+
 .dashboard__header-actions {
   display: flex;
   align-items: center;
@@ -558,19 +575,6 @@
   display: none;
 }
 
-@media (max-width: 599px) {
-  .dashboard-menu--mobile .dashboard-menu__mobile-font-row {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 0.75rem 0 0;
-  }
-
-  .dashboard-menu--mobile .dashboard-menu__mobile-font-row .dashboard-menu__font-btn {
-    margin-left: 0;
-  }
-}
-
 .dashboard__font-popup {
   max-width: min(520px, calc(100vw - 2rem));
   min-width: min(400px, calc(100vw - 2rem));
@@ -724,56 +728,31 @@
 }
 
 @media (max-width: 599px) {
-  .dashboard-menu__item {
-    font-size: 1.8rem;
-    padding: 1.05rem 0.6rem;
-    padding-left: calc(0.6rem + 4px);
-    gap: 1rem;
+  .dashboard-menu--mobile .dashboard-menu__item {
+    font-size: 1.0625rem;
+    padding: 0.62rem 0.45rem;
+    padding-left: calc(0.45rem + 4px);
+    gap: 0.65rem;
   }
 
-  .dashboard-menu__item img {
-    width: 2.25rem;
-    height: 2.25rem;
+  .dashboard-menu--mobile .dashboard-menu__item img {
+    width: 1.2rem;
+    height: 1.2rem;
   }
 
-  .dashboard-menu__close {
-    width: 1.75rem;
-    height: 1.75rem;
-    font-size: 1.05rem;
+  .dashboard-menu--mobile .dashboard-menu__close {
+    width: 1.55rem;
+    height: 1.55rem;
+    font-size: 0.95rem;
   }
 
-  .dashboard-menu__add-project {
-    position: static;
-    left: auto;
-    bottom: auto;
-    width: fit-content;
-    height: auto;
-    font-size: 2.25rem;
-    line-height: 1;
-    margin: 1rem auto 0;
-    padding: 0.6rem 1rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.06);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    color: #e0e0e0;
-    transition: background 260ms ease, transform 260ms ease;
+  .dashboard-menu--mobile .dashboard-menu__project-drag-handle {
+    padding: 0.2rem;
   }
 
-  .dashboard-menu__add-project:hover {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .dashboard-menu__add-project:active {
-    transform: translateY(1px);
-  }
-
-  .dashboard-menu__add-project-text {
-    display: inline;
-    font-size: 1.125rem;
-    color: #e0e0e0;
+  .dashboard-menu--mobile .dashboard-menu__project-drag-handle img {
+    width: 0.82rem;
+    height: 0.82rem;
   }
 }
 
@@ -884,10 +863,14 @@
 }
 
 @media (max-width: 599px) {
-  .dashboard-menu__add-project {
+  .dashboard-menu.dashboard-menu--mobile {
+    padding-bottom: 11rem;
+  }
+
+  .dashboard-menu--mobile .dashboard-menu__add-project {
     position: fixed;
     left: 50%;
-    bottom: 40px;
+    bottom: 86px;
     transform: translateX(-50%);
     width: auto;
     height: auto;
@@ -906,18 +889,35 @@
     z-index: 95;
   }
 
-  .dashboard-menu__add-project:hover {
+  .dashboard-menu--mobile .dashboard-menu__add-project:hover {
     background: rgba(255, 255, 255, 0.08);
     color: #5A86EE;
+    transform: translateX(-50%);
   }
 
-  .dashboard-menu__add-project:active {
-    transform: translateY(1px);
+  .dashboard-menu--mobile .dashboard-menu__add-project:active {
+    transform: translateX(-50%) translateY(1px);
   }
 
-  .dashboard-menu__add-project-text {
+  .dashboard-menu--mobile .dashboard-menu__add-project-text {
     display: inline;
     font-size: 0.95rem;
     color: #666666;
+  }
+
+  .dashboard-menu--mobile .dashboard-menu__mobile-font-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    z-index: 95;
+    padding: 0;
+  }
+
+  .dashboard-menu--mobile .dashboard-menu__mobile-font-row .dashboard-menu__font-btn {
+    margin-left: 0;
   }
 }
