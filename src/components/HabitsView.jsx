@@ -304,7 +304,7 @@ export function HabitsView({
   const [offset, setOffset] = useState(() => loadInt(HABITS_OFFSET_KEY, 0));
   const [daysCount, setDaysCount] = useState(() => {
     const n = loadInt(HABITS_COUNT_KEY, 21);
-    return n >= 1 && n <= 31 ? n : 21;
+    return n >= 1 && n <= 60 ? n : 21;
   });
   const [selectedId, setSelectedId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -548,7 +548,7 @@ export function HabitsView({
           onChange={(e) => setDaysCount(Number(e.target.value))}
           aria-label="Число дней в сетке"
         >
-          {[7, 14, 21, 28, 31].map((n) => (
+          {[3, 4, 5, 6, 7, 14, 21, 28, 30, 60].map((n) => (
             <option key={n} value={n}>
               {n}
             </option>
