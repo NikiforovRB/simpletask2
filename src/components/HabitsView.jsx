@@ -17,7 +17,10 @@ import {
   getEntryColor,
   computeStreak,
   normalizeHabitTimeString,
+  isInfoHabitType,
 } from '../lib/habitsLogic';
+
+const INFO_HABIT_COLOR = '#666666';
 import checkIcon from '../assets/check.svg';
 import netIcon from '../assets/net.svg';
 import dragIcon from '../assets/drag.svg';
@@ -64,6 +67,7 @@ function getDays(baseDate, count) {
 }
 
 function HabitNameRow({ habit, isSelected, streak, onSelect, onEdit, isFirst }) {
+  const isInfo = isInfoHabitType(habit.type);
   return (
     <div
       className={`habits-view__name-row ${isFirst ? 'habits-view__name-row--first' : ''}`}
@@ -80,8 +84,13 @@ function HabitNameRow({ habit, isSelected, streak, onSelect, onEdit, isFirst }) 
           onEdit(habit.id);
         }}
       >
-        <span className="habits-view__name-text">{habit.title}</span>
-        {habit.streak_enabled && streak > 0 && (
+        <span
+          className="habits-view__name-text"
+          style={isInfo && !isSelected ? { color: INFO_HABIT_COLOR } : undefined}
+        >
+          {habit.title}
+        </span>
+        {!isInfo && habit.streak_enabled && streak > 0 && (
           <span className="habits-view__streak" title="Дней подряд">
             {streak}
           </span>
@@ -174,6 +183,47 @@ function TimePickCell({ habit, entry, dateStr, onOpen }) {
     >
       {t ? <span style={color ? { color } : undefined}>{t.length >= 5 ? t.slice(0, 5) : t}</span> : null}
     </button>
+  );
+}
+
+function JustTimeCell({ habit, entry, dateStr, onOpen }) {
+  const t = entry?.time;
+  return (
+    <button
+      type="button"
+      className="habits-view__cell habits-view__time-pick"
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen({ habitId: habit.id, dateStr, initial: t || '' });
+      }}
+    >
+      {t ? <span style={{ color: INFO_HABIT_COLOR }}>{t.length >= 5 ? t.slice(0, 5) : t}</span> : null}
+    </button>
+  );
+}
+
+function JustTextCell({ entry, onCommit }) {
+  const saved = typeof entry?.text === 'string' ? entry.text : '';
+  const [local, setLocal] = useState(saved);
+  useEffect(() => {
+    setLocal(saved);
+  }, [saved]);
+  return (
+    <input
+      type="text"
+      className="habits-view__cell habits-view__cell--input habits-view__cell--text"
+      style={{ color: INFO_HABIT_COLOR }}
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => {
+        const raw = local;
+        if ((raw || '').trim() === '') {
+          onCommit(null);
+          return;
+        }
+        onCommit({ text: raw });
+      }}
+    />
   );
 }
 
@@ -572,6 +622,10 @@ export function HabitsView({
                       {habit.type === 'not_later' && (
                         <TimePickCell habit={habit} entry={entry} dateStr={ds} onOpen={openTimePicker} />
                       )}
+                      {habit.type === 'just_time' && (
+                        <JustTimeCell habit={habit} entry={entry} dateStr={ds} onOpen={openTimePicker} />
+                      )}
+                      {habit.type === 'just_text' && <JustTextCell entry={entry} onCommit={setVal} />}
                     </div>
                   );
                 })
@@ -748,6 +802,8 @@ export function HabitsView({
                 { id: 'not_more', label: 'Не больше (число)' },
                 { id: 'not_less', label: 'Не меньше (число)' },
                 { id: 'not_later', label: 'Не позже (время)' },
+                { id: 'just_time', label: 'Просто время' },
+                { id: 'just_text', label: 'Просто текст' },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -802,10 +858,12 @@ export function HabitsView({
                 </button>
               ))}
             </div>
-            <label className="habits-view__toggle">
-              <input type="checkbox" checked={formStreak} onChange={(e) => setFormStreak(e.target.checked)} />
-              <span>Считать дни подряд</span>
-            </label>
+            {!isInfoHabitType(formType) && (
+              <label className="habits-view__toggle">
+                <input type="checkbox" checked={formStreak} onChange={(e) => setFormStreak(e.target.checked)} />
+                <span>Считать дни подряд</span>
+              </label>
+            )}
             <div className="dashboard__settings-edit-actions">
               {editingId && (
                 <button type="button" className="dashboard__settings-delete" onClick={handleDelete}>

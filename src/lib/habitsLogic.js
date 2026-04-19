@@ -56,6 +56,11 @@ function parseTimeToMinutes(t) {
   return h * 60 + min;
 }
 
+/** Типы-заметки без оценки "успех/провал" (нет счётчика серии) */
+export function isInfoHabitType(type) {
+  return type === 'just_time' || type === 'just_text';
+}
+
 /** true = соблюдено, false = нет, null = нет данных / нельзя оценить */
 export function isSatisfied(habit, rawEntry) {
   const type = habit.type;
@@ -86,6 +91,7 @@ export function isSatisfied(habit, rawEntry) {
     return userMin <= limitMin;
   }
 
+  // just_time / just_text — это просто заметки, успеха/провала нет
   return null;
 }
 
@@ -104,6 +110,7 @@ export function getEntryColor(habit, rawEntry) {
  */
 export function computeStreak(habit, entriesByDate, todayStr) {
   if (!habit.streak_enabled) return 0;
+  if (isInfoHabitType(habit.type)) return 0;
 
   if (isRequiredDay(habit, todayStr)) {
     const satToday = isSatisfied(habit, entriesByDate[todayStr]);
