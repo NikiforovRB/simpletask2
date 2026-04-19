@@ -38,7 +38,9 @@ import { useSettings } from '../hooks/useSettings';
 import { useListCollapsed } from '../hooks/useListCollapsed';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useProjects } from '../hooks/useProjects';
+import { useHabits } from '../hooks/useHabits';
 import { DayCard } from '../components/DayCard';
+import { HabitsView } from '../components/HabitsView';
 import { NoDateList } from '../components/NoDateList';
 import { SomedayList } from '../components/SomedayList';
 import { ProjectList } from '../components/ProjectList';
@@ -89,6 +91,8 @@ import editNavIcon from '../assets/edit-nav.svg';
 import deleteNavIcon from '../assets/delete-nav2.svg';
 import zavtraIcon from '../assets/zavtra.svg';
 import poslezavtraIcon from '../assets/poslezavtra.svg';
+import privIcon from '../assets/priv.svg';
+import privNavIcon from '../assets/priv-nav.svg';
 import './Dashboard.css';
 
 function getDays(baseDate, count) {
@@ -185,6 +189,7 @@ export default function Dashboard() {
   } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const { projects, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
+  const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
   const [dateOffset, setDateOffset] = useState(() => {
     try {
       const v = localStorage.getItem('dashboard_date_offset');
@@ -207,11 +212,11 @@ export default function Dashboard() {
       if (!raw) return 'plans';
       const parsed = JSON.parse(raw);
       const v = parsed?.viewMode;
-      return ['today', 'plans', 'no_date', 'someday', 'project'].includes(v) ? v : 'plans';
+      return ['today', 'plans', 'no_date', 'someday', 'habits', 'project'].includes(v) ? v : 'plans';
     } catch {
       return 'plans';
     }
-  }); // 'today' | 'plans' | 'no_date' | 'someday' | 'project'
+  }); // 'today' | 'plans' | 'no_date' | 'someday' | 'habits' | 'project'
   const [dateTodayHover, setDateTodayHover] = useState(false);
 
   const [menuOpen, setMenuOpen] = useState(() => {
@@ -242,6 +247,7 @@ export default function Dashboard() {
     if (viewMode === 'plans') return 'plans';
     if (viewMode === 'no_date') return 'no_date';
     if (viewMode === 'someday') return 'someday';
+    if (viewMode === 'habits') return 'habits';
     if (viewMode === 'project' && activeProjectId) return `project:${activeProjectId}`;
     return null;
   }, [viewMode, activeProjectId]);
@@ -264,6 +270,7 @@ export default function Dashboard() {
   const [plansHover, setPlansHover] = useState(false);
   const [noDateHover, setNoDateHover] = useState(false);
   const [somedayHover, setSomedayHover] = useState(false);
+  const [habitsHover, setHabitsHover] = useState(false);
   const [projectHoverId, setProjectHoverId] = useState(null);
   const [eyeHover, setEyeHover] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
@@ -279,6 +286,7 @@ export default function Dashboard() {
   const [contextMenu, setContextMenu] = useState(null);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [activeProjectDragId, setActiveProjectDragId] = useState(null);
+  const [activeHabitDragId, setActiveHabitDragId] = useState(null);
   const [menuWidthModalOpen, setMenuWidthModalOpen] = useState(false);
   const [menuWidthDraft, setMenuWidthDraft] = useState(220);
   const [spacingBtnHover, setSpacingBtnHover] = useState(false);
@@ -297,6 +305,10 @@ export default function Dashboard() {
   const activeProjectDrag = useMemo(
     () => (activeProjectDragId ? projects.find((p) => p.id === activeProjectDragId) : null),
     [activeProjectDragId, projects]
+  );
+  const activeHabitDrag = useMemo(
+    () => (activeHabitDragId ? habits.find((h) => h.id === activeHabitDragId) : null),
+    [activeHabitDragId, habits]
   );
 
   const closeMenu = useCallback(() => {
@@ -346,7 +358,7 @@ export default function Dashboard() {
   }, [viewMode, activeProjectId, projects]);
 
   const handleMenuSelect = useCallback((viewModeOrProject) => {
-    const isViewMode = ['today', 'plans', 'no_date', 'someday'].includes(viewModeOrProject);
+    const isViewMode = ['today', 'plans', 'no_date', 'someday', 'habits'].includes(viewModeOrProject);
     if (isViewMode) {
       setViewMode(viewModeOrProject);
       setActiveProjectId(null);
@@ -658,6 +670,14 @@ export default function Dashboard() {
   const handleDragEnd = useCallback(
     async (event) => {
       const { active, over } = event;
+      const habitIds = habits.map((h) => h.id);
+      if (habitIds.includes(active.id) && over && habitIds.includes(over.id) && active.id !== over.id) {
+        const oldIndex = habitIds.indexOf(active.id);
+        const newIndex = habitIds.indexOf(over.id);
+        const newOrder = arrayMove(habitIds, oldIndex, newIndex);
+        reorderHabits(newOrder);
+        return;
+      }
       const projectIds = projects.map((p) => p.id);
       if (projectIds.includes(active.id) && over && projectIds.includes(over.id) && active.id !== over.id) {
         const oldIndex = projectIds.indexOf(active.id);
@@ -728,7 +748,7 @@ export default function Dashboard() {
         }
       });
     },
-    [tasks, projects, moveTask, updateTask, reorderProjects]
+    [tasks, projects, habits, moveTask, updateTask, reorderProjects, reorderHabits]
   );
 
   const sensors = useSensors(
@@ -737,15 +757,21 @@ export default function Dashboard() {
 
   const handleDragStart = useCallback(
     (event) => {
-      if (projects.some((p) => p.id === event.active.id)) {
+      if (habits.some((h) => h.id === event.active.id)) {
+        setActiveHabitDragId(event.active.id);
+        setActiveDragId(null);
+        setActiveProjectDragId(null);
+      } else if (projects.some((p) => p.id === event.active.id)) {
         setActiveProjectDragId(event.active.id);
         setActiveDragId(null);
+        setActiveHabitDragId(null);
       } else {
         setActiveDragId(event.active.id);
         setActiveProjectDragId(null);
+        setActiveHabitDragId(null);
       }
     },
-    [projects]
+    [habits, projects]
   );
 
   const handleDragEndWithClear = useCallback(
@@ -753,6 +779,7 @@ export default function Dashboard() {
       await handleDragEnd(event);
       setActiveDragId(null);
       setActiveProjectDragId(null);
+      setActiveHabitDragId(null);
     },
     [handleDragEnd]
   );
@@ -811,7 +838,7 @@ export default function Dashboard() {
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
     <div
-      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''}`}
+      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''}`}
       style={{
         '--sidebar-width': `${liveMenuWidth}px`,
         '--task-font-weight': String(taskFontWeightToCssNumber(normalizeTaskFontWeight(liveTaskFontWeight))),
@@ -863,9 +890,11 @@ export default function Dashboard() {
             )}
           </div>
           <div className="dashboard__header-actions">
+            {viewMode !== 'habits' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
+            )}
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setSettingsHover(true)} onMouseLeave={() => hasHover && setSettingsHover(false)} onClick={() => setSettingsOpen((v) => !v)} aria-label="Настройки">
               <img src={hasHover && settingsHover ? settingsNavIcon : settingsIcon} alt="" />
             </button>
@@ -922,6 +951,16 @@ export default function Dashboard() {
               >
                 <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
                 <span>Когда-нибудь</span>
+              </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'habits' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setHabitsHover(true)}
+                onMouseLeave={() => hasHover && setHabitsHover(false)}
+                onClick={() => handleMenuSelect('habits')}
+              >
+                <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
+                <span>Привычки</span>
               </button>
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                 {projects.map((p) => (
@@ -1018,6 +1057,16 @@ export default function Dashboard() {
               >
                 <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
                 <span>Когда-нибудь</span>
+              </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'habits' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setHabitsHover(true)}
+                onMouseLeave={() => hasHover && setHabitsHover(false)}
+                onClick={() => handleMenuSelect('habits')}
+              >
+                <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
+                <span>Привычки</span>
               </button>
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                 {projects.map((p) => (
@@ -1339,6 +1388,19 @@ export default function Dashboard() {
         />
       )}
 
+      {viewMode === 'habits' && (
+        <HabitsView
+          habits={habits}
+          entries={habitEntries}
+          addHabit={addHabit}
+          updateHabit={updateHabit}
+          deleteHabit={deleteHabit}
+          reorderHabits={reorderHabits}
+          setEntry={setHabitEntry}
+          hasHover={hasHover}
+        />
+      )}
+
       {viewMode === 'project' && activeProjectId && (
         <ProjectList
           projectId={activeProjectId}
@@ -1402,6 +1464,10 @@ export default function Dashboard() {
           <div className="dashboard-menu__project-drag-overlay" style={{ cursor: 'grabbing', pointerEvents: 'none' }}>
             <img src={folderIcon} alt="" />
             <span>{activeProjectDrag.title}</span>
+          </div>
+        ) : activeHabitDrag ? (
+          <div className="habits-view__drag-overlay" style={{ cursor: 'grabbing', pointerEvents: 'none' }}>
+            <span>{activeHabitDrag.title}</span>
           </div>
         ) : null}
       </DragOverlay>

@@ -9,6 +9,12 @@
   transition: padding-left 360ms ease;
 }
 
+.dashboard--habits {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
 .dashboard__header {
   margin-bottom: 1.25rem;
 }
