@@ -414,6 +414,12 @@ export function HabitsView({
 
   const todayStr = useMemo(() => toLocalDateString(today), [today]);
 
+  const todayColIdx = useMemo(
+    () => dateColumns.findIndex((d) => toLocalDateString(d) === todayStr),
+    [dateColumns, todayStr]
+  );
+  const todayIsFirstCol = todayColIdx === 0;
+
   const gridTemplateColumns = useMemo(
     () => `repeat(${dateColumns.length}, minmax(44px, 1fr))`,
     [dateColumns.length]
@@ -682,11 +688,19 @@ export function HabitsView({
                   );
                 })}
               </div>
-              <div className="habits-view__head-row" style={{ gridTemplateColumns }}>
-                {dateColumns.map((d) => {
+              <div
+                className={`habits-view__head-row ${todayIsFirstCol ? 'habits-view__head-row--today-first' : ''}`}
+                style={{ gridTemplateColumns }}
+              >
+                {dateColumns.map((d, i) => {
                   const ds = toLocalDateString(d);
+                  const isToday = ds === todayStr;
+                  const isTodayPrev = todayColIdx > 0 && i === todayColIdx - 1;
                   return (
-                    <div key={`h-${ds}`} className="habits-view__head-cell">
+                    <div
+                      key={`h-${ds}`}
+                      className={`habits-view__head-cell ${isToday ? 'habits-view__head-cell--today' : ''} ${isTodayPrev ? 'habits-view__head-cell--today-prev' : ''}`}
+                    >
                       <div className="habits-view__head-wd">{weekdayShortMon(d)}</div>
                       <div className="habits-view__head-day">{d.getDate()}</div>
                     </div>
@@ -694,7 +708,10 @@ export function HabitsView({
                 })}
               </div>
             </div>
-            <div className="habits-view__data-grid" style={{ gridTemplateColumns }}>
+            <div
+              className="habits-view__data-grid"
+              style={{ gridTemplateColumns }}
+            >
               {habits.flatMap((habit) =>
                 dateColumns.map((d) => {
                   const ds = toLocalDateString(d);

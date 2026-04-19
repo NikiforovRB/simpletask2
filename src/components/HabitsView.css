@@ -465,6 +465,32 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+.habits-view__head-cell--today {
+  position: relative;
+  border-right-color: #5A86EE;
+  border-bottom-color: #5A86EE;
+}
+
+.habits-view__head-cell--today-prev {
+  border-right-color: #5A86EE;
+}
+
+.habits-view__head-cell--today::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: -1px;
+  height: 1px;
+  background: #5A86EE;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.habits-view__head-row--today-first {
+  border-left-color: #5A86EE;
+}
+
 .habits-view__cell {
   width: 100%;
   height: 100%;
