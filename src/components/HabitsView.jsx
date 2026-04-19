@@ -18,9 +18,69 @@ import {
   computeStreak,
   normalizeHabitTimeString,
   isInfoHabitType,
+  parseTimeToMinutes,
+  formatMinutesToHabitTime,
 } from '../lib/habitsLogic';
 
 const INFO_HABIT_COLOR = '#666666';
+
+const MONTH_FULL_RU = [
+  'Январь',
+  'Февраль',
+  'Март',
+  'Апрель',
+  'Май',
+  'Июнь',
+  'Июль',
+  'Август',
+  'Сентябрь',
+  'Октябрь',
+  'Ноябрь',
+  'Декабрь',
+];
+
+const WEEKDAY_SHORT_MON = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+
+function getMonthGridCells(year, month) {
+  const first = new Date(year, month, 1);
+  const firstDay = first.getDay();
+  const padStart = firstDay === 0 ? 6 : firstDay - 1;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < padStart; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+function computeMonthAverageLabel(habit, habitEntries, year, month) {
+  const type = habit.type;
+  if (type !== 'not_more' && type !== 'not_later' && type !== 'just_time') return null;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const nums = [];
+  const mins = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = toLocalDateString(new Date(year, month, d));
+    const e = habitEntries[ds];
+    if (!e) continue;
+    if (type === 'not_more') {
+      const n = Number(e.num);
+      if (Number.isFinite(n)) nums.push(n);
+    } else {
+      const m = parseTimeToMinutes(e.time);
+      if (m != null) mins.push(m);
+    }
+  }
+  if (type === 'not_more') {
+    if (!nums.length) return null;
+    const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+    const r = Math.round(avg * 100) / 100;
+    return Number.isInteger(r) ? String(r) : r.toFixed(2).replace(/\.?0+$/, '');
+  }
+  if (!mins.length) return null;
+  const avg = mins.reduce((a, b) => a + b, 0) / mins.length;
+  return formatMinutesToHabitTime(avg);
+}
 import checkIcon from '../assets/check.svg';
 import netIcon from '../assets/net.svg';
 import dragIcon from '../assets/drag.svg';
@@ -34,6 +94,8 @@ import rightIcon from '../assets/right.svg';
 import rightNavIcon from '../assets/right-nav.svg';
 import spacingIcon from '../assets/spacing.svg';
 import spacingNavIcon from '../assets/spacing-nav.svg';
+import calendarIcon from '../assets/calendar.svg';
+import calendarNavIcon from '../assets/calendar-nav.svg';
 import './HabitsView.css';
 
 function clampHabitsSidebarWidthPx(n) {
@@ -260,6 +322,9 @@ export function HabitsView({
   const [editBtnHover, setEditBtnHover] = useState(false);
   const [reorderBtnHover, setReorderBtnHover] = useState(false);
   const [widthBtnHover, setWidthBtnHover] = useState(false);
+  const [statsBtnHover, setStatsBtnHover] = useState(false);
+  const [statsPrevHover, setStatsPrevHover] = useState(false);
+  const [statsNextHover, setStatsNextHover] = useState(false);
   const [todayHover, setTodayHover] = useState(false);
   const [timeModal, setTimeModal] = useState(null);
   const timeInputRef = useRef(null);
@@ -269,6 +334,7 @@ export function HabitsView({
   const [activeReorderId, setActiveReorderId] = useState(null);
   const [widthModalOpen, setWidthModalOpen] = useState(false);
   const [widthDraft, setWidthDraft] = useState(220);
+  const [statsModal, setStatsModal] = useState(null);
 
   const effectiveSidebarWidth = clampHabitsSidebarWidthPx(habitsSidebarWidthPx ?? 220);
   const liveSidebarWidth = widthModalOpen ? clampHabitsSidebarWidthPx(widthDraft) : effectiveSidebarWidth;
@@ -288,6 +354,21 @@ export function HabitsView({
     }
     setWidthModalOpen(false);
   }, [widthDraft, setHabitsSidebarWidthPx]);
+
+  const openStatsModal = useCallback((habitId) => {
+    const now = new Date();
+    setStatsModal({ habitId, year: now.getFullYear(), month: now.getMonth() });
+  }, []);
+
+  const shiftStatsMonth = useCallback((delta) => {
+    setStatsModal((m) => {
+      if (!m) return m;
+      const d = new Date(m.year, m.month + delta, 1);
+      return { habitId: m.habitId, year: d.getFullYear(), month: d.getMonth() };
+    });
+  }, []);
+
+  const closeStatsModal = useCallback(() => setStatsModal(null), []);
 
   useEffect(() => {
     try {
@@ -538,6 +619,18 @@ export function HabitsView({
             <button
               type="button"
               className="habits-view__action-btn habits-view__action-btn--icon"
+              onMouseEnter={() => hasHover && setStatsBtnHover(true)}
+              onMouseLeave={() => hasHover && setStatsBtnHover(false)}
+              onClick={() => openStatsModal(selectedId)}
+              aria-label="Данные за месяц"
+            >
+              <img src={hasHover && statsBtnHover ? calendarNavIcon : calendarIcon} alt="" />
+            </button>
+          )}
+          {selectedId && (
+            <button
+              type="button"
+              className="habits-view__action-btn habits-view__action-btn--icon"
               onMouseEnter={() => hasHover && setEditBtnHover(true)}
               onMouseLeave={() => hasHover && setEditBtnHover(false)}
               onClick={() => openEditModal(selectedId)}
@@ -737,6 +830,138 @@ export function HabitsView({
           </div>
         </div>
       )}
+
+      {statsModal && (() => {
+        const habit = habits.find((h) => h.id === statsModal.habitId);
+        if (!habit) return null;
+        const habitEntries = entries[habit.id] || {};
+        const cells = getMonthGridCells(statsModal.year, statsModal.month);
+        const avg = computeMonthAverageLabel(habit, habitEntries, statsModal.year, statsModal.month);
+        const todayDs = toLocalDateString(today);
+        const renderCellValue = (ds, entry) => {
+          if (!entry) return null;
+          if (habit.type === 'yes_no') {
+            if (entry.yes_no === 'yes') {
+              return <img src={checkIcon} alt="" className="habits-view__stats-yesno" />;
+            }
+            if (entry.yes_no === 'no') {
+              return <img src={netIcon} alt="" className="habits-view__stats-yesno" />;
+            }
+            return null;
+          }
+          if (habit.type === 'not_more' || habit.type === 'not_less') {
+            if (entry.num == null || entry.num === '') return null;
+            const color = getEntryColor(habit, entry);
+            return (
+              <span style={color ? { color } : undefined}>
+                {String(entry.num)}
+              </span>
+            );
+          }
+          if (habit.type === 'not_later') {
+            if (!entry.time) return null;
+            const color = getEntryColor(habit, entry);
+            return (
+              <span style={color ? { color } : undefined}>
+                {entry.time.length >= 5 ? entry.time.slice(0, 5) : entry.time}
+              </span>
+            );
+          }
+          if (habit.type === 'just_time') {
+            if (!entry.time) return null;
+            return (
+              <span style={{ color: INFO_HABIT_COLOR }}>
+                {entry.time.length >= 5 ? entry.time.slice(0, 5) : entry.time}
+              </span>
+            );
+          }
+          if (habit.type === 'just_text') {
+            if (!entry.text) return null;
+            return (
+              <span className="habits-view__stats-text" style={{ color: INFO_HABIT_COLOR }} title={entry.text}>
+                {entry.text}
+              </span>
+            );
+          }
+          return null;
+        };
+        return (
+          <div className="dashboard__settings-overlay" onClick={closeStatsModal}>
+            <div
+              className="dashboard__settings-popup habits-view__stats-popup"
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="habits-view__stats-close"
+                onClick={closeStatsModal}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+              <div className="habits-view__stats-title">{habit.title}</div>
+              <div className="habits-view__stats-monthbar">
+                <button
+                  type="button"
+                  className="dashboard__shift-btn"
+                  onMouseEnter={() => hasHover && setStatsPrevHover(true)}
+                  onMouseLeave={() => hasHover && setStatsPrevHover(false)}
+                  onClick={() => shiftStatsMonth(-1)}
+                  aria-label="Предыдущий месяц"
+                >
+                  <img src={hasHover && statsPrevHover ? leftNavIcon : leftIcon} alt="" />
+                </button>
+                <span className="habits-view__stats-monthlabel">
+                  {MONTH_FULL_RU[statsModal.month]} {statsModal.year}
+                </span>
+                <button
+                  type="button"
+                  className="dashboard__shift-btn"
+                  onMouseEnter={() => hasHover && setStatsNextHover(true)}
+                  onMouseLeave={() => hasHover && setStatsNextHover(false)}
+                  onClick={() => shiftStatsMonth(1)}
+                  aria-label="Следующий месяц"
+                >
+                  <img src={hasHover && statsNextHover ? rightNavIcon : rightIcon} alt="" />
+                </button>
+              </div>
+              <div className="habits-view__stats-weekdays">
+                {WEEKDAY_SHORT_MON.map((wd) => (
+                  <div key={wd} className="habits-view__stats-wd">
+                    {wd}
+                  </div>
+                ))}
+              </div>
+              <div className="habits-view__stats-grid">
+                {cells.map((d, i) => {
+                  if (!d) {
+                    return <div key={`e-${i}`} className="habits-view__stats-cell habits-view__stats-cell--empty" />;
+                  }
+                  const ds = toLocalDateString(d);
+                  const entry = habitEntries[ds];
+                  const isToday = ds === todayDs;
+                  return (
+                    <div
+                      key={ds}
+                      className={`habits-view__stats-cell ${isToday ? 'habits-view__stats-cell--today' : ''}`}
+                    >
+                      <div className="habits-view__stats-day">{d.getDate()}</div>
+                      <div className="habits-view__stats-val">{renderCellValue(ds, entry)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              {avg != null && (
+                <div className="habits-view__stats-avg">
+                  Среднее за месяц: <strong>{avg}</strong>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {reorderOpen && (
         <div className="dashboard__settings-overlay" onClick={() => setReorderOpen(false)}>

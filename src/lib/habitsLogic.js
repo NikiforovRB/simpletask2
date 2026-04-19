@@ -45,7 +45,7 @@ export function normalizeHabitTimeString(input) {
   return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
-function parseTimeToMinutes(t) {
+export function parseTimeToMinutes(t) {
   if (t == null || t === '') return null;
   const norm = normalizeHabitTimeString(t);
   if (!norm) return null;
@@ -54,6 +54,15 @@ function parseTimeToMinutes(t) {
   const h = Number(m[1]);
   const min = Number(m[2]);
   return h * 60 + min;
+}
+
+export function formatMinutesToHabitTime(mins) {
+  if (mins == null || !Number.isFinite(mins)) return '';
+  let total = Math.round(mins);
+  total = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+  const h = Math.floor(total / 60);
+  const m = total - h * 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 /** Типы-заметки без оценки "успех/провал" (нет счётчика серии) */
