@@ -184,6 +184,7 @@ export default function Dashboard() {
     setNewTasksPosition,
     setNoDateListVisible,
     setSidebarWidthPx,
+    setHabitsSidebarWidthPx,
     setTaskFontWeight,
     setTaskFontScale,
   } = useSettings();
@@ -1398,6 +1399,8 @@ export default function Dashboard() {
           reorderHabits={reorderHabits}
           setEntry={setHabitEntry}
           hasHover={hasHover}
+          habitsSidebarWidthPx={settings.habits_sidebar_width_px ?? 220}
+          setHabitsSidebarWidthPx={setHabitsSidebarWidthPx}
         />
       )}
 

@@ -75,8 +75,8 @@
 }
 
 .habits-view__sidebar-col {
-  flex: 0 0 220px;
-  min-width: 180px;
+  flex: 0 0 auto;
+  min-width: 100px;
   display: flex;
   flex-direction: column;
   background: transparent;

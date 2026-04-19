@@ -9,6 +9,12 @@ function clampSidebarWidth(n) {
   return 220;
 }
 
+function clampHabitsSidebarWidth(n) {
+  const v = Number(n);
+  if (Number.isFinite(v)) return Math.max(100, Math.min(400, Math.round(v)));
+  return 220;
+}
+
 export function useSettings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState({
@@ -17,6 +23,7 @@ export function useSettings() {
     no_date_list_visible: true,
     completed_visible: true,
     sidebar_width_px: 220,
+    habits_sidebar_width_px: 220,
     task_font_weight: 'medium',
     task_font_scale: 1,
   });
@@ -31,7 +38,7 @@ export function useSettings() {
       const { data, error } = await supabase
         .from('user_settings')
         .select(
-          'days_count, new_tasks_position, no_date_list_visible, completed_visible, sidebar_width_px, task_font_weight, task_font_scale'
+          'days_count, new_tasks_position, no_date_list_visible, completed_visible, sidebar_width_px, habits_sidebar_width_px, task_font_weight, task_font_scale'
         )
         .eq('user_id', user.id)
         .maybeSingle();
@@ -42,6 +49,7 @@ export function useSettings() {
           no_date_list_visible: data.no_date_list_visible !== false,
           completed_visible: data.completed_visible !== false,
           sidebar_width_px: clampSidebarWidth(data.sidebar_width_px),
+          habits_sidebar_width_px: clampHabitsSidebarWidth(data.habits_sidebar_width_px),
           task_font_weight: normalizeTaskFontWeight(data.task_font_weight),
           task_font_scale: normalizeTaskFontScale(data.task_font_scale),
         });
@@ -53,6 +61,7 @@ export function useSettings() {
           no_date_list_visible: true,
           completed_visible: true,
           sidebar_width_px: 220,
+          habits_sidebar_width_px: 220,
           task_font_weight: 'medium',
           task_font_scale: 1,
         });
@@ -62,6 +71,7 @@ export function useSettings() {
           no_date_list_visible: true,
           completed_visible: true,
           sidebar_width_px: 220,
+          habits_sidebar_width_px: 220,
           task_font_weight: 'medium',
           task_font_scale: 1,
         });
@@ -104,6 +114,13 @@ export function useSettings() {
     setSettings((s) => ({ ...s, sidebar_width_px: w }));
   };
 
+  const setHabitsSidebarWidthPx = async (habits_sidebar_width_px) => {
+    if (!user) return;
+    const w = clampHabitsSidebarWidth(habits_sidebar_width_px);
+    await supabase.from('user_settings').update({ habits_sidebar_width_px: w }).eq('user_id', user.id);
+    setSettings((s) => ({ ...s, habits_sidebar_width_px: w }));
+  };
+
   const setTaskFontWeight = async (task_font_weight) => {
     if (!user) return;
     const w = normalizeTaskFontWeight(task_font_weight);
@@ -125,6 +142,7 @@ export function useSettings() {
     setNoDateListVisible,
     setCompletedVisible,
     setSidebarWidthPx,
+    setHabitsSidebarWidthPx,
     setTaskFontWeight,
     setTaskFontScale,
     loading,

@@ -29,7 +29,15 @@ import leftIcon from '../assets/left.svg';
 import leftNavIcon from '../assets/left-nav.svg';
 import rightIcon from '../assets/right.svg';
 import rightNavIcon from '../assets/right-nav.svg';
+import spacingIcon from '../assets/spacing.svg';
+import spacingNavIcon from '../assets/spacing-nav.svg';
 import './HabitsView.css';
+
+function clampHabitsSidebarWidthPx(n) {
+  const v = Number(n);
+  if (Number.isFinite(v)) return Math.max(100, Math.min(400, Math.round(v)));
+  return 220;
+}
 
 const HABITS_OFFSET_KEY = 'habits_date_offset';
 const HABITS_COUNT_KEY = 'habits_days_count';
@@ -178,6 +186,8 @@ export function HabitsView({
   reorderHabits,
   setEntry,
   hasHover,
+  habitsSidebarWidthPx,
+  setHabitsSidebarWidthPx,
 }) {
   const [offset, setOffset] = useState(() => loadInt(HABITS_OFFSET_KEY, 0));
   const [daysCount, setDaysCount] = useState(() => {
@@ -199,6 +209,7 @@ export function HabitsView({
   const [addBtnHover, setAddBtnHover] = useState(false);
   const [editBtnHover, setEditBtnHover] = useState(false);
   const [reorderBtnHover, setReorderBtnHover] = useState(false);
+  const [widthBtnHover, setWidthBtnHover] = useState(false);
   const [todayHover, setTodayHover] = useState(false);
   const [timeModal, setTimeModal] = useState(null);
   const timeInputRef = useRef(null);
@@ -206,6 +217,27 @@ export function HabitsView({
   const [stackH, setStackH] = useState(72);
   const [reorderOpen, setReorderOpen] = useState(false);
   const [activeReorderId, setActiveReorderId] = useState(null);
+  const [widthModalOpen, setWidthModalOpen] = useState(false);
+  const [widthDraft, setWidthDraft] = useState(220);
+
+  const effectiveSidebarWidth = clampHabitsSidebarWidthPx(habitsSidebarWidthPx ?? 220);
+  const liveSidebarWidth = widthModalOpen ? clampHabitsSidebarWidthPx(widthDraft) : effectiveSidebarWidth;
+
+  const openWidthModal = useCallback(() => {
+    setWidthDraft(effectiveSidebarWidth);
+    setWidthModalOpen(true);
+  }, [effectiveSidebarWidth]);
+
+  const applyWidthStep = useCallback((delta) => {
+    setWidthDraft((w) => clampHabitsSidebarWidthPx(w + delta));
+  }, []);
+
+  const saveWidthModal = useCallback(async () => {
+    if (typeof setHabitsSidebarWidthPx === 'function') {
+      await setHabitsSidebarWidthPx(clampHabitsSidebarWidthPx(widthDraft));
+    }
+    setWidthModalOpen(false);
+  }, [widthDraft, setHabitsSidebarWidthPx]);
 
   useEffect(() => {
     try {
@@ -419,6 +451,16 @@ export function HabitsView({
           <img src={hasHover && rightHover ? rightNavIcon : rightIcon} alt="" />
         </button>
         <div className="habits-view__toolbar-actions">
+          <button
+            type="button"
+            className="habits-view__action-btn habits-view__action-btn--icon"
+            onMouseEnter={() => hasHover && setWidthBtnHover(true)}
+            onMouseLeave={() => hasHover && setWidthBtnHover(false)}
+            onClick={openWidthModal}
+            aria-label="Изменить ширину столбца привычек"
+          >
+            <img src={hasHover && widthBtnHover ? spacingNavIcon : spacingIcon} alt="" />
+          </button>
           {habits.length > 0 && (
             <button
               type="button"
@@ -458,7 +500,10 @@ export function HabitsView({
       </div>
 
       <div className="habits-view__main">
-        <div className="habits-view__sidebar-col">
+        <div
+          className="habits-view__sidebar-col"
+          style={{ flexBasis: `${liveSidebarWidth}px`, width: `${liveSidebarWidth}px`, maxWidth: `${liveSidebarWidth}px` }}
+        >
           <div className="habits-view__sidebar-spacer" style={{ height: stackH, minHeight: stackH }} aria-hidden />
           {habits.map((habit, index) => {
             const streak = computeStreak(habit, entries[habit.id] || {}, todayStr);
@@ -597,6 +642,41 @@ export function HabitsView({
                   commitTimeModal();
                 }}
               >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {widthModalOpen && (
+        <div className="dashboard__settings-overlay" onClick={() => setWidthModalOpen(false)}>
+          <div className="dashboard__settings-popup dashboard__menu-width-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="dashboard__settings-title">Ширина столбца привычек</div>
+            <div className="dashboard__menu-width-controls">
+              <button
+                type="button"
+                className="dashboard__menu-width-step"
+                onClick={() => applyWidthStep(-10)}
+                aria-label="Уменьшить на 10 пикселей"
+              >
+                <span className="dashboard__menu-width-step-inner">−</span>
+              </button>
+              <span className="dashboard__menu-width-value">{liveSidebarWidth}px</span>
+              <button
+                type="button"
+                className="dashboard__menu-width-step"
+                onClick={() => applyWidthStep(10)}
+                aria-label="Увеличить на 10 пикселей"
+              >
+                <span className="dashboard__menu-width-step-inner">+</span>
+              </button>
+            </div>
+            <div className="dashboard__settings-edit-actions">
+              <button type="button" className="dashboard__settings-submit" onClick={() => setWidthModalOpen(false)}>
+                Отмена
+              </button>
+              <button type="button" className="dashboard__settings-submit" onClick={saveWidthModal}>
                 Сохранить
               </button>
             </div>
