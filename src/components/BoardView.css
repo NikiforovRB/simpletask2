@@ -144,9 +144,12 @@
   background: #000;
 }
 
-.board-view__world--dots {
-  background-image: radial-gradient(circle, #292929 0.5px, transparent 0.5px);
-  background-size: 20px 20px;
+.board-view__dots {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at center, #333333 0 0.5px, transparent 0.5px);
   background-position: 0 0;
 }
 

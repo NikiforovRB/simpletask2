@@ -435,9 +435,20 @@ export function BoardView({
         onMouseDown={handleCanvasMouseDown}
         onContextMenu={(e) => e.preventDefault()}
       >
+        {dots && (
+          <div
+            className="board-view__dots"
+            aria-hidden
+            style={{
+              width: WORLD_WIDTH * zoomScale,
+              height: WORLD_HEIGHT * zoomScale,
+              backgroundSize: `${20 * zoomScale}px ${20 * zoomScale}px`,
+            }}
+          />
+        )}
         <div
           ref={worldRef}
-          className={`board-view__world ${dots ? 'board-view__world--dots' : ''}`}
+          className="board-view__world"
           style={{
             width: WORLD_WIDTH,
             height: WORLD_HEIGHT,
@@ -463,7 +474,10 @@ export function BoardView({
                 if (text !== it.text) updateItem(it.id, { text });
                 setEditingId((cur) => (cur === it.id ? null : cur));
               }}
-              onOpenStyling={() => setStylingId(it.id)}
+              onOpenStyling={() => {
+                setSelectedIds(new Set());
+                setStylingId(it.id);
+              }}
               hasHover={hasHover}
             />
           ))}
