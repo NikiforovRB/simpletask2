@@ -4,7 +4,6 @@ import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import editIcon from '../assets/edit.svg';
 import editNavIcon from '../assets/edit-nav.svg';
-import dragIcon from '../assets/drag.svg';
 import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav.svg';
 import zoomInIcon from '../assets/zoom-in.svg';
@@ -122,6 +121,11 @@ export function BoardView({
       if (editingId === item.id) return;
       e.preventDefault();
       e.stopPropagation();
+      if (e.pointerId != null && typeof e.currentTarget?.setPointerCapture === 'function') {
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {}
+      }
       const isAlreadySelected = selectedIds.has(item.id);
       const groupIds = mode === 'move' && isAlreadySelected && selectedIds.size > 1
         ? Array.from(selectedIds)
@@ -206,11 +210,13 @@ export function BoardView({
         }
       });
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
     return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
   }, [items, updateItem, updateItemLocal, zoomScale]);
 
@@ -579,17 +585,15 @@ function BoardTextBlock({
       style={style}
       onMouseEnter={onHoverEnter}
       onMouseLeave={onHoverLeave}
-      onMouseDown={(e) => {
+      onPointerDown={(e) => {
         if (editing) return;
         if (e.target.closest('.board-view__block-resize')) return;
         if (e.target.closest('.board-view__block-edit-btn')) return;
-        if (e.target.closest('.board-view__block-move-btn')) return;
         onBeginDrag(e, item, 'move');
       }}
       onDoubleClick={(e) => {
         if (e.target.closest('.board-view__block-resize')) return;
         if (e.target.closest('.board-view__block-edit-btn')) return;
-        if (e.target.closest('.board-view__block-move-btn')) return;
         onStartEdit();
       }}
     >
@@ -619,17 +623,6 @@ function BoardTextBlock({
       {!editing && hovered && (
         <button
           type="button"
-          className="board-view__block-move-btn"
-          onMouseDown={(e) => onBeginDrag(e, item, 'move')}
-          aria-label="Переместить блок"
-        >
-          <img src={dragIcon} alt="" />
-        </button>
-      )}
-
-      {!editing && hovered && (
-        <button
-          type="button"
           className="board-view__block-edit-btn"
           onMouseEnter={() => hasHover && setEditHover(true)}
           onMouseLeave={() => hasHover && setEditHover(false)}
@@ -654,9 +647,28 @@ function BoardTextBlock({
           <div
             key={dir}
             className={`board-view__block-resize board-view__block-resize--${dir}`}
-            onMouseDown={(e) => onBeginDrag(e, item, dir)}
+            onPointerDown={(e) => onBeginDrag(e, item, dir)}
           />
         ))}
+
+      {!editing && selected && (
+        <button
+          type="button"
+          className="board-view__block-mobile-resize"
+          onPointerDown={(e) => onBeginDrag(e, item, 'se')}
+          aria-label="Изменить размер блока"
+        >
+          <svg viewBox="0 0 14 14" aria-hidden>
+            <path
+              d="M13 5 L5 13 M13 9 L9 13"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
