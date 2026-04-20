@@ -243,6 +243,42 @@
   object-fit: contain;
 }
 
+.board-view__block-move-btn {
+  position: absolute;
+  bottom: 0.2rem;
+  right: 0.2rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  background: rgba(17, 17, 17, 0.85);
+  border: none;
+  border-radius: 4px;
+  cursor: grab;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  touch-action: none;
+}
+
+.board-view__block-move-btn:active {
+  cursor: grabbing;
+  background: rgba(42, 42, 42, 0.9);
+}
+
+.board-view__block-move-btn img {
+  width: 0.85rem;
+  height: 0.85rem;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+@media (max-width: 499px) {
+  .board-view__block-move-btn {
+    display: inline-flex;
+  }
+}
+
 .board-view__block-resize {
   position: absolute;
   z-index: 4;

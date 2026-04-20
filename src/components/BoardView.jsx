@@ -4,6 +4,7 @@ import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import editIcon from '../assets/edit.svg';
 import editNavIcon from '../assets/edit-nav.svg';
+import dragIcon from '../assets/drag.svg';
 import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav.svg';
 import zoomInIcon from '../assets/zoom-in.svg';
@@ -582,11 +583,13 @@ function BoardTextBlock({
         if (editing) return;
         if (e.target.closest('.board-view__block-resize')) return;
         if (e.target.closest('.board-view__block-edit-btn')) return;
+        if (e.target.closest('.board-view__block-move-btn')) return;
         onBeginDrag(e, item, 'move');
       }}
       onDoubleClick={(e) => {
         if (e.target.closest('.board-view__block-resize')) return;
         if (e.target.closest('.board-view__block-edit-btn')) return;
+        if (e.target.closest('.board-view__block-move-btn')) return;
         onStartEdit();
       }}
     >
@@ -611,6 +614,17 @@ function BoardTextBlock({
         />
       ) : (
         <div className="board-view__block-text">{item.text || <span className="board-view__block-placeholder">Текст</span>}</div>
+      )}
+
+      {!editing && hovered && (
+        <button
+          type="button"
+          className="board-view__block-move-btn"
+          onMouseDown={(e) => onBeginDrag(e, item, 'move')}
+          aria-label="Переместить блок"
+        >
+          <img src={dragIcon} alt="" />
+        </button>
       )}
 
       {!editing && hovered && (
