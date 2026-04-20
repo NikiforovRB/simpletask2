@@ -15,6 +15,13 @@
   box-sizing: border-box;
 }
 
+.dashboard--board {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 100vh;
+}
+
 .dashboard__header {
   margin-bottom: 1.25rem;
 }
@@ -256,6 +263,10 @@
   min-width: 340px;
 }
 
+.dashboard__settings-popup--new-project {
+  min-width: 340px;
+}
+
 .dashboard__settings-title {
   color: #888;
   font-size: 0.8125rem;
@@ -287,6 +298,35 @@
 
 .dashboard__settings-option--active {
   color: #5a86ee;
+}
+
+.dashboard__kind-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.dashboard__kind-toggle-option {
+  flex: 1 1 0;
+  background: #1e1e1e;
+  color: #888;
+  border: 1px solid #2f2f2f;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.dashboard__kind-toggle-option:hover {
+  color: #e0e0e0;
+}
+
+.dashboard__kind-toggle-option--active {
+  color: #fff;
+  border-color: #5a86ee;
 }
 
 .dashboard__settings-input {

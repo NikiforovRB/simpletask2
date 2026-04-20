@@ -15,6 +15,12 @@ function clampHabitsSidebarWidth(n) {
   return 220;
 }
 
+function clampBoardZoom(n) {
+  const v = Number(n);
+  if (Number.isFinite(v)) return Math.max(25, Math.min(200, Math.round(v)));
+  return 100;
+}
+
 export function useSettings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState({
@@ -26,6 +32,8 @@ export function useSettings() {
     habits_sidebar_width_px: 220,
     task_font_weight: 'medium',
     task_font_scale: 1,
+    board_zoom: 100,
+    board_dots: false,
   });
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +46,7 @@ export function useSettings() {
       const { data, error } = await supabase
         .from('user_settings')
         .select(
-          'days_count, new_tasks_position, no_date_list_visible, completed_visible, sidebar_width_px, habits_sidebar_width_px, task_font_weight, task_font_scale'
+          'days_count, new_tasks_position, no_date_list_visible, completed_visible, sidebar_width_px, habits_sidebar_width_px, task_font_weight, task_font_scale, board_zoom, board_dots'
         )
         .eq('user_id', user.id)
         .maybeSingle();
@@ -52,6 +60,8 @@ export function useSettings() {
           habits_sidebar_width_px: clampHabitsSidebarWidth(data.habits_sidebar_width_px),
           task_font_weight: normalizeTaskFontWeight(data.task_font_weight),
           task_font_scale: normalizeTaskFontScale(data.task_font_scale),
+          board_zoom: clampBoardZoom(data.board_zoom),
+          board_dots: data.board_dots === true,
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -64,6 +74,8 @@ export function useSettings() {
           habits_sidebar_width_px: 220,
           task_font_weight: 'medium',
           task_font_scale: 1,
+          board_zoom: 100,
+          board_dots: false,
         });
         setSettings({
           days_count: 3,
@@ -74,6 +86,8 @@ export function useSettings() {
           habits_sidebar_width_px: 220,
           task_font_weight: 'medium',
           task_font_scale: 1,
+          board_zoom: 100,
+          board_dots: false,
         });
       }
       setLoading(false);
@@ -135,6 +149,20 @@ export function useSettings() {
     setSettings((s) => ({ ...s, task_font_scale: sc }));
   };
 
+  const setBoardZoom = async (board_zoom) => {
+    if (!user) return;
+    const z = clampBoardZoom(board_zoom);
+    await supabase.from('user_settings').update({ board_zoom: z }).eq('user_id', user.id);
+    setSettings((s) => ({ ...s, board_zoom: z }));
+  };
+
+  const setBoardDots = async (board_dots) => {
+    if (!user) return;
+    const v = !!board_dots;
+    await supabase.from('user_settings').update({ board_dots: v }).eq('user_id', user.id);
+    setSettings((s) => ({ ...s, board_dots: v }));
+  };
+
   return {
     settings,
     setDaysCount,
@@ -145,6 +173,8 @@ export function useSettings() {
     setHabitsSidebarWidthPx,
     setTaskFontWeight,
     setTaskFontScale,
+    setBoardZoom,
+    setBoardDots,
     loading,
   };
 }

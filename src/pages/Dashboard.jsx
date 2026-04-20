@@ -39,8 +39,10 @@ import { useListCollapsed } from '../hooks/useListCollapsed';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useProjects } from '../hooks/useProjects';
 import { useHabits } from '../hooks/useHabits';
+import { useBoardItems } from '../hooks/useBoardItems';
 import { DayCard } from '../components/DayCard';
 import { HabitsView } from '../components/HabitsView';
+import { BoardView } from '../components/BoardView';
 import { NoDateList } from '../components/NoDateList';
 import { SomedayList } from '../components/SomedayList';
 import { ProjectList } from '../components/ProjectList';
@@ -93,6 +95,8 @@ import zavtraIcon from '../assets/zavtra.svg';
 import poslezavtraIcon from '../assets/poslezavtra.svg';
 import privIcon from '../assets/priv.svg';
 import privNavIcon from '../assets/priv-nav.svg';
+import doskaIcon from '../assets/doska.svg';
+import doskaNavIcon from '../assets/doska-nav.svg';
 import './Dashboard.css';
 
 function getDays(baseDate, count) {
@@ -142,9 +146,9 @@ function getTasksInContainer(tasks, containerId) {
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 }
 
-function SortableProjectItem({ project, isActive, isHover, folderIcon, folderNavIcon, dragIcon, onClick, onMouseEnter, onMouseLeave, disableDrag }) {
+function SortableProjectItem({ project, isActive, isHover, iconDefault, iconHover, dragIcon, onClick, onMouseEnter, onMouseLeave, disableDrag }) {
   const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: project.id, disabled: !!disableDrag });
-  const icon = (isActive || isHover) ? folderNavIcon : folderIcon;
+  const icon = (isActive || isHover) ? iconHover : iconDefault;
   const smoothTransition = transition
     ? transition.replace(/(\d+)ms/g, (_, ms) => `${Math.round(Number(ms) * 1.85)}ms`)
     : 'transform 400ms cubic-bezier(0.2, 0.8, 0.2, 1)';
@@ -187,10 +191,13 @@ export default function Dashboard() {
     setHabitsSidebarWidthPx,
     setTaskFontWeight,
     setTaskFontScale,
+    setBoardZoom,
+    setBoardDots,
   } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const { projects, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
+  const { items: boardItems, addItem: addBoardItem, updateItem: updateBoardItem, updateItemLocal: updateBoardItemLocal, deleteItem: deleteBoardItem } = useBoardItems();
   const [dateOffset, setDateOffset] = useState(() => {
     try {
       const v = localStorage.getItem('dashboard_date_offset');
@@ -213,7 +220,7 @@ export default function Dashboard() {
       if (!raw) return 'plans';
       const parsed = JSON.parse(raw);
       const v = parsed?.viewMode;
-      return ['today', 'plans', 'no_date', 'someday', 'habits', 'project'].includes(v) ? v : 'plans';
+      return ['today', 'plans', 'no_date', 'someday', 'habits', 'board', 'project'].includes(v) ? v : 'plans';
     } catch {
       return 'plans';
     }
@@ -238,6 +245,16 @@ export default function Dashboard() {
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       return parsed?.activeProjectId ?? null;
+    } catch {
+      return null;
+    }
+  });
+  const [activeBoardId, setActiveBoardId] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dashboard_view_state');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.activeBoardId ?? null;
     } catch {
       return null;
     }
@@ -272,6 +289,7 @@ export default function Dashboard() {
   const [noDateHover, setNoDateHover] = useState(false);
   const [somedayHover, setSomedayHover] = useState(false);
   const [habitsHover, setHabitsHover] = useState(false);
+  const [boardHover, setBoardHover] = useState(false);
   const [projectHoverId, setProjectHoverId] = useState(null);
   const [eyeHover, setEyeHover] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
@@ -280,9 +298,11 @@ export default function Dashboard() {
   const [editProjectFabHover, setEditProjectFabHover] = useState(false);
   const [addProjectModalOpen, setAddProjectModalOpen] = useState(false);
   const [addProjectTitle, setAddProjectTitle] = useState('');
+  const [addProjectKind, setAddProjectKind] = useState('project'); // 'project' | 'board'
   const [editProjectOpen, setEditProjectOpen] = useState(false);
   const [editProjectId, setEditProjectId] = useState(null);
   const [editProjectTitle, setEditProjectTitle] = useState('');
+  const [editProjectKind, setEditProjectKind] = useState('project');
   const [activeDragId, setActiveDragId] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [editingTaskId, setEditingTaskId] = useState(null);
@@ -342,46 +362,75 @@ export default function Dashboard() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('dashboard_view_state', JSON.stringify({ viewMode, activeProjectId, menuOpen }));
+      localStorage.setItem(
+        'dashboard_view_state',
+        JSON.stringify({ viewMode, activeProjectId, activeBoardId, menuOpen })
+      );
     } catch {}
-  }, [viewMode, activeProjectId, menuOpen]);
+  }, [viewMode, activeProjectId, activeBoardId, menuOpen]);
 
   useEffect(() => {
-    if (viewMode !== 'project') return;
-    if (!activeProjectId) {
-      setViewMode('plans');
+    if (viewMode === 'project') {
+      if (!activeProjectId) {
+        setViewMode('plans');
+        return;
+      }
+      if (projects.length && !projects.some((p) => p.id === activeProjectId && (p.kind || 'project') === 'project')) {
+        setViewMode('plans');
+        setActiveProjectId(null);
+      }
       return;
     }
-    if (projects.length && !projects.some((p) => p.id === activeProjectId)) {
-      setViewMode('plans');
-      setActiveProjectId(null);
+    if (viewMode === 'board' && activeBoardId) {
+      if (projects.length && !projects.some((p) => p.id === activeBoardId && p.kind === 'board')) {
+        setActiveBoardId(null);
+      }
     }
-  }, [viewMode, activeProjectId, projects]);
+  }, [viewMode, activeProjectId, activeBoardId, projects]);
 
-  const handleMenuSelect = useCallback((viewModeOrProject) => {
-    const isViewMode = ['today', 'plans', 'no_date', 'someday', 'habits'].includes(viewModeOrProject);
-    if (isViewMode) {
-      setViewMode(viewModeOrProject);
+  const handleMenuSelect = useCallback((target) => {
+    const isBuiltinView = ['today', 'plans', 'no_date', 'someday', 'habits', 'board'].includes(target);
+    if (isBuiltinView) {
+      setViewMode(target);
       setActiveProjectId(null);
+      if (target === 'board') setActiveBoardId(null);
     } else {
-      setViewMode('project');
-      setActiveProjectId(viewModeOrProject);
+      const project = projects.find((p) => p.id === target);
+      if (project && project.kind === 'board') {
+        setViewMode('board');
+        setActiveBoardId(target);
+        setActiveProjectId(null);
+      } else {
+        setViewMode('project');
+        setActiveProjectId(target);
+      }
     }
     if (!isWideMenu) closeMenu();
-  }, [isWideMenu, closeMenu]);
+  }, [isWideMenu, closeMenu, projects]);
 
-  const handleAddProjectSubmit = useCallback(() => {
+  const handleAddProjectSubmit = useCallback(async () => {
     const title = addProjectTitle.trim();
-    if (title) {
-      addProject(title);
-      setAddProjectTitle('');
-      setAddProjectModalOpen(false);
+    if (!title) return;
+    const created = await addProject(title, addProjectKind);
+    setAddProjectTitle('');
+    setAddProjectModalOpen(false);
+    setAddProjectKind('project');
+    if (created?.id) {
+      if (addProjectKind === 'board') {
+        setViewMode('board');
+        setActiveBoardId(created.id);
+        setActiveProjectId(null);
+      } else {
+        setViewMode('project');
+        setActiveProjectId(created.id);
+      }
     }
-  }, [addProjectTitle, addProject]);
+  }, [addProjectTitle, addProjectKind, addProject]);
 
-  const handleOpenEditProject = useCallback((id, title) => {
+  const handleOpenEditProject = useCallback((id, title, kind = 'project') => {
     setEditProjectId(id);
     setEditProjectTitle(title ?? '');
+    setEditProjectKind(kind);
     setEditProjectOpen(true);
   }, []);
 
@@ -403,14 +452,24 @@ export default function Dashboard() {
 
   const handleConfirmDeleteProject = useCallback(() => {
     if (!editProjectId) return;
+    const kind = editProjectKind;
     deleteProject(editProjectId);
-    setViewMode('plans');
-    setActiveProjectId(null);
+    if (kind === 'board') {
+      if (activeBoardId === editProjectId) {
+        setActiveBoardId(null);
+      }
+      setViewMode('plans');
+    } else {
+      if (activeProjectId === editProjectId) {
+        setActiveProjectId(null);
+      }
+      setViewMode('plans');
+    }
     setEditProjectOpen(false);
     setEditProjectId(null);
     setEditProjectTitle('');
     setDeleteProjectConfirmOpen(false);
-  }, [editProjectId, deleteProject]);
+  }, [editProjectId, editProjectKind, activeBoardId, activeProjectId, deleteProject]);
 
   const handleCancelDeleteProject = useCallback(() => {
     setDeleteProjectConfirmOpen(false);
@@ -839,7 +898,7 @@ export default function Dashboard() {
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
     <div
-      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''}`}
+      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''} ${viewMode === 'board' ? 'dashboard--board' : ''}`}
       style={{
         '--sidebar-width': `${liveMenuWidth}px`,
         '--task-font-weight': String(taskFontWeightToCssNumber(normalizeTaskFontWeight(liveTaskFontWeight))),
@@ -891,14 +950,16 @@ export default function Dashboard() {
             )}
           </div>
           <div className="dashboard__header-actions">
-            {viewMode !== 'habits' && (
+            {viewMode !== 'habits' && viewMode !== 'board' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
             )}
+            {viewMode !== 'board' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setSettingsHover(true)} onMouseLeave={() => hasHover && setSettingsHover(false)} onClick={() => setSettingsOpen((v) => !v)} aria-label="Настройки">
               <img src={hasHover && settingsHover ? settingsNavIcon : settingsIcon} alt="" />
             </button>
+            )}
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setExitHover(true)} onMouseLeave={() => hasHover && setExitHover(false)} onClick={signOut} aria-label="Выйти">
               <img src={hasHover && exitHover ? exitNavIcon : exitIcon} alt="" />
             </button>
@@ -963,21 +1024,37 @@ export default function Dashboard() {
                 <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
                 <span>Привычки</span>
               </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'board' && !activeBoardId ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setBoardHover(true)}
+                onMouseLeave={() => hasHover && setBoardHover(false)}
+                onClick={() => handleMenuSelect('board')}
+              >
+                <img src={(viewMode === 'board' && !activeBoardId) || (hasHover && boardHover) ? doskaNavIcon : doskaIcon} alt="" />
+                <span>Доска</span>
+              </button>
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-                {projects.map((p) => (
-                  <SortableProjectItem
-                    key={p.id}
-                    project={p}
-                    isActive={viewMode === 'project' && activeProjectId === p.id}
-                    isHover={hasHover && projectHoverId === p.id}
-                    folderIcon={folderIcon}
-                    folderNavIcon={folderNavIcon}
-                    dragIcon={dragIcon}
-                    onClick={() => handleMenuSelect(p.id)}
-                    onMouseEnter={() => setProjectHoverId(p.id)}
-                    onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
-                  />
-                ))}
+                {projects.map((p) => {
+                  const isBoard = p.kind === 'board';
+                  const isActive = isBoard
+                    ? viewMode === 'board' && activeBoardId === p.id
+                    : viewMode === 'project' && activeProjectId === p.id;
+                  return (
+                    <SortableProjectItem
+                      key={p.id}
+                      project={p}
+                      isActive={isActive}
+                      isHover={hasHover && projectHoverId === p.id}
+                      iconDefault={isBoard ? doskaIcon : folderIcon}
+                      iconHover={isBoard ? doskaNavIcon : folderNavIcon}
+                      dragIcon={dragIcon}
+                      onClick={() => handleMenuSelect(p.id)}
+                      onMouseEnter={() => setProjectHoverId(p.id)}
+                      onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
+                    />
+                  );
+                })}
               </SortableContext>
             </div>
             <div className="dashboard-menu__bottom-tools">
@@ -1069,22 +1146,38 @@ export default function Dashboard() {
                 <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
                 <span>Привычки</span>
               </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'board' && !activeBoardId ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setBoardHover(true)}
+                onMouseLeave={() => hasHover && setBoardHover(false)}
+                onClick={() => handleMenuSelect('board')}
+              >
+                <img src={(viewMode === 'board' && !activeBoardId) || (hasHover && boardHover) ? doskaNavIcon : doskaIcon} alt="" />
+                <span>Доска</span>
+              </button>
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-                {projects.map((p) => (
-                  <SortableProjectItem
-                    key={p.id}
-                    project={p}
-                    isActive={viewMode === 'project' && activeProjectId === p.id}
-                    isHover={hasHover && projectHoverId === p.id}
-                    folderIcon={folderIcon}
-                    folderNavIcon={folderNavIcon}
-                    dragIcon={dragIcon}
-                    disableDrag
-                    onClick={() => handleMenuSelect(p.id)}
-                    onMouseEnter={() => setProjectHoverId(p.id)}
-                    onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
-                  />
-                ))}
+                {projects.map((p) => {
+                  const isBoard = p.kind === 'board';
+                  const isActive = isBoard
+                    ? viewMode === 'board' && activeBoardId === p.id
+                    : viewMode === 'project' && activeProjectId === p.id;
+                  return (
+                    <SortableProjectItem
+                      key={p.id}
+                      project={p}
+                      isActive={isActive}
+                      isHover={hasHover && projectHoverId === p.id}
+                      iconDefault={isBoard ? doskaIcon : folderIcon}
+                      iconHover={isBoard ? doskaNavIcon : folderNavIcon}
+                      dragIcon={dragIcon}
+                      disableDrag
+                      onClick={() => handleMenuSelect(p.id)}
+                      onMouseEnter={() => setProjectHoverId(p.id)}
+                      onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
+                    />
+                  );
+                })}
               </SortableContext>
               <button
                 type="button"
@@ -1102,20 +1195,36 @@ export default function Dashboard() {
       )}
 
       {addProjectModalOpen && (
-        <div className="dashboard__settings-overlay" onClick={() => setAddProjectModalOpen(false)}>
-          <div className="dashboard__settings-popup" onClick={(e) => e.stopPropagation()}>
-            <div className="dashboard__settings-title">Новый проект</div>
+        <div className="dashboard__settings-overlay" onClick={() => { setAddProjectModalOpen(false); setAddProjectKind('project'); }}>
+          <div className="dashboard__settings-popup dashboard__settings-popup--new-project" onClick={(e) => e.stopPropagation()}>
+            <div className="dashboard__settings-title">{addProjectKind === 'board' ? 'Новая доска' : 'Новый проект'}</div>
+            <div className="dashboard__kind-toggle">
+              <button
+                type="button"
+                className={`dashboard__kind-toggle-option ${addProjectKind === 'project' ? 'dashboard__kind-toggle-option--active' : ''}`}
+                onClick={() => setAddProjectKind('project')}
+              >
+                Список задач
+              </button>
+              <button
+                type="button"
+                className={`dashboard__kind-toggle-option ${addProjectKind === 'board' ? 'dashboard__kind-toggle-option--active' : ''}`}
+                onClick={() => setAddProjectKind('board')}
+              >
+                Доска
+              </button>
+            </div>
             <input
               type="text"
               className="dashboard__settings-input"
               value={addProjectTitle}
               onChange={(e) => setAddProjectTitle(e.target.value)}
-              placeholder="Название проекта"
+              placeholder={addProjectKind === 'board' ? 'Название доски' : 'Название проекта'}
               autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter') handleAddProjectSubmit(); }}
             />
             <button type="button" className="dashboard__settings-submit" onClick={handleAddProjectSubmit}>
-              Добавить проект
+              {addProjectKind === 'board' ? 'Добавить доску' : 'Добавить проект'}
             </button>
           </div>
         </div>
@@ -1124,13 +1233,13 @@ export default function Dashboard() {
       {editProjectOpen && (
         <div className="dashboard__settings-overlay" onClick={() => { setEditProjectOpen(false); setEditProjectId(null); setEditProjectTitle(''); }}>
           <div className="dashboard__settings-popup dashboard__settings-popup--edit-project" onClick={(e) => e.stopPropagation()}>
-            <div className="dashboard__settings-title">Редактировать проект</div>
+            <div className="dashboard__settings-title">{editProjectKind === 'board' ? 'Редактировать доску' : 'Редактировать проект'}</div>
             <input
               type="text"
               className="dashboard__settings-input"
               value={editProjectTitle}
               onChange={(e) => setEditProjectTitle(e.target.value)}
-              placeholder="Название проекта"
+              placeholder={editProjectKind === 'board' ? 'Название доски' : 'Название проекта'}
               autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter') handleEditProjectSave(); }}
             />
@@ -1139,7 +1248,7 @@ export default function Dashboard() {
                 Сохранить
               </button>
               <button type="button" className="dashboard__settings-delete" onClick={handleEditProjectDeleteClick}>
-                Удалить проект
+                {editProjectKind === 'board' ? 'Удалить доску' : 'Удалить проект'}
               </button>
             </div>
           </div>
@@ -1149,14 +1258,14 @@ export default function Dashboard() {
       {deleteProjectConfirmOpen && (
         <div className="dashboard__settings-overlay" onClick={handleCancelDeleteProject}>
           <div className="dashboard__settings-popup" onClick={(e) => e.stopPropagation()}>
-            <div className="dashboard__settings-title">Удалить проект?</div>
-            <p className="dashboard__confirm-text">Все задачи в этом проекте также будут удалены.</p>
+            <div className="dashboard__settings-title">{editProjectKind === 'board' ? 'Удалить доску?' : 'Удалить проект?'}</div>
+            <p className="dashboard__confirm-text">{editProjectKind === 'board' ? 'Все текстовые блоки на этой доске также будут удалены.' : 'Все задачи в этом проекте также будут удалены.'}</p>
             <div className="dashboard__settings-edit-actions">
               <button type="button" className="dashboard__settings-submit" onClick={handleCancelDeleteProject}>
                 Отмена
               </button>
               <button type="button" className="dashboard__settings-delete" onClick={handleConfirmDeleteProject}>
-                Да, удалить проект
+                {editProjectKind === 'board' ? 'Да, удалить доску' : 'Да, удалить проект'}
               </button>
             </div>
           </div>
@@ -1220,7 +1329,7 @@ export default function Dashboard() {
               <img src={archiveIcon} alt="" className="dashboard__context-menu-item-icon" />
               <span>Когда-нибудь</span>
             </button>
-            {projects.map((p) => (
+            {projects.filter((p) => (p.kind || 'project') === 'project').map((p) => (
               <button
                 key={p.id}
                 type="button"
@@ -1404,6 +1513,22 @@ export default function Dashboard() {
         />
       )}
 
+      {viewMode === 'board' && (
+        <BoardView
+          key={activeBoardId ?? 'default'}
+          items={boardItems.filter((it) => (it.board_id ?? null) === (activeBoardId ?? null))}
+          addItem={(patch = {}) => addBoardItem({ ...patch, board_id: activeBoardId ?? null })}
+          updateItem={updateBoardItem}
+          updateItemLocal={updateBoardItemLocal}
+          deleteItem={deleteBoardItem}
+          zoom={settings.board_zoom ?? 100}
+          setZoom={setBoardZoom}
+          dots={settings.board_dots ?? false}
+          setDots={setBoardDots}
+          hasHover={hasHover}
+        />
+      )}
+
       {viewMode === 'project' && activeProjectId && (
         <ProjectList
           projectId={activeProjectId}
@@ -1426,19 +1551,18 @@ export default function Dashboard() {
         />
       )}
 
-      {viewMode === 'project' && activeProjectId && (
+      {((viewMode === 'project' && activeProjectId) || (viewMode === 'board' && activeBoardId)) && (
         <button
           type="button"
           className="dashboard__edit-project-fab"
           onMouseEnter={() => hasHover && setEditProjectFabHover(true)}
           onMouseLeave={() => hasHover && setEditProjectFabHover(false)}
-          onClick={() =>
-            handleOpenEditProject(
-              activeProjectId,
-              projects.find((p) => p.id === activeProjectId)?.title ?? ''
-            )
-          }
-          aria-label="Редактировать проект"
+          onClick={() => {
+            const id = viewMode === 'board' ? activeBoardId : activeProjectId;
+            const entry = projects.find((p) => p.id === id);
+            handleOpenEditProject(id, entry?.title ?? '', entry?.kind ?? (viewMode === 'board' ? 'board' : 'project'));
+          }}
+          aria-label={viewMode === 'board' ? 'Редактировать доску' : 'Редактировать проект'}
         >
           <img src={hasHover && editProjectFabHover ? editNavIcon : editIcon} alt="" />
         </button>
@@ -1465,7 +1589,7 @@ export default function Dashboard() {
           </div>
         ) : activeProjectDrag ? (
           <div className="dashboard-menu__project-drag-overlay" style={{ cursor: 'grabbing', pointerEvents: 'none' }}>
-            <img src={folderIcon} alt="" />
+            <img src={activeProjectDrag.kind === 'board' ? doskaIcon : folderIcon} alt="" />
             <span>{activeProjectDrag.title}</span>
           </div>
         ) : activeHabitDrag ? (

@@ -33,19 +33,20 @@ export function useProjects() {
     return () => supabase.removeChannel(channel);
   }, [user?.id, fetchProjects]);
 
-  const addProject = async (title) => {
-    if (!user) return;
+  const addProject = async (title, kind = 'project') => {
+    if (!user) return null;
     const maxPos = projects.length ? Math.max(...projects.map((p) => p.position ?? 0)) : -1;
     const { data, error } = await supabase
       .from('task_projects')
-      .insert({ user_id: user.id, title: title.trim(), position: maxPos + 1 })
+      .insert({ user_id: user.id, title: title.trim(), position: maxPos + 1, kind })
       .select()
       .single();
     if (!error && data) {
       setProjects((prev) => [...prev, data].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
-    } else if (!error) {
-      fetchProjects();
+      return data;
     }
+    if (!error) fetchProjects();
+    return null;
   };
 
   const reorderProjects = async (orderedIds) => {
