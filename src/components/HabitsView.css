@@ -118,7 +118,7 @@
 }
 
 .habits-view__head-row {
-  background: #111;
+  background: #131313;
   border-top: 1px solid #2f2f2f;
   border-left: 1px solid #2f2f2f;
 }
@@ -149,7 +149,7 @@
 }
 
 .habits-view__head-cell {
-  background: #111;
+  background: #131313;
   border-bottom: 1px solid #2f2f2f;
   border-right: 1px solid #2f2f2f;
   padding: 0.35rem 0.25rem;
@@ -181,7 +181,7 @@
   border-left: 1px solid #2f2f2f;
   border-bottom: 1px solid #2f2f2f;
   min-height: 2.75rem;
-  background: #0a0a0a;
+  background: transparent;
 }
 
 .habits-view__name-row--first {
@@ -458,11 +458,11 @@
   justify-content: center;
   padding: 2px;
   box-sizing: border-box;
-  background: #000;
+  background: #000000;
 }
 
 .habits-view__matrix-cell-wrap--skip {
-  background: rgba(255, 255, 255, 0.03);
+  background: #000000;
 }
 
 .habits-view__head-cell--today {
@@ -617,41 +617,23 @@
   cursor: pointer;
 }
 
-.dashboard__habits-fab {
-  position: fixed;
-  bottom: 1.5rem;
-  left: 1.5rem;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  background: #1e1e1e;
-  border: 1px solid #2f2f2f;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 25;
-  transition: background 0.15s ease, transform 0.1s ease;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
-}
-
-.dashboard__habits-fab:hover {
-  background: #141414;
-}
-
-.dashboard__habits-fab:active {
-  transform: translateY(1px);
-}
-
-.dashboard__habits-fab img {
-  width: 1.25rem;
-  height: 1.25rem;
-  object-fit: contain;
-}
-
 @media (max-width: 599px) {
   .habits-view__grid {
     font-size: 0.9em;
+  }
+
+  .habits-view__modal {
+    width: calc(100vw - 2rem);
+    max-width: calc(100vw - 2rem);
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 1rem;
+  }
+
+  .habits-view__modal .habits-view__time-24 {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 }

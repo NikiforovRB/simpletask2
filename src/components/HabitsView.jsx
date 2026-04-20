@@ -317,7 +317,6 @@ export function HabitsView({
   const [formStreak, setFormStreak] = useState(true);
   const [leftHover, setLeftHover] = useState(false);
   const [rightHover, setRightHover] = useState(false);
-  const [fabHover, setFabHover] = useState(false);
   const [addBtnHover, setAddBtnHover] = useState(false);
   const [editBtnHover, setEditBtnHover] = useState(false);
   const [reorderBtnHover, setReorderBtnHover] = useState(false);
@@ -744,17 +743,6 @@ export function HabitsView({
           </div>
         </div>
       </div>
-
-      <button
-        type="button"
-        className="dashboard__habits-fab"
-        onMouseEnter={() => hasHover && setFabHover(true)}
-        onMouseLeave={() => hasHover && setFabHover(false)}
-        onClick={openNewModal}
-        aria-label="Добавить привычку"
-      >
-        <img src={hasHover && fabHover ? editNavIcon : editIcon} alt="" />
-      </button>
 
       {timeModal && (
         <div
