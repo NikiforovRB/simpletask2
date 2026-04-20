@@ -620,10 +620,10 @@ function BoardTextBlock({
         <div className="board-view__block-text">{item.text || <span className="board-view__block-placeholder">Текст</span>}</div>
       )}
 
-      {!editing && hovered && (
+      {!editing && (hovered || selected) && (
         <button
           type="button"
-          className="board-view__block-edit-btn"
+          className={`board-view__block-edit-btn ${hovered ? 'board-view__block-edit-btn--hovered' : ''} ${selected ? 'board-view__block-edit-btn--selected' : ''}`}
           onMouseEnter={() => hasHover && setEditHover(true)}
           onMouseLeave={() => hasHover && setEditHover(false)}
           onMouseDown={(e) => {

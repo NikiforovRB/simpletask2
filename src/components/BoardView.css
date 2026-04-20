@@ -171,7 +171,7 @@
   line-height: 1.4;
   cursor: grab;
   user-select: none;
-  overflow: hidden;
+  overflow: visible;
   font-family: inherit;
   white-space: pre-wrap;
   touch-action: none;
@@ -242,6 +242,15 @@
   width: 0.85rem;
   height: 0.85rem;
   object-fit: contain;
+}
+
+@media (max-width: 499px) {
+  .board-view__block-edit-btn--selected:not(.board-view__block-edit-btn--hovered) {
+    top: auto;
+    right: 0;
+    bottom: 100%;
+    margin-bottom: 0.25rem;
+  }
 }
 
 .board-view__block-mobile-resize {
