@@ -60,6 +60,7 @@ export function BoardView({
   updateItem,
   updateItemLocal,
   deleteItem,
+  cloneItems,
   zoom,
   setZoom,
   hasHover,
@@ -133,6 +134,17 @@ export function BoardView({
       if (editingId === item.id) return;
       e.preventDefault();
       e.stopPropagation();
+
+      if (mode === 'move' && e.shiftKey) {
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(item.id)) next.delete(item.id);
+          else next.add(item.id);
+          return next;
+        });
+        return;
+      }
+
       if (e.pointerId != null && typeof e.currentTarget?.setPointerCapture === 'function') {
         try {
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -142,15 +154,34 @@ export function BoardView({
       const groupIds = mode === 'move' && isAlreadySelected && selectedIds.size > 1
         ? Array.from(selectedIds)
         : [item.id];
-      if (!isAlreadySelected) {
+      if (!isAlreadySelected && mode !== 'move') {
         setSelectedIds(new Set([item.id]));
       }
-      const group = groupIds
-        .map((id) => items.find((it) => it.id === id))
-        .filter(Boolean)
-        .map((it) => ({ id: it.id, startX: it.x, startY: it.y, startWidth: it.width, startHeight: it.height }));
+
+      let group;
+      if (mode === 'move' && e.altKey && typeof cloneItems === 'function') {
+        const mapping = cloneItems(groupIds, { dx: 0, dy: 0 });
+        if (!mapping.length) return;
+        group = mapping.map(({ newId, row }) => ({
+          id: newId,
+          startX: row.x,
+          startY: row.y,
+          startWidth: row.width,
+          startHeight: row.height,
+        }));
+        setSelectedIds(new Set(group.map((g) => g.id)));
+      } else {
+        if (mode === 'move' && !isAlreadySelected) {
+          setSelectedIds(new Set([item.id]));
+        }
+        group = groupIds
+          .map((id) => items.find((it) => it.id === id))
+          .filter(Boolean)
+          .map((it) => ({ id: it.id, startX: it.x, startY: it.y, startWidth: it.width, startHeight: it.height }));
+      }
+
       dragRef.current = {
-        primaryId: item.id,
+        primaryId: group[0]?.id ?? item.id,
         mode,
         startMouseX: e.clientX,
         startMouseY: e.clientY,
@@ -158,7 +189,7 @@ export function BoardView({
         moved: false,
       };
     },
-    [editingId, selectedIds, items]
+    [editingId, selectedIds, items, cloneItems]
   );
 
   useEffect(() => {
@@ -657,7 +688,20 @@ export function BoardView({
               setContextMenu(null);
             }}
           >
-            Копировать
+            <svg
+              className="board-view__context-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <rect x="9" y="9" width="12" height="12" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            <span>Копировать</span>
           </button>
           <button
             type="button"
@@ -673,12 +717,33 @@ export function BoardView({
               deleteItem(id);
             }}
           >
-            Удалить
+            <svg
+              className="board-view__context-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M9 3H15M3 6H21M19 6L18.3 16.52C18.19 18.1 18.14 18.89 17.8 19.49C17.5 20.01 17.05 20.44 16.5 20.7C15.88 21 15.09 21 13.51 21H10.49C8.91 21 8.12 21 7.5 20.7C6.95 20.44 6.5 20.01 6.2 19.49C5.86 18.89 5.81 18.1 5.7 16.52L5 6M10 10.5V15.5M14 10.5V15.5" />
+            </svg>
+            <span>Удалить</span>
           </button>
         </div>
       )}
 
       <div className="board-view__offline-bar">
+        <button
+          type="button"
+          className="board-view__offline-toggle"
+          onClick={() => setOffline(!offline)}
+          aria-label={offline ? 'Включить онлайн-режим' : 'Включить офлайн-режим'}
+          title={offline ? 'Офлайн-режим' : 'Онлайн-режим'}
+        >
+          <img src={offline ? offlineIcon : globeIcon} alt="" />
+        </button>
         {hasPending && (
           <button
             type="button"
@@ -690,15 +755,6 @@ export function BoardView({
             {syncing && <span className="board-view__sync-spinner" aria-hidden />}
           </button>
         )}
-        <button
-          type="button"
-          className="board-view__offline-toggle"
-          onClick={() => setOffline(!offline)}
-          aria-label={offline ? 'Включить онлайн-режим' : 'Включить офлайн-режим'}
-          title={offline ? 'Офлайн-режим' : 'Онлайн-режим'}
-        >
-          <img src={offline ? offlineIcon : globeIcon} alt="" />
-        </button>
       </div>
 
       {stylingItem && (

@@ -41,6 +41,9 @@ function normalizeRow(user, patch, idOverride) {
 export function useBoardItems() {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
+  const itemsRef = useRef([]);
+  itemsRef.current = items;
+  const pendingInsertsRef = useRef(new Map());
   const [loading, setLoading] = useState(true);
 
   const [offline, setOfflineState] = useState(() => {
@@ -157,12 +160,19 @@ export function useBoardItems() {
         touchPending();
         return row.id;
       }
-      const { error } = await supabase.from('board_items').insert(row);
-      if (error) {
-        // revert on error
-        setItems((prev) => prev.filter((it) => it.id !== row.id));
-        return null;
-      }
+      const insertPromise = supabase
+        .from('board_items')
+        .insert(row)
+        .then(({ error }) => {
+          if (error) {
+            setItems((prev) => prev.filter((it) => it.id !== row.id));
+          }
+        })
+        .finally(() => {
+          pendingInsertsRef.current.delete(row.id);
+        });
+      pendingInsertsRef.current.set(row.id, insertPromise);
+      await insertPromise;
       return row.id;
     },
     [user, touchPending]
@@ -194,10 +204,68 @@ export function useBoardItems() {
         touchPending();
         return;
       }
+      const pendingInsert = pendingInsertsRef.current.get(id);
+      if (pendingInsert) {
+        try {
+          await pendingInsert;
+        } catch {}
+      }
       const updates = { ...patch, updated_at: new Date().toISOString() };
       await supabase.from('board_items').update(updates).eq('id', id).eq('user_id', user.id);
     },
     [user?.id, touchPending]
+  );
+
+  const cloneItems = useCallback(
+    (sourceIds, { dx = 0, dy = 0 } = {}) => {
+      if (!user?.id) return [];
+      const currentItems = itemsRef.current;
+      const srcMap = new Map(currentItems.map((it) => [it.id, it]));
+      const newRows = [];
+      const mapping = [];
+      for (const srcId of sourceIds) {
+        const src = srcMap.get(srcId);
+        if (!src) continue;
+        const row = normalizeRow(user, {
+          text: src.text,
+          x: (src.x || 0) + dx,
+          y: (src.y || 0) + dy,
+          width: src.width,
+          height: src.height,
+          text_color: src.text_color,
+          has_border: src.has_border,
+          padding: src.padding,
+          text_scale: src.text_scale,
+          border_color: src.border_color,
+          board_id: src.board_id,
+        });
+        newRows.push(row);
+        mapping.push({ oldId: srcId, newId: row.id, row });
+      }
+      if (!newRows.length) return [];
+      setItems((prev) => [...prev, ...newRows]);
+      if (offlineRef.current) {
+        const p = pendingRef.current;
+        for (const r of newRows) p.creates.set(r.id, r);
+        touchPending();
+      } else {
+        const insertPromise = supabase
+          .from('board_items')
+          .insert(newRows)
+          .then(({ error }) => {
+            if (error) {
+              const ids = new Set(newRows.map((r) => r.id));
+              setItems((prev) => prev.filter((it) => !ids.has(it.id)));
+            }
+          })
+          .finally(() => {
+            for (const r of newRows) pendingInsertsRef.current.delete(r.id);
+          });
+        for (const r of newRows) pendingInsertsRef.current.set(r.id, insertPromise);
+      }
+      return mapping;
+    },
+    [user, touchPending]
   );
 
   const deleteItem = useCallback(
@@ -220,6 +288,12 @@ export function useBoardItems() {
         }
         touchPending();
         return;
+      }
+      const pendingInsert = pendingInsertsRef.current.get(id);
+      if (pendingInsert) {
+        try {
+          await pendingInsert;
+        } catch {}
       }
       await supabase.from('board_items').delete().eq('id', id).eq('user_id', user.id);
     },
@@ -275,6 +349,7 @@ export function useBoardItems() {
     updateItem,
     updateItemLocal,
     deleteItem,
+    cloneItems,
     refetch: fetchAll,
     offline,
     setOffline,

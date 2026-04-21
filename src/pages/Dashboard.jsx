@@ -204,6 +204,7 @@ export default function Dashboard() {
     updateItem: updateBoardItem,
     updateItemLocal: updateBoardItemLocal,
     deleteItem: deleteBoardItem,
+    cloneItems: cloneBoardItems,
     offline: boardOffline,
     setOffline: setBoardOffline,
     hasPending: boardHasPending,
@@ -1537,6 +1538,7 @@ export default function Dashboard() {
           updateItem={updateBoardItem}
           updateItemLocal={updateBoardItemLocal}
           deleteItem={deleteBoardItem}
+          cloneItems={cloneBoardItems}
           zoom={settings.board_zoom ?? 100}
           setZoom={setBoardZoom}
           hasHover={hasHover}
