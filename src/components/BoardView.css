@@ -144,15 +144,6 @@
   background: #000;
 }
 
-.board-view__dots {
-  position: absolute;
-  left: 0;
-  top: 0;
-  pointer-events: none;
-  background-image: radial-gradient(circle at center, #333333 0 0.5px, transparent 0.5px);
-  background-position: 0 0;
-}
-
 .board-view__lasso {
   position: absolute;
   border: 1px solid #5A86EE;
@@ -482,4 +473,113 @@
 .board-view__styling-actions .dashboard__settings-submit {
   flex: 1;
   margin: 0;
+}
+
+.board-view__offline-bar {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.board-view__offline-toggle {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: #1e1e1e;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease;
+}
+
+.board-view__offline-toggle:hover {
+  background: #2a2a2a;
+}
+
+.board-view__offline-toggle img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+}
+
+.board-view__sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #1e1e1e;
+  border: none;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  height: 2rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.board-view__sync-btn:hover:not(:disabled) {
+  color: #5a86ee;
+}
+
+.board-view__sync-btn:disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+
+.board-view__sync-spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid #555;
+  border-top-color: #5a86ee;
+  border-radius: 50%;
+  animation: board-view-spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+@keyframes board-view-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.board-view__context-menu {
+  position: fixed;
+  background: #141414;
+  border: 1px solid #2f2f2f;
+  border-radius: 6px;
+  padding: 0.25rem;
+  min-width: 10rem;
+  z-index: 100;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+}
+
+.board-view__context-item {
+  background: none;
+  border: none;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 0.875rem;
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.board-view__context-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #5a86ee;
+}
+
+.board-view__context-item--danger:hover {
+  color: #f46b6b;
 }

@@ -840,6 +840,16 @@
   background: rgba(90, 134, 238, 0.12);
 }
 
+.dashboard-menu__dirty-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #666666;
+  margin-left: auto;
+  flex: 0 0 6px;
+}
+
 .dashboard-menu__divider {
   display: none;
 }

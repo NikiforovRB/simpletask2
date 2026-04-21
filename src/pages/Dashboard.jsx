@@ -146,7 +146,7 @@ function getTasksInContainer(tasks, containerId) {
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 }
 
-function SortableProjectItem({ project, isActive, isHover, iconDefault, iconHover, dragIcon, onClick, onMouseEnter, onMouseLeave, disableDrag }) {
+function SortableProjectItem({ project, isActive, isHover, iconDefault, iconHover, dragIcon, onClick, onMouseEnter, onMouseLeave, disableDrag, dirty }) {
   const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: project.id, disabled: !!disableDrag });
   const icon = (isActive || isHover) ? iconHover : iconDefault;
   const smoothTransition = transition
@@ -169,6 +169,7 @@ function SortableProjectItem({ project, isActive, isHover, iconDefault, iconHove
       >
         <img src={icon} alt="" />
         <span>{project.title}</span>
+        {dirty && <span className="dashboard-menu__dirty-dot" aria-label="Есть несохранённые изменения" />}
       </button>
       {!disableDrag && (
         <span className="dashboard-menu__project-drag-handle" {...attributes} {...listeners} aria-label="Переместить">
@@ -197,7 +198,18 @@ export default function Dashboard() {
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const { projects, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
-  const { items: boardItems, addItem: addBoardItem, updateItem: updateBoardItem, updateItemLocal: updateBoardItemLocal, deleteItem: deleteBoardItem } = useBoardItems();
+  const {
+    items: boardItems,
+    addItem: addBoardItem,
+    updateItem: updateBoardItem,
+    updateItemLocal: updateBoardItemLocal,
+    deleteItem: deleteBoardItem,
+    offline: boardOffline,
+    setOffline: setBoardOffline,
+    hasPending: boardHasPending,
+    dirtyBoardIds: boardDirtyIds,
+    sync: syncBoardItems,
+  } = useBoardItems();
   const [dateOffset, setDateOffset] = useState(() => {
     try {
       const v = localStorage.getItem('dashboard_date_offset');
@@ -1033,6 +1045,7 @@ export default function Dashboard() {
               >
                 <img src={(viewMode === 'board' && !activeBoardId) || (hasHover && boardHover) ? doskaNavIcon : doskaIcon} alt="" />
                 <span>Доска</span>
+                {boardDirtyIds.has(null) && <span className="dashboard-menu__dirty-dot" aria-label="Есть несохранённые изменения" />}
               </button>
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                 {projects.map((p) => {
@@ -1052,6 +1065,7 @@ export default function Dashboard() {
                       onClick={() => handleMenuSelect(p.id)}
                       onMouseEnter={() => setProjectHoverId(p.id)}
                       onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
+                      dirty={isBoard && boardDirtyIds.has(p.id)}
                     />
                   );
                 })}
@@ -1155,6 +1169,7 @@ export default function Dashboard() {
               >
                 <img src={(viewMode === 'board' && !activeBoardId) || (hasHover && boardHover) ? doskaNavIcon : doskaIcon} alt="" />
                 <span>Доска</span>
+                {boardDirtyIds.has(null) && <span className="dashboard-menu__dirty-dot" aria-label="Есть несохранённые изменения" />}
               </button>
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                 {projects.map((p) => {
@@ -1175,6 +1190,7 @@ export default function Dashboard() {
                       onClick={() => handleMenuSelect(p.id)}
                       onMouseEnter={() => setProjectHoverId(p.id)}
                       onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
+                      dirty={isBoard && boardDirtyIds.has(p.id)}
                     />
                   );
                 })}
@@ -1523,9 +1539,11 @@ export default function Dashboard() {
           deleteItem={deleteBoardItem}
           zoom={settings.board_zoom ?? 100}
           setZoom={setBoardZoom}
-          dots={settings.board_dots ?? false}
-          setDots={setBoardDots}
           hasHover={hasHover}
+          offline={boardOffline}
+          setOffline={setBoardOffline}
+          hasPending={boardHasPending}
+          onSync={syncBoardItems}
         />
       )}
 

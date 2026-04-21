@@ -10,8 +10,16 @@ import zoomInIcon from '../assets/zoom-in.svg';
 import zoomInNavIcon from '../assets/zoom-in-nav.svg';
 import zoomOutIcon from '../assets/zoom-out.svg';
 import zoomOutNavIcon from '../assets/zoom-out-nav.svg';
-import dotsIcon from '../assets/dots.svg';
-import dotsNavIcon from '../assets/dots-nav.svg';
+import globeIcon from '../assets/globe.svg';
+import offlineIcon from '../assets/offline.svg';
+import gridLeftIcon from '../assets/grid-left.svg';
+import gridLeftNavIcon from '../assets/grid-left-nav.svg';
+import gridTopIcon from '../assets/grid-top.svg';
+import gridTopNavIcon from '../assets/grid-top-nav.svg';
+import hCenterIcon from '../assets/horizontal-center.svg';
+import hCenterNavIcon from '../assets/horizontal-center-nav.svg';
+import vCenterIcon from '../assets/vertical-center.svg';
+import vCenterNavIcon from '../assets/vertical-center-nav.svg';
 import './BoardView.css';
 
 const ZOOM_PRESETS = [25, 50, 75, 100, 150, 200];
@@ -54,9 +62,11 @@ export function BoardView({
   deleteItem,
   zoom,
   setZoom,
-  dots,
-  setDots,
   hasHover,
+  offline,
+  setOffline,
+  hasPending,
+  onSync,
 }) {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [editingId, setEditingId] = useState(null);
@@ -64,9 +74,11 @@ export function BoardView({
   const [stylingId, setStylingId] = useState(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [addHover, setAddHover] = useState(false);
-  const [dotsHover, setDotsHover] = useState(false);
   const [zoomInHover, setZoomInHover] = useState(false);
   const [zoomOutHover, setZoomOutHover] = useState(false);
+  const [alignHover, setAlignHover] = useState({ left: false, top: false, hcenter: false, vcenter: false });
+  const [syncing, setSyncing] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, itemId }
   const [lasso, setLasso] = useState(null); // {x,y,width,height} in world coords
 
   const canvasRef = useRef(null);
@@ -235,10 +247,11 @@ export function BoardView({
       }
       let dx = 0;
       let dy = 0;
-      if (e.key === 'ArrowLeft') dx = -1;
-      else if (e.key === 'ArrowRight') dx = 1;
-      else if (e.key === 'ArrowUp') dy = -1;
-      else if (e.key === 'ArrowDown') dy = 1;
+      const step = e.shiftKey ? 10 : 1;
+      if (e.key === 'ArrowLeft') dx = -step;
+      else if (e.key === 'ArrowRight') dx = step;
+      else if (e.key === 'ArrowUp') dy = -step;
+      else if (e.key === 'ArrowDown') dy = step;
       else return;
       e.preventDefault();
       const ids = Array.from(selectedIds);
@@ -359,6 +372,107 @@ export function BoardView({
     [stylingId, items]
   );
 
+  const alignSelected = useCallback(
+    (mode) => {
+      const ids = Array.from(selectedIds);
+      const group = ids.map((id) => items.find((it) => it.id === id)).filter(Boolean);
+      if (group.length < 2) return;
+      if (mode === 'left') {
+        const x = Math.min(...group.map((g) => g.x));
+        group.forEach((g) => updateItem(g.id, { x }));
+      } else if (mode === 'top') {
+        const y = Math.min(...group.map((g) => g.y));
+        group.forEach((g) => updateItem(g.id, { y }));
+      } else if (mode === 'hcenter') {
+        const minY = Math.min(...group.map((g) => g.y));
+        const maxY = Math.max(...group.map((g) => g.y + g.height));
+        const cy = (minY + maxY) / 2;
+        group.forEach((g) => {
+          const y = clamp(Math.round(cy - g.height / 2), 0, WORLD_HEIGHT - g.height);
+          updateItem(g.id, { y });
+        });
+      } else if (mode === 'vcenter') {
+        const minX = Math.min(...group.map((g) => g.x));
+        const maxX = Math.max(...group.map((g) => g.x + g.width));
+        const cx = (minX + maxX) / 2;
+        group.forEach((g) => {
+          const x = clamp(Math.round(cx - g.width / 2), 0, WORLD_WIDTH - g.width);
+          updateItem(g.id, { x });
+        });
+      }
+    },
+    [selectedIds, items, updateItem]
+  );
+
+  const openContextMenu = useCallback(
+    (e, itemId) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!selectedIds.has(itemId)) {
+        setSelectedIds(new Set([itemId]));
+      }
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        itemId,
+      });
+    },
+    [selectedIds]
+  );
+
+  const handleCopyItem = useCallback(
+    (id) => {
+      const src = items.find((it) => it.id === id);
+      if (!src) return;
+      const width = src.width;
+      const height = src.height;
+      const x = clamp(Math.round(src.x + 20), 0, WORLD_WIDTH - width);
+      const y = clamp(Math.round(src.y + 20), 0, WORLD_HEIGHT - height);
+      addItem({
+        x,
+        y,
+        width,
+        height,
+        text: src.text,
+        text_color: src.text_color,
+        has_border: src.has_border,
+        padding: src.padding,
+        text_scale: src.text_scale,
+        border_color: src.border_color,
+      });
+    },
+    [items, addItem]
+  );
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const onDown = (e) => {
+      if (e.target.closest('.board-view__context-menu')) return;
+      setContextMenu(null);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [contextMenu]);
+
+  const handleSync = useCallback(async () => {
+    if (!onSync || syncing) return;
+    setSyncing(true);
+    try {
+      await onSync();
+    } finally {
+      setSyncing(false);
+    }
+  }, [onSync, syncing]);
+
+  const multiSelected = selectedIds.size >= 2;
+
   return (
     <div className="board-view">
       <div className="board-view__toolbar-left">
@@ -414,16 +528,54 @@ export function BoardView({
       </div>
 
       <div className="board-view__toolbar-right">
-        <button
-          type="button"
-          className={`board-view__icon-btn ${dots ? 'board-view__icon-btn--active' : ''}`}
-          onMouseEnter={() => hasHover && setDotsHover(true)}
-          onMouseLeave={() => hasHover && setDotsHover(false)}
-          onClick={() => setDots(!dots)}
-          aria-label={dots ? 'Скрыть разметку точками' : 'Показать разметку точками'}
-        >
-          <img src={hasHover && dotsHover ? dotsNavIcon : dotsIcon} alt="" />
-        </button>
+        {multiSelected && (
+          <>
+            <button
+              type="button"
+              className="board-view__icon-btn"
+              onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, left: true }))}
+              onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, left: false }))}
+              onClick={() => alignSelected('left')}
+              aria-label="Выровнять по левой границе"
+              title="Выровнять по левой границе"
+            >
+              <img src={hasHover && alignHover.left ? gridLeftNavIcon : gridLeftIcon} alt="" />
+            </button>
+            <button
+              type="button"
+              className="board-view__icon-btn"
+              onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, top: true }))}
+              onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, top: false }))}
+              onClick={() => alignSelected('top')}
+              aria-label="Выровнять по верхней границе"
+              title="Выровнять по верхней границе"
+            >
+              <img src={hasHover && alignHover.top ? gridTopNavIcon : gridTopIcon} alt="" />
+            </button>
+            <button
+              type="button"
+              className="board-view__icon-btn"
+              onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, hcenter: true }))}
+              onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, hcenter: false }))}
+              onClick={() => alignSelected('hcenter')}
+              aria-label="Выровнять по центру по горизонтали"
+              title="Выровнять по центру по горизонтали"
+            >
+              <img src={hasHover && alignHover.hcenter ? hCenterNavIcon : hCenterIcon} alt="" />
+            </button>
+            <button
+              type="button"
+              className="board-view__icon-btn"
+              onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, vcenter: true }))}
+              onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, vcenter: false }))}
+              onClick={() => alignSelected('vcenter')}
+              aria-label="Выровнять по центру по вертикали"
+              title="Выровнять по центру по вертикали"
+            >
+              <img src={hasHover && alignHover.vcenter ? vCenterNavIcon : vCenterIcon} alt="" />
+            </button>
+          </>
+        )}
         <button
           type="button"
           className="board-view__icon-btn"
@@ -442,17 +594,6 @@ export function BoardView({
         onMouseDown={handleCanvasMouseDown}
         onContextMenu={(e) => e.preventDefault()}
       >
-        {dots && (
-          <div
-            className="board-view__dots"
-            aria-hidden
-            style={{
-              width: WORLD_WIDTH * zoomScale,
-              height: WORLD_HEIGHT * zoomScale,
-              backgroundSize: `${20 * zoomScale}px ${20 * zoomScale}px`,
-            }}
-          />
-        )}
         <div
           ref={worldRef}
           className="board-view__world"
@@ -473,6 +614,7 @@ export function BoardView({
               onHoverEnter={() => setHoverId(it.id)}
               onHoverLeave={() => setHoverId((cur) => (cur === it.id ? null : cur))}
               onBeginDrag={beginDrag}
+              onContextMenu={(e) => openContextMenu(e, it.id)}
               onStartEdit={() => {
                 setSelectedIds(new Set([it.id]));
                 setEditingId(it.id);
@@ -500,6 +642,63 @@ export function BoardView({
             />
           )}
         </div>
+      </div>
+
+      {contextMenu && (
+        <div
+          className="board-view__context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            type="button"
+            className="board-view__context-item"
+            onClick={() => {
+              handleCopyItem(contextMenu.itemId);
+              setContextMenu(null);
+            }}
+          >
+            Копировать
+          </button>
+          <button
+            type="button"
+            className="board-view__context-item board-view__context-item--danger"
+            onClick={() => {
+              const id = contextMenu.itemId;
+              setContextMenu(null);
+              setSelectedIds((prev) => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+              });
+              deleteItem(id);
+            }}
+          >
+            Удалить
+          </button>
+        </div>
+      )}
+
+      <div className="board-view__offline-bar">
+        {hasPending && (
+          <button
+            type="button"
+            className="board-view__sync-btn"
+            onClick={handleSync}
+            disabled={syncing}
+          >
+            <span>Синхронизировать</span>
+            {syncing && <span className="board-view__sync-spinner" aria-hidden />}
+          </button>
+        )}
+        <button
+          type="button"
+          className="board-view__offline-toggle"
+          onClick={() => setOffline(!offline)}
+          aria-label={offline ? 'Включить онлайн-режим' : 'Включить офлайн-режим'}
+          title={offline ? 'Офлайн-режим' : 'Онлайн-режим'}
+        >
+          <img src={offline ? offlineIcon : globeIcon} alt="" />
+        </button>
       </div>
 
       {stylingItem && (
@@ -533,6 +732,7 @@ function BoardTextBlock({
   onHoverEnter,
   onHoverLeave,
   onBeginDrag,
+  onContextMenu,
   onStartEdit,
   onCommitText,
   onOpenStyling,
@@ -590,6 +790,10 @@ function BoardTextBlock({
         if (e.target.closest('.board-view__block-resize')) return;
         if (e.target.closest('.board-view__block-edit-btn')) return;
         onBeginDrag(e, item, 'move');
+      }}
+      onContextMenu={(e) => {
+        if (editing) return;
+        onContextMenu?.(e);
       }}
       onDoubleClick={(e) => {
         if (e.target.closest('.board-view__block-resize')) return;
