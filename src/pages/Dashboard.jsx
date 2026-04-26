@@ -74,6 +74,7 @@ import archiveNavIcon from '../assets/archive-nav.svg';
 import folderIcon from '../assets/folder.svg';
 import folderNavIcon from '../assets/folder-nav.svg';
 import dragIcon from '../assets/drag.svg';
+import dragNavIcon from '../assets/drag-nav.svg';
 import spacingIcon from '../assets/spacing.svg';
 import spacingNavIcon from '../assets/spacing-nav.svg';
 import textIcon from '../assets/text.svg';
@@ -146,8 +147,34 @@ function getTasksInContainer(tasks, containerId) {
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 }
 
-function SortableProjectItem({ project, isActive, isHover, iconDefault, iconHover, dragIcon, onClick, onMouseEnter, onMouseLeave, disableDrag, dirty }) {
-  const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: project.id, disabled: !!disableDrag });
+function SortableMenuOrderRow({ project }) {
+  const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: project.id });
+  const isBoard = (project.kind || 'project') === 'board';
+  const icon = isBoard ? doskaIcon : folderIcon;
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0 : 1,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`dashboard-menu__order-row ${isDragging ? 'dashboard-menu__order-row--dragging' : ''}`}
+      {...attributes}
+      {...listeners}
+    >
+      <img src={icon} alt="" className="dashboard-menu__order-icon" />
+      <span className="dashboard-menu__order-title">{project.title}</span>
+      <span className="dashboard-menu__order-handle" aria-hidden>
+        <img src={dragIcon} alt="" />
+      </span>
+    </div>
+  );
+}
+
+function SortableProjectItem({ project, isActive, isHover, iconDefault, iconHover, onClick, onMouseEnter, onMouseLeave, dirty }) {
+  const { setNodeRef, transform, transition, isDragging } = useSortable({ id: project.id, disabled: true });
   const icon = (isActive || isHover) ? iconHover : iconDefault;
   const smoothTransition = transition
     ? transition.replace(/(\d+)ms/g, (_, ms) => `${Math.round(Number(ms) * 1.85)}ms`)
@@ -171,11 +198,6 @@ function SortableProjectItem({ project, isActive, isHover, iconDefault, iconHove
         <span>{project.title}</span>
         {dirty && <span className="dashboard-menu__dirty-dot" aria-label="Есть несохранённые изменения" />}
       </button>
-      {!disableDrag && (
-        <span className="dashboard-menu__project-drag-handle" {...attributes} {...listeners} aria-label="Переместить">
-          <img src={dragIcon} alt="" />
-        </span>
-      )}
     </div>
   );
 }
@@ -328,6 +350,10 @@ export default function Dashboard() {
   const [fontWeightDraft, setFontWeightDraft] = useState('medium');
   const [fontScaleDraft, setFontScaleDraft] = useState(1);
   const [textFontBtnHover, setTextFontBtnHover] = useState(false);
+  const [menuOrderBtnHover, setMenuOrderBtnHover] = useState(false);
+  const [menuOrderModalOpen, setMenuOrderModalOpen] = useState(false);
+  const [menuOrderDraft, setMenuOrderDraft] = useState([]);
+  const [menuOrderActiveId, setMenuOrderActiveId] = useState(null);
   const contextMenuRef = useRef(null);
   const hasHover = useMediaQuery('(hover: hover)');
   const isWideMenu = useMediaQuery('(min-width: 600px)');
@@ -895,6 +921,38 @@ export default function Dashboard() {
     setFontModalOpen(false);
   }, [fontWeightDraft, fontScaleDraft, setTaskFontWeight, setTaskFontScale]);
 
+  const menuOrderSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const openMenuOrderModal = useCallback(() => {
+    setMenuOrderDraft(projects.map((p) => p.id));
+    setMenuOrderModalOpen(true);
+  }, [projects]);
+
+  const handleMenuOrderDragStart = useCallback((event) => {
+    setMenuOrderActiveId(event.active?.id ?? null);
+  }, []);
+
+  const handleMenuOrderDragEnd = useCallback((event) => {
+    setMenuOrderActiveId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setMenuOrderDraft((prev) => {
+      const oldIndex = prev.indexOf(active.id);
+      const newIndex = prev.indexOf(over.id);
+      if (oldIndex < 0 || newIndex < 0) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  }, []);
+
+  const saveMenuOrder = useCallback(async () => {
+    await reorderProjects(menuOrderDraft);
+    setMenuOrderModalOpen(false);
+  }, [menuOrderDraft, reorderProjects]);
+
+  const activeMenuOrderProject = menuOrderActiveId
+    ? projects.find((p) => p.id === menuOrderActiveId)
+    : null;
+
   const renderFontMenuButton = () => (
     <button
       type="button"
@@ -1062,7 +1120,6 @@ export default function Dashboard() {
                       isHover={hasHover && projectHoverId === p.id}
                       iconDefault={isBoard ? doskaIcon : folderIcon}
                       iconHover={isBoard ? doskaNavIcon : folderNavIcon}
-                      dragIcon={dragIcon}
                       onClick={() => handleMenuSelect(p.id)}
                       onMouseEnter={() => setProjectHoverId(p.id)}
                       onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
@@ -1092,6 +1149,18 @@ export default function Dashboard() {
                 <img src={hasHover && spacingBtnHover ? spacingNavIcon : spacingIcon} alt="" />
               </button>
               {renderFontMenuButton()}
+              {projects.length > 1 && (
+                <button
+                  type="button"
+                  className="dashboard-menu__order-btn"
+                  onMouseEnter={() => hasHover && setMenuOrderBtnHover(true)}
+                  onMouseLeave={() => hasHover && setMenuOrderBtnHover(false)}
+                  onClick={openMenuOrderModal}
+                  aria-label="Изменить порядок пунктов в меню"
+                >
+                  <img src={hasHover && menuOrderBtnHover ? dragNavIcon : dragIcon} alt="" />
+                </button>
+              )}
             </div>
           </nav>
         ) : (
@@ -1186,8 +1255,6 @@ export default function Dashboard() {
                       isHover={hasHover && projectHoverId === p.id}
                       iconDefault={isBoard ? doskaIcon : folderIcon}
                       iconHover={isBoard ? doskaNavIcon : folderNavIcon}
-                      dragIcon={dragIcon}
-                      disableDrag
                       onClick={() => handleMenuSelect(p.id)}
                       onMouseEnter={() => setProjectHoverId(p.id)}
                       onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
@@ -1375,6 +1442,58 @@ export default function Dashboard() {
             <button type="button" className={`dashboard__settings-option ${settings.new_tasks_position === 'end' ? 'dashboard__settings-option--active' : ''}`} onClick={() => { setNewTasksPosition('end'); setSettingsOpen(false); }}>
               В конец списка
             </button>
+          </div>
+        </div>
+      )}
+
+      {menuOrderModalOpen && (
+        <div className="dashboard__settings-overlay" onClick={() => setMenuOrderModalOpen(false)}>
+          <div
+            className="dashboard__settings-popup dashboard-menu__order-popup"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dashboard__settings-title">Порядок пунктов меню</div>
+            <DndContext
+              sensors={menuOrderSensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleMenuOrderDragStart}
+              onDragEnd={handleMenuOrderDragEnd}
+            >
+              <SortableContext items={menuOrderDraft} strategy={verticalListSortingStrategy}>
+                <div className="dashboard-menu__order-list">
+                  {menuOrderDraft.map((id) => {
+                    const p = projects.find((proj) => proj.id === id);
+                    if (!p) return null;
+                    return <SortableMenuOrderRow key={id} project={p} />;
+                  })}
+                </div>
+              </SortableContext>
+              <DragOverlay>
+                {activeMenuOrderProject ? (
+                  <div className="dashboard-menu__order-row dashboard-menu__order-row--overlay">
+                    <img
+                      src={(activeMenuOrderProject.kind || 'project') === 'board' ? doskaIcon : folderIcon}
+                      alt=""
+                      className="dashboard-menu__order-icon"
+                    />
+                    <span className="dashboard-menu__order-title">{activeMenuOrderProject.title}</span>
+                    <span className="dashboard-menu__order-handle" aria-hidden>
+                      <img src={dragIcon} alt="" />
+                    </span>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+            <div className="dashboard__settings-edit-actions">
+              <button type="button" className="dashboard__settings-submit" onClick={() => setMenuOrderModalOpen(false)}>
+                Отмена
+              </button>
+              <button type="button" className="dashboard__settings-submit" onClick={saveMenuOrder}>
+                Сохранить
+              </button>
+            </div>
           </div>
         </div>
       )}

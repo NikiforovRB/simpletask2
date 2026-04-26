@@ -616,6 +616,34 @@
   object-fit: contain;
 }
 
+.dashboard-menu__order-btn {
+  width: 2rem;
+  height: 2rem;
+  margin-left: 5px;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #666666;
+  transition: color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.dashboard-menu__order-btn:hover {
+  color: #5a86ee;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dashboard-menu__order-btn img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+}
+
 /* Мобильное меню: иконка шрифта под «Добавить проект» (в т.ч. при ширине &lt; 500px) */
 .dashboard-menu__mobile-font-row {
   display: none;
@@ -916,6 +944,78 @@
 
 .dashboard-menu__project-row--dragging .dashboard-menu__project-drag-handle {
   opacity: 1;
+}
+
+.dashboard-menu__order-popup {
+  min-width: 320px;
+  max-width: 480px;
+}
+
+.dashboard-menu__order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.dashboard-menu__order-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.75rem;
+  background: #1a1a1a;
+  border: 1px solid #2f2f2f;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 0.9375rem;
+  user-select: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.dashboard-menu__order-row:active {
+  cursor: grabbing;
+}
+
+.dashboard-menu__order-row--dragging {
+  background: #141414;
+}
+
+.dashboard-menu__order-row--overlay {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  cursor: grabbing;
+}
+
+.dashboard-menu__order-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.dashboard-menu__order-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-menu__order-handle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.35rem;
+  opacity: 0.6;
+}
+
+.dashboard-menu__order-handle img {
+  width: 0.9rem;
+  height: 0.9rem;
+  object-fit: contain;
 }
 
 @media (max-width: 599px) {
