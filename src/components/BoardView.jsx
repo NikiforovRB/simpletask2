@@ -1004,6 +1004,8 @@ function BoardTextBlock({
   const customBorderColor = item.border_color || DEFAULT_BORDER_COLOR;
   const borderColor = selected ? '#5A86EE' : item.has_border ? customBorderColor : 'transparent';
 
+  const radius = Math.max(0, Number(item.border_radius) || 0);
+
   const style = {
     left: item.x,
     top: item.y,
@@ -1011,6 +1013,7 @@ function BoardTextBlock({
     height: item.height,
     color: item.text_color,
     borderColor,
+    borderRadius: radius,
     padding: item.padding,
     fontSize: `${0.9375 * scale}rem`,
   };
@@ -1119,6 +1122,8 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
   const [deleteHover, setDeleteHover] = useState(false);
   const [widthDraft, setWidthDraft] = useState(String(item.width));
   const [heightDraft, setHeightDraft] = useState(String(item.height));
+  const currentRadius = Math.max(0, Math.round(Number(item.border_radius) || 0));
+  const [radiusDraft, setRadiusDraft] = useState(String(currentRadius));
 
   useEffect(() => {
     setWidthDraft(String(item.width));
@@ -1126,9 +1131,13 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
   useEffect(() => {
     setHeightDraft(String(item.height));
   }, [item.height]);
+  useEffect(() => {
+    setRadiusDraft(String(currentRadius));
+  }, [currentRadius]);
 
   const widthMax = Math.max(60, WORLD_WIDTH - item.x);
   const heightMax = Math.max(30, WORLD_HEIGHT - item.y);
+  const radiusMax = 100;
 
   const applyWidth = (n) => {
     const clamped = clamp(Math.round(n), 60, widthMax);
@@ -1139,6 +1148,11 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
     const clamped = clamp(Math.round(n), 30, heightMax);
     if (clamped !== item.height) onUpdate({ height: clamped });
     setHeightDraft(String(clamped));
+  };
+  const applyRadius = (n) => {
+    const clamped = clamp(Math.round(n), 0, radiusMax);
+    if (clamped !== currentRadius) onUpdate({ border_radius: clamped });
+    setRadiusDraft(String(clamped));
   };
 
   const commitWidth = () => {
@@ -1156,6 +1170,14 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
       return;
     }
     applyHeight(n);
+  };
+  const commitRadius = () => {
+    const n = parseInt(radiusDraft, 10);
+    if (!Number.isFinite(n)) {
+      setRadiusDraft(String(currentRadius));
+      return;
+    }
+    applyRadius(n);
   };
 
   const currentBorderColor = (item.border_color || DEFAULT_BORDER_COLOR).toLowerCase();
@@ -1233,6 +1255,46 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
               {p}px
             </button>
           ))}
+        </div>
+
+        <div className="board-view__styling-section-label">Скругление углов</div>
+        <div className="board-view__styling-size-row">
+          <div className="board-view__styling-size-field">
+            <span className="board-view__styling-size-label">Радиус</span>
+            <button
+              type="button"
+              className="board-view__styling-size-btn"
+              onClick={() => applyRadius(currentRadius - 1)}
+              aria-label="Уменьшить скругление"
+            >
+              −
+            </button>
+            <input
+              type="number"
+              className="board-view__styling-size-input"
+              value={radiusDraft}
+              onChange={(e) => setRadiusDraft(e.target.value)}
+              onBlur={commitRadius}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitRadius();
+                  e.currentTarget.blur();
+                }
+              }}
+              min={0}
+              max={radiusMax}
+              step={1}
+            />
+            <button
+              type="button"
+              className="board-view__styling-size-btn"
+              onClick={() => applyRadius(currentRadius + 1)}
+              aria-label="Увеличить скругление"
+            >
+              +
+            </button>
+          </div>
         </div>
 
         <div className="board-view__styling-section-label">Размер текста</div>

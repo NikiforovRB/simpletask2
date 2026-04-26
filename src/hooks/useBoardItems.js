@@ -32,6 +32,7 @@ function normalizeRow(user, patch, idOverride) {
     padding: Math.max(0, Math.round(patch.padding ?? 10)),
     text_scale: patch.text_scale ?? 1,
     border_color: patch.border_color ?? '#2f2f2f',
+    border_radius: Math.max(0, Math.round(patch.border_radius ?? 0)),
     board_id: patch.board_id ?? null,
     created_at: nowIso,
     updated_at: nowIso,
@@ -237,6 +238,7 @@ export function useBoardItems() {
           padding: src.padding,
           text_scale: src.text_scale,
           border_color: src.border_color,
+          border_radius: src.border_radius,
           board_id: src.board_id,
         });
         newRows.push(row);
