@@ -39,11 +39,44 @@ function formatScaleLabel(s) {
 const WORLD_WIDTH = 4000;
 const WORLD_HEIGHT = 3000;
 const NEW_BLOCK_TOP_OFFSET = 100;
+const SNAP_SCREEN_PX = 6;
 
 const RESIZE_DIRECTIONS = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 
 function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
+}
+
+function snapLines(activeLines, candidateLines, threshold) {
+  let best = null;
+  for (const a of activeLines) {
+    for (const c of candidateLines) {
+      const delta = c - a;
+      const abs = Math.abs(delta);
+      if (abs <= threshold && (!best || abs < Math.abs(best.delta))) {
+        best = { delta };
+      }
+    }
+  }
+  return best;
+}
+
+function gatherAligned(activeLines, candidateLines, eps = 0.5) {
+  const out = new Set();
+  for (const a of activeLines) {
+    for (const c of candidateLines) {
+      if (Math.abs(a - c) <= eps) out.add(c);
+    }
+  }
+  return Array.from(out);
+}
+
+function rectLinesV(r) {
+  return [r.left, (r.left + r.right) / 2, r.right];
+}
+
+function rectLinesH(r) {
+  return [r.top, (r.top + r.bottom) / 2, r.bottom];
 }
 
 function snapZoom(n) {
@@ -81,6 +114,7 @@ export function BoardView({
   const [syncing, setSyncing] = useState(false);
   const [contextMenu, setContextMenu] = useState(null); // { x, y, itemId }
   const [lasso, setLasso] = useState(null); // {x,y,width,height} in world coords
+  const [guides, setGuides] = useState({ v: [], h: [] });
 
   const canvasRef = useRef(null);
   const worldRef = useRef(null);
@@ -180,6 +214,25 @@ export function BoardView({
           .map((it) => ({ id: it.id, startX: it.x, startY: it.y, startWidth: it.width, startHeight: it.height }));
       }
 
+      const groupSet = new Set(group.map((g) => g.id));
+      const others = items
+        .filter((it) => !groupSet.has(it.id))
+        .map((it) => ({
+          left: it.x,
+          top: it.y,
+          right: it.x + it.width,
+          bottom: it.y + it.height,
+        }));
+      const groupBounds = group.reduce(
+        (acc, g) => ({
+          left: Math.min(acc.left, g.startX),
+          top: Math.min(acc.top, g.startY),
+          right: Math.max(acc.right, g.startX + g.startWidth),
+          bottom: Math.max(acc.bottom, g.startY + g.startHeight),
+        }),
+        { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity }
+      );
+
       dragRef.current = {
         primaryId: group[0]?.id ?? item.id,
         mode,
@@ -187,6 +240,8 @@ export function BoardView({
         startMouseY: e.clientY,
         group,
         moved: false,
+        others,
+        groupBounds,
       };
     },
     [editingId, selectedIds, items, cloneItems]
@@ -200,16 +255,64 @@ export function BoardView({
       const dy = (e.clientY - d.startMouseY) / zoomScale;
       if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) d.moved = true;
 
+      const threshold = SNAP_SCREEN_PX / zoomScale;
+      const otherV = [];
+      const otherH = [];
+      (d.others || []).forEach((o) => {
+        otherV.push(...rectLinesV(o));
+        otherH.push(...rectLinesH(o));
+      });
+      // Hold Ctrl/Cmd to temporarily disable snapping for fine positioning.
+      const snapDisabled = e.ctrlKey || e.metaKey;
+
       if (d.mode === 'move') {
         const minDx = -Math.min(...d.group.map((g) => g.startX));
         const maxDx = Math.min(...d.group.map((g) => WORLD_WIDTH - g.startX - g.startWidth));
         const minDy = -Math.min(...d.group.map((g) => g.startY));
         const maxDy = Math.min(...d.group.map((g) => WORLD_HEIGHT - g.startY - g.startHeight));
-        const cdx = clamp(dx, minDx, maxDx);
-        const cdy = clamp(dy, minDy, maxDy);
+        let cdx = clamp(dx, minDx, maxDx);
+        let cdy = clamp(dy, minDy, maxDy);
+
+        if (!snapDisabled && d.groupBounds && otherV.length) {
+          const proposedV = [
+            d.groupBounds.left + cdx,
+            (d.groupBounds.left + d.groupBounds.right) / 2 + cdx,
+            d.groupBounds.right + cdx,
+          ];
+          const sx = snapLines(proposedV, otherV, threshold);
+          if (sx) cdx = clamp(cdx + sx.delta, minDx, maxDx);
+        }
+        if (!snapDisabled && d.groupBounds && otherH.length) {
+          const proposedH = [
+            d.groupBounds.top + cdy,
+            (d.groupBounds.top + d.groupBounds.bottom) / 2 + cdy,
+            d.groupBounds.bottom + cdy,
+          ];
+          const sy = snapLines(proposedH, otherH, threshold);
+          if (sy) cdy = clamp(cdy + sy.delta, minDy, maxDy);
+        }
+
         d.group.forEach((g) => {
           updateItemLocal(g.id, { x: Math.round(g.startX + cdx), y: Math.round(g.startY + cdy) });
         });
+
+        if (!snapDisabled && d.groupBounds) {
+          const finalV = [
+            d.groupBounds.left + cdx,
+            (d.groupBounds.left + d.groupBounds.right) / 2 + cdx,
+            d.groupBounds.right + cdx,
+          ];
+          const finalH = [
+            d.groupBounds.top + cdy,
+            (d.groupBounds.top + d.groupBounds.bottom) / 2 + cdy,
+            d.groupBounds.bottom + cdy,
+          ];
+          const vGuides = gatherAligned(finalV, otherV, 0.5);
+          const hGuides = gatherAligned(finalH, otherH, 0.5);
+          setGuides({ v: vGuides, h: hGuides });
+        } else {
+          setGuides({ v: [], h: [] });
+        }
       } else {
         const g = d.group[0];
         const minW = 60;
@@ -230,18 +333,77 @@ export function BoardView({
           y = g.startY + (g.startHeight - newH);
           h = newH;
         }
+
+        if (!snapDisabled && otherV.length) {
+          const movingV = [];
+          if (d.mode.includes('e')) movingV.push(x + w);
+          if (d.mode.includes('w')) movingV.push(x);
+          if (movingV.length) {
+            const s = snapLines(movingV, otherV, threshold);
+            if (s) {
+              if (d.mode.includes('e')) {
+                const newW = clamp(w + s.delta, minW, WORLD_WIDTH - x);
+                w = newW;
+              } else {
+                const newX = x + s.delta;
+                const newW = w - s.delta;
+                if (newW >= minW && newX >= 0) {
+                  x = newX;
+                  w = newW;
+                }
+              }
+            }
+          }
+        }
+        if (!snapDisabled && otherH.length) {
+          const movingH = [];
+          if (d.mode.includes('s')) movingH.push(y + h);
+          if (d.mode.includes('n')) movingH.push(y);
+          if (movingH.length) {
+            const s = snapLines(movingH, otherH, threshold);
+            if (s) {
+              if (d.mode.includes('s')) {
+                const newH = clamp(h + s.delta, minH, WORLD_HEIGHT - y);
+                h = newH;
+              } else {
+                const newY = y + s.delta;
+                const newH = h - s.delta;
+                if (newH >= minH && newY >= 0) {
+                  y = newY;
+                  h = newH;
+                }
+              }
+            }
+          }
+        }
+
         updateItemLocal(g.id, {
           x: Math.round(x),
           y: Math.round(y),
           width: Math.round(w),
           height: Math.round(h),
         });
+
+        if (!snapDisabled) {
+          const movingV = [];
+          if (d.mode.includes('e')) movingV.push(x + w);
+          if (d.mode.includes('w')) movingV.push(x);
+          const movingH = [];
+          if (d.mode.includes('s')) movingH.push(y + h);
+          if (d.mode.includes('n')) movingH.push(y);
+          const vGuides = movingV.length ? gatherAligned(movingV, otherV, 0.5) : [];
+          const hGuides = movingH.length ? gatherAligned(movingH, otherH, 0.5) : [];
+          setGuides({ v: vGuides, h: hGuides });
+        } else {
+          setGuides({ v: [], h: [] });
+        }
       }
     };
     const onUp = () => {
       const d = dragRef.current;
       if (!d) return;
       dragRef.current = null;
+      setGuides({ v: [], h: [] });
       if (!d.moved) return;
       d.group.forEach((g) => {
         const cur = items.find((it) => it.id === g.id);
@@ -672,6 +834,26 @@ export function BoardView({
               }}
             />
           )}
+          {guides.v.map((x, i) => {
+            const w = 1 / zoomScale;
+            return (
+              <div
+                key={`vg-${i}-${x}`}
+                className="board-view__guide board-view__guide--v"
+                style={{ left: x - w / 2, width: w, top: 0, height: WORLD_HEIGHT }}
+              />
+            );
+          })}
+          {guides.h.map((y, i) => {
+            const h = 1 / zoomScale;
+            return (
+              <div
+                key={`hg-${i}-${y}`}
+                className="board-view__guide board-view__guide--h"
+                style={{ top: y - h / 2, height: h, left: 0, width: WORLD_WIDTH }}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -935,6 +1117,47 @@ function BoardTextBlock({
 
 function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
   const [deleteHover, setDeleteHover] = useState(false);
+  const [widthDraft, setWidthDraft] = useState(String(item.width));
+  const [heightDraft, setHeightDraft] = useState(String(item.height));
+
+  useEffect(() => {
+    setWidthDraft(String(item.width));
+  }, [item.width]);
+  useEffect(() => {
+    setHeightDraft(String(item.height));
+  }, [item.height]);
+
+  const widthMax = Math.max(60, WORLD_WIDTH - item.x);
+  const heightMax = Math.max(30, WORLD_HEIGHT - item.y);
+
+  const applyWidth = (n) => {
+    const clamped = clamp(Math.round(n), 60, widthMax);
+    if (clamped !== item.width) onUpdate({ width: clamped });
+    setWidthDraft(String(clamped));
+  };
+  const applyHeight = (n) => {
+    const clamped = clamp(Math.round(n), 30, heightMax);
+    if (clamped !== item.height) onUpdate({ height: clamped });
+    setHeightDraft(String(clamped));
+  };
+
+  const commitWidth = () => {
+    const n = parseInt(widthDraft, 10);
+    if (!Number.isFinite(n)) {
+      setWidthDraft(String(item.width));
+      return;
+    }
+    applyWidth(n);
+  };
+  const commitHeight = () => {
+    const n = parseInt(heightDraft, 10);
+    if (!Number.isFinite(n)) {
+      setHeightDraft(String(item.height));
+      return;
+    }
+    applyHeight(n);
+  };
+
   const currentBorderColor = (item.border_color || DEFAULT_BORDER_COLOR).toLowerCase();
   const currentScale = Number.isFinite(Number(item.text_scale)) ? Number(item.text_scale) : 1;
   return (
@@ -1024,6 +1247,82 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
               {formatScaleLabel(s)}
             </button>
           ))}
+        </div>
+
+        <div className="board-view__styling-section-label">Размер блока</div>
+        <div className="board-view__styling-size-row">
+          <div className="board-view__styling-size-field">
+            <span className="board-view__styling-size-label">Ширина</span>
+            <button
+              type="button"
+              className="board-view__styling-size-btn"
+              onClick={() => applyWidth(item.width - 1)}
+              aria-label="Уменьшить ширину"
+            >
+              −
+            </button>
+            <input
+              type="number"
+              className="board-view__styling-size-input"
+              value={widthDraft}
+              onChange={(e) => setWidthDraft(e.target.value)}
+              onBlur={commitWidth}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitWidth();
+                  e.currentTarget.blur();
+                }
+              }}
+              min={60}
+              max={widthMax}
+              step={1}
+            />
+            <button
+              type="button"
+              className="board-view__styling-size-btn"
+              onClick={() => applyWidth(item.width + 1)}
+              aria-label="Увеличить ширину"
+            >
+              +
+            </button>
+          </div>
+          <div className="board-view__styling-size-field">
+            <span className="board-view__styling-size-label">Высота</span>
+            <button
+              type="button"
+              className="board-view__styling-size-btn"
+              onClick={() => applyHeight(item.height - 1)}
+              aria-label="Уменьшить высоту"
+            >
+              −
+            </button>
+            <input
+              type="number"
+              className="board-view__styling-size-input"
+              value={heightDraft}
+              onChange={(e) => setHeightDraft(e.target.value)}
+              onBlur={commitHeight}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitHeight();
+                  e.currentTarget.blur();
+                }
+              }}
+              min={30}
+              max={heightMax}
+              step={1}
+            />
+            <button
+              type="button"
+              className="board-view__styling-size-btn"
+              onClick={() => applyHeight(item.height + 1)}
+              aria-label="Увеличить высоту"
+            >
+              +
+            </button>
+          </div>
         </div>
 
         <div className="board-view__styling-actions">
