@@ -115,6 +115,18 @@ export function BoardView({
   const [contextMenu, setContextMenu] = useState(null); // { x, y, itemId }
   const [lasso, setLasso] = useState(null); // {x,y,width,height} in world coords
   const [guides, setGuides] = useState({ v: [], h: [] });
+  const [wideStyling, setWideStyling] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth > 1400 : false
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onResize = () => setWideStyling(window.innerWidth > 1400);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // panelOpen recomputed below; we attach body class via separate effect
 
   const canvasRef = useRef(null);
   const worldRef = useRef(null);
@@ -565,6 +577,32 @@ export function BoardView({
     [stylingId, items]
   );
 
+  const panelItems = useMemo(() => {
+    if (wideStyling) {
+      return items.filter((it) => selectedIds.has(it.id));
+    }
+    return stylingItem ? [stylingItem] : [];
+  }, [wideStyling, items, selectedIds, stylingItem]);
+  const panelOpen = panelItems.length > 0;
+  const multiPanel = panelItems.length >= 2;
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    if (wideStyling && panelOpen) {
+      document.body.classList.add('board-styling-side-open');
+      return () => document.body.classList.remove('board-styling-side-open');
+    }
+    return undefined;
+  }, [wideStyling, panelOpen]);
+
+  // If wide mode turns on while a centered modal is open, translate it into a selection
+  useEffect(() => {
+    if (wideStyling && stylingId) {
+      setSelectedIds(new Set([stylingId]));
+      setStylingId(null);
+    }
+  }, [wideStyling, stylingId]);
+
   const alignSelected = useCallback(
     (mode) => {
       const ids = Array.from(selectedIds);
@@ -721,7 +759,7 @@ export function BoardView({
       </div>
 
       <div className="board-view__toolbar-right">
-        {multiSelected && (
+        {multiSelected && !wideStyling && (
           <>
             <button
               type="button"
@@ -817,8 +855,13 @@ export function BoardView({
                 setEditingId((cur) => (cur === it.id ? null : cur));
               }}
               onOpenStyling={() => {
-                setSelectedIds(new Set());
-                setStylingId(it.id);
+                if (wideStyling) {
+                  setSelectedIds(new Set([it.id]));
+                  setStylingId(null);
+                } else {
+                  setSelectedIds(new Set());
+                  setStylingId(it.id);
+                }
               }}
               hasHover={hasHover}
             />
@@ -939,21 +982,36 @@ export function BoardView({
         )}
       </div>
 
-      {stylingItem && (
+      {panelOpen && (
         <StylingModal
-          item={stylingItem}
-          onClose={() => setStylingId(null)}
-          onUpdate={(patch) => updateItem(stylingItem.id, patch)}
-          onDelete={() => {
-            const id = stylingItem.id;
-            setStylingId(null);
-            setSelectedIds((prev) => {
-              const next = new Set(prev);
-              next.delete(id);
-              return next;
-            });
-            deleteItem(id);
+          items={panelItems}
+          layout={wideStyling ? 'side' : 'centered'}
+          onClose={() => {
+            if (wideStyling) {
+              setSelectedIds(new Set());
+            } else {
+              setStylingId(null);
+            }
           }}
+          updateItem={updateItem}
+          onDelete={() => {
+            const ids = panelItems.map((it) => it.id);
+            if (wideStyling) {
+              setSelectedIds(new Set());
+            } else {
+              setStylingId(null);
+              setSelectedIds((prev) => {
+                const next = new Set(prev);
+                ids.forEach((id) => next.delete(id));
+                return next;
+              });
+            }
+            ids.forEach((id) => deleteItem(id));
+          }}
+          showAlign={wideStyling && multiPanel}
+          onAlign={alignSelected}
+          alignHover={alignHover}
+          setAlignHover={setAlignHover}
           hasHover={hasHover}
         />
       )}
@@ -1118,82 +1176,288 @@ function BoardTextBlock({
   );
 }
 
-function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
+function allSame(items, key) {
+  if (!items.length) return true;
+  const first = items[0][key];
+  return items.every((it) => it[key] === first);
+}
+
+function StylingModal({
+  items,
+  layout,
+  onClose,
+  updateItem,
+  onDelete,
+  showAlign,
+  onAlign,
+  alignHover,
+  setAlignHover,
+  hasHover,
+}) {
   const [deleteHover, setDeleteHover] = useState(false);
-  const [widthDraft, setWidthDraft] = useState(String(item.width));
-  const [heightDraft, setHeightDraft] = useState(String(item.height));
-  const currentRadius = Math.max(0, Math.round(Number(item.border_radius) || 0));
-  const [radiusDraft, setRadiusDraft] = useState(String(currentRadius));
+  const isMulti = items.length > 1;
+
+  const xMixed = !allSame(items, 'x');
+  const yMixed = !allSame(items, 'y');
+  const widthMixed = !allSame(items, 'width');
+  const heightMixed = !allSame(items, 'height');
+  const radiusMixed = !allSame(
+    items.map((it) => ({ v: Math.max(0, Math.round(Number(it.border_radius) || 0)) })),
+    'v'
+  );
+  const paddingMixed = !allSame(items, 'padding');
+  const textColorMixed = !allSame(
+    items.map((it) => ({ v: (it.text_color || '').toLowerCase() })),
+    'v'
+  );
+  const borderColorMixed = !allSame(
+    items.map((it) => ({ v: (it.border_color || DEFAULT_BORDER_COLOR).toLowerCase() })),
+    'v'
+  );
+  const hasBorderMixed = !allSame(items, 'has_border');
+  const textScaleMixed = !allSame(
+    items.map((it) => ({ v: Number.isFinite(Number(it.text_scale)) ? Number(it.text_scale) : 1 })),
+    'v'
+  );
+
+  const first = items[0];
+  const currentRadius = Math.max(0, Math.round(Number(first.border_radius) || 0));
+  const currentBorderColor = (first.border_color || DEFAULT_BORDER_COLOR).toLowerCase();
+  const currentScale = Number.isFinite(Number(first.text_scale)) ? Number(first.text_scale) : 1;
+
+  const [xDraft, setXDraft] = useState(xMixed ? '' : String(first.x));
+  const [yDraft, setYDraft] = useState(yMixed ? '' : String(first.y));
+  const [widthDraft, setWidthDraft] = useState(widthMixed ? '' : String(first.width));
+  const [heightDraft, setHeightDraft] = useState(heightMixed ? '' : String(first.height));
+  const [radiusDraft, setRadiusDraft] = useState(radiusMixed ? '' : String(currentRadius));
 
   useEffect(() => {
-    setWidthDraft(String(item.width));
-  }, [item.width]);
+    setXDraft(xMixed ? '' : String(first.x));
+  }, [xMixed, first.x]);
   useEffect(() => {
-    setHeightDraft(String(item.height));
-  }, [item.height]);
+    setYDraft(yMixed ? '' : String(first.y));
+  }, [yMixed, first.y]);
   useEffect(() => {
-    setRadiusDraft(String(currentRadius));
-  }, [currentRadius]);
+    setWidthDraft(widthMixed ? '' : String(first.width));
+  }, [widthMixed, first.width]);
+  useEffect(() => {
+    setHeightDraft(heightMixed ? '' : String(first.height));
+  }, [heightMixed, first.height]);
+  useEffect(() => {
+    setRadiusDraft(radiusMixed ? '' : String(currentRadius));
+  }, [radiusMixed, currentRadius]);
 
-  const widthMax = Math.max(60, WORLD_WIDTH - item.x);
-  const heightMax = Math.max(30, WORLD_HEIGHT - item.y);
+  const borderCheckboxRef = useRef(null);
+  useEffect(() => {
+    if (borderCheckboxRef.current) {
+      borderCheckboxRef.current.indeterminate = hasBorderMixed;
+    }
+  }, [hasBorderMixed]);
+
   const radiusMax = 100;
 
-  const applyWidth = (n) => {
-    const clamped = clamp(Math.round(n), 60, widthMax);
-    if (clamped !== item.width) onUpdate({ width: clamped });
-    setWidthDraft(String(clamped));
-  };
-  const applyHeight = (n) => {
-    const clamped = clamp(Math.round(n), 30, heightMax);
-    if (clamped !== item.height) onUpdate({ height: clamped });
-    setHeightDraft(String(clamped));
-  };
-  const applyRadius = (n) => {
-    const clamped = clamp(Math.round(n), 0, radiusMax);
-    if (clamped !== currentRadius) onUpdate({ border_radius: clamped });
-    setRadiusDraft(String(clamped));
+  const setAll = (patcher) => {
+    items.forEach((it) => {
+      const patch = typeof patcher === 'function' ? patcher(it) : patcher;
+      if (!patch) return;
+      const keys = Object.keys(patch);
+      const changed = keys.some((k) => it[k] !== patch[k]);
+      if (changed) updateItem(it.id, patch);
+    });
   };
 
-  const commitWidth = () => {
-    const n = parseInt(widthDraft, 10);
-    if (!Number.isFinite(n)) {
-      setWidthDraft(String(item.width));
-      return;
+  const stepAll = (key, delta, opts = {}) => {
+    items.forEach((it) => {
+      const cur = Number(it[key]) || 0;
+      let next = cur + delta;
+      if (opts.clampPerItem) next = opts.clampPerItem(next, it);
+      if (Math.round(next) !== cur) updateItem(it.id, { [key]: Math.round(next) });
+    });
+  };
+
+  const setAllValue = (key, value, opts = {}) => {
+    items.forEach((it) => {
+      let v = value;
+      if (opts.clampPerItem) v = opts.clampPerItem(v, it);
+      const rounded = Math.round(v);
+      if (it[key] !== rounded) updateItem(it.id, { [key]: rounded });
+    });
+  };
+
+  const clampX = (n, it) => clamp(n, 0, WORLD_WIDTH - it.width);
+  const clampY = (n, it) => clamp(n, 0, WORLD_HEIGHT - it.height);
+  const clampW = (n, it) => clamp(n, 60, WORLD_WIDTH - it.x);
+  const clampH = (n, it) => clamp(n, 30, WORLD_HEIGHT - it.y);
+  const clampR = (n) => clamp(n, 0, radiusMax);
+
+  const applyXStep = (delta) => stepAll('x', delta, { clampPerItem: clampX });
+  const applyYStep = (delta) => stepAll('y', delta, { clampPerItem: clampY });
+  const applyWStep = (delta) => stepAll('width', delta, { clampPerItem: clampW });
+  const applyHStep = (delta) => stepAll('height', delta, { clampPerItem: clampH });
+  const applyRStep = (delta) => {
+    items.forEach((it) => {
+      const cur = Math.max(0, Math.round(Number(it.border_radius) || 0));
+      const next = clampR(cur + delta);
+      if (next !== cur) updateItem(it.id, { border_radius: next });
+    });
+  };
+
+  const commitDraft = (draft, mixed, fallback, key, clampFn) => {
+    const trimmed = String(draft).trim();
+    if (trimmed === '') {
+      // empty + mixed → keep as-is; empty + non-mixed → revert
+      if (!mixed) return { revert: true };
+      return null;
     }
-    applyWidth(n);
+    const n = parseInt(trimmed, 10);
+    if (!Number.isFinite(n)) return { revert: true };
+    setAllValue(key, n, { clampPerItem: clampFn });
+    return null;
+  };
+
+  const commitX = () => {
+    const r = commitDraft(xDraft, xMixed, first.x, 'x', clampX);
+    if (r?.revert) setXDraft(xMixed ? '' : String(first.x));
+  };
+  const commitY = () => {
+    const r = commitDraft(yDraft, yMixed, first.y, 'y', clampY);
+    if (r?.revert) setYDraft(yMixed ? '' : String(first.y));
+  };
+  const commitWidth = () => {
+    const r = commitDraft(widthDraft, widthMixed, first.width, 'width', clampW);
+    if (r?.revert) setWidthDraft(widthMixed ? '' : String(first.width));
   };
   const commitHeight = () => {
-    const n = parseInt(heightDraft, 10);
-    if (!Number.isFinite(n)) {
-      setHeightDraft(String(item.height));
-      return;
-    }
-    applyHeight(n);
+    const r = commitDraft(heightDraft, heightMixed, first.height, 'height', clampH);
+    if (r?.revert) setHeightDraft(heightMixed ? '' : String(first.height));
   };
   const commitRadius = () => {
-    const n = parseInt(radiusDraft, 10);
-    if (!Number.isFinite(n)) {
-      setRadiusDraft(String(currentRadius));
+    const trimmed = String(radiusDraft).trim();
+    if (trimmed === '') {
+      if (!radiusMixed) setRadiusDraft(String(currentRadius));
       return;
     }
-    applyRadius(n);
+    const n = parseInt(trimmed, 10);
+    if (!Number.isFinite(n)) {
+      setRadiusDraft(radiusMixed ? '' : String(currentRadius));
+      return;
+    }
+    const v = clampR(n);
+    items.forEach((it) => {
+      const cur = Math.max(0, Math.round(Number(it.border_radius) || 0));
+      if (cur !== v) updateItem(it.id, { border_radius: v });
+    });
   };
 
-  const currentBorderColor = (item.border_color || DEFAULT_BORDER_COLOR).toLowerCase();
-  const currentScale = Number.isFinite(Number(item.text_scale)) ? Number(item.text_scale) : 1;
-  return (
-    <div className="dashboard__settings-overlay" onClick={onClose}>
-      <div
-        className="dashboard__settings-popup board-view__styling-popup"
-        onClick={(e) => e.stopPropagation()}
+  const renderSizeField = ({ label, value, mixed, onMinus, onPlus, onChange, onCommit, min, max }) => (
+    <div className="board-view__styling-size-field">
+      <span className="board-view__styling-size-label">{label}</span>
+      <button
+        type="button"
+        className="board-view__styling-size-btn"
+        onClick={onMinus}
+        aria-label={`Уменьшить ${label}`}
       >
-        <div className="dashboard__settings-title">Настройки блока</div>
+        −
+      </button>
+      <input
+        type="number"
+        className="board-view__styling-size-input"
+        value={value}
+        placeholder={mixed ? 'Mixed' : ''}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onCommit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onCommit();
+            e.currentTarget.blur();
+          }
+        }}
+        min={min}
+        max={max}
+        step={1}
+      />
+      <button
+        type="button"
+        className="board-view__styling-size-btn"
+        onClick={onPlus}
+        aria-label={`Увеличить ${label}`}
+      >
+        +
+      </button>
+    </div>
+  );
+
+  const wrapperClass = layout === 'side' ? 'board-view__styling-side' : 'dashboard__settings-overlay';
+  const popupClass =
+    layout === 'side'
+      ? 'board-view__styling-popup board-view__styling-popup--side'
+      : 'dashboard__settings-popup board-view__styling-popup';
+  const onWrapperClick = layout === 'side' ? undefined : onClose;
+
+  const content = (
+    <div className={popupClass} onClick={(e) => e.stopPropagation()}>
+        <div className="dashboard__settings-title">
+          {isMulti ? `Настройки блоков (${items.length})` : 'Настройки блока'}
+        </div>
+
+        {showAlign && onAlign && (
+          <>
+            <div className="board-view__styling-section-label">Выравнивание</div>
+            <div className="board-view__styling-align-row">
+              <button
+                type="button"
+                className="board-view__icon-btn"
+                onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, left: true }))}
+                onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, left: false }))}
+                onClick={() => onAlign('left')}
+                aria-label="Выровнять по левой границе"
+                title="Выровнять по левой границе"
+              >
+                <img src={hasHover && alignHover.left ? gridLeftNavIcon : gridLeftIcon} alt="" />
+              </button>
+              <button
+                type="button"
+                className="board-view__icon-btn"
+                onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, top: true }))}
+                onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, top: false }))}
+                onClick={() => onAlign('top')}
+                aria-label="Выровнять по верхней границе"
+                title="Выровнять по верхней границе"
+              >
+                <img src={hasHover && alignHover.top ? gridTopNavIcon : gridTopIcon} alt="" />
+              </button>
+              <button
+                type="button"
+                className="board-view__icon-btn"
+                onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, hcenter: true }))}
+                onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, hcenter: false }))}
+                onClick={() => onAlign('hcenter')}
+                aria-label="Выровнять по центру по горизонтали"
+                title="Выровнять по центру по горизонтали"
+              >
+                <img src={hasHover && alignHover.hcenter ? hCenterNavIcon : hCenterIcon} alt="" />
+              </button>
+              <button
+                type="button"
+                className="board-view__icon-btn"
+                onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, vcenter: true }))}
+                onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, vcenter: false }))}
+                onClick={() => onAlign('vcenter')}
+                aria-label="Выровнять по центру по вертикали"
+                title="Выровнять по центру по вертикали"
+              >
+                <img src={hasHover && alignHover.vcenter ? vCenterNavIcon : vCenterIcon} alt="" />
+              </button>
+            </div>
+          </>
+        )}
 
         <div className="board-view__styling-section-label">Цвет текста</div>
         <div className="board-view__styling-colors">
           {TASK_COLORS.map((c) => {
-            const selected = (item.text_color || '').toLowerCase() === c.toLowerCase();
+            const selected = !textColorMixed && (first.text_color || '').toLowerCase() === c.toLowerCase();
             return (
               <span
                 key={c}
@@ -1204,7 +1468,7 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
                   type="button"
                   className="board-view__styling-swatch"
                   style={{ background: c }}
-                  onClick={() => onUpdate({ text_color: c })}
+                  onClick={() => setAll({ text_color: c })}
                   aria-label={`Цвет ${c}`}
                 />
               </span>
@@ -1214,17 +1478,21 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
 
         <label className="board-view__styling-toggle">
           <input
+            ref={borderCheckboxRef}
             type="checkbox"
-            checked={!!item.has_border}
-            onChange={(e) => onUpdate({ has_border: e.target.checked })}
+            checked={!hasBorderMixed && !!first.has_border}
+            onChange={() => {
+              const next = hasBorderMixed ? true : !first.has_border;
+              setAll({ has_border: next });
+            }}
           />
-          <span>Показать границу</span>
+          <span>Показать границу{hasBorderMixed ? ' (Mixed)' : ''}</span>
         </label>
 
         <div className="board-view__styling-section-label">Цвет границы</div>
         <div className="board-view__styling-colors">
           {BORDER_COLOR_OPTIONS.map((c) => {
-            const selected = currentBorderColor === c.toLowerCase();
+            const selected = !borderColorMixed && currentBorderColor === c.toLowerCase();
             return (
               <span
                 key={c}
@@ -1235,7 +1503,7 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
                   type="button"
                   className="board-view__styling-swatch"
                   style={{ background: c }}
-                  onClick={() => onUpdate({ border_color: c })}
+                  onClick={() => setAll({ border_color: c })}
                   aria-label={`Цвет границы ${c}`}
                 />
               </span>
@@ -1249,8 +1517,10 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
             <button
               key={p}
               type="button"
-              className={`board-view__styling-pad ${item.padding === p ? 'board-view__styling-pad--active' : ''}`}
-              onClick={() => onUpdate({ padding: p })}
+              className={`board-view__styling-pad ${
+                !paddingMixed && first.padding === p ? 'board-view__styling-pad--active' : ''
+              }`}
+              onClick={() => setAll({ padding: p })}
             >
               {p}px
             </button>
@@ -1259,42 +1529,17 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
 
         <div className="board-view__styling-section-label">Скругление углов</div>
         <div className="board-view__styling-size-row">
-          <div className="board-view__styling-size-field">
-            <span className="board-view__styling-size-label">Радиус</span>
-            <button
-              type="button"
-              className="board-view__styling-size-btn"
-              onClick={() => applyRadius(currentRadius - 1)}
-              aria-label="Уменьшить скругление"
-            >
-              −
-            </button>
-            <input
-              type="number"
-              className="board-view__styling-size-input"
-              value={radiusDraft}
-              onChange={(e) => setRadiusDraft(e.target.value)}
-              onBlur={commitRadius}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  commitRadius();
-                  e.currentTarget.blur();
-                }
-              }}
-              min={0}
-              max={radiusMax}
-              step={1}
-            />
-            <button
-              type="button"
-              className="board-view__styling-size-btn"
-              onClick={() => applyRadius(currentRadius + 1)}
-              aria-label="Увеличить скругление"
-            >
-              +
-            </button>
-          </div>
+          {renderSizeField({
+            label: 'Радиус',
+            value: radiusDraft,
+            mixed: radiusMixed,
+            onMinus: () => applyRStep(-1),
+            onPlus: () => applyRStep(1),
+            onChange: setRadiusDraft,
+            onCommit: commitRadius,
+            min: 0,
+            max: radiusMax,
+          })}
         </div>
 
         <div className="board-view__styling-section-label">Размер текста</div>
@@ -1303,88 +1548,66 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
             <button
               key={s}
               type="button"
-              className={`board-view__styling-pad ${Math.abs(currentScale - s) < 0.001 ? 'board-view__styling-pad--active' : ''}`}
-              onClick={() => onUpdate({ text_scale: s })}
+              className={`board-view__styling-pad ${
+                !textScaleMixed && Math.abs(currentScale - s) < 0.001 ? 'board-view__styling-pad--active' : ''
+              }`}
+              onClick={() => setAll({ text_scale: s })}
             >
               {formatScaleLabel(s)}
             </button>
           ))}
         </div>
 
+        <div className="board-view__styling-section-label">Координаты</div>
+        <div className="board-view__styling-size-row">
+          {renderSizeField({
+            label: 'X',
+            value: xDraft,
+            mixed: xMixed,
+            onMinus: () => applyXStep(-1),
+            onPlus: () => applyXStep(1),
+            onChange: setXDraft,
+            onCommit: commitX,
+            min: 0,
+            max: WORLD_WIDTH,
+          })}
+          {renderSizeField({
+            label: 'Y',
+            value: yDraft,
+            mixed: yMixed,
+            onMinus: () => applyYStep(-1),
+            onPlus: () => applyYStep(1),
+            onChange: setYDraft,
+            onCommit: commitY,
+            min: 0,
+            max: WORLD_HEIGHT,
+          })}
+        </div>
+
         <div className="board-view__styling-section-label">Размер блока</div>
         <div className="board-view__styling-size-row">
-          <div className="board-view__styling-size-field">
-            <span className="board-view__styling-size-label">Ширина</span>
-            <button
-              type="button"
-              className="board-view__styling-size-btn"
-              onClick={() => applyWidth(item.width - 1)}
-              aria-label="Уменьшить ширину"
-            >
-              −
-            </button>
-            <input
-              type="number"
-              className="board-view__styling-size-input"
-              value={widthDraft}
-              onChange={(e) => setWidthDraft(e.target.value)}
-              onBlur={commitWidth}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  commitWidth();
-                  e.currentTarget.blur();
-                }
-              }}
-              min={60}
-              max={widthMax}
-              step={1}
-            />
-            <button
-              type="button"
-              className="board-view__styling-size-btn"
-              onClick={() => applyWidth(item.width + 1)}
-              aria-label="Увеличить ширину"
-            >
-              +
-            </button>
-          </div>
-          <div className="board-view__styling-size-field">
-            <span className="board-view__styling-size-label">Высота</span>
-            <button
-              type="button"
-              className="board-view__styling-size-btn"
-              onClick={() => applyHeight(item.height - 1)}
-              aria-label="Уменьшить высоту"
-            >
-              −
-            </button>
-            <input
-              type="number"
-              className="board-view__styling-size-input"
-              value={heightDraft}
-              onChange={(e) => setHeightDraft(e.target.value)}
-              onBlur={commitHeight}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  commitHeight();
-                  e.currentTarget.blur();
-                }
-              }}
-              min={30}
-              max={heightMax}
-              step={1}
-            />
-            <button
-              type="button"
-              className="board-view__styling-size-btn"
-              onClick={() => applyHeight(item.height + 1)}
-              aria-label="Увеличить высоту"
-            >
-              +
-            </button>
-          </div>
+          {renderSizeField({
+            label: 'Ширина',
+            value: widthDraft,
+            mixed: widthMixed,
+            onMinus: () => applyWStep(-1),
+            onPlus: () => applyWStep(1),
+            onChange: setWidthDraft,
+            onCommit: commitWidth,
+            min: 60,
+            max: WORLD_WIDTH,
+          })}
+          {renderSizeField({
+            label: 'Высота',
+            value: heightDraft,
+            mixed: heightMixed,
+            onMinus: () => applyHStep(-1),
+            onPlus: () => applyHStep(1),
+            onChange: setHeightDraft,
+            onCommit: commitHeight,
+            min: 30,
+            max: WORLD_HEIGHT,
+          })}
         </div>
 
         <div className="board-view__styling-actions">
@@ -1394,16 +1617,24 @@ function StylingModal({ item, onClose, onUpdate, onDelete, hasHover }) {
             onMouseEnter={() => hasHover && setDeleteHover(true)}
             onMouseLeave={() => hasHover && setDeleteHover(false)}
             onClick={onDelete}
-            aria-label="Удалить блок"
+            aria-label={isMulti ? 'Удалить блоки' : 'Удалить блок'}
           >
             <img src={hasHover && deleteHover ? deleteNavIcon : deleteIcon} alt="" />
             <span>Удалить</span>
           </button>
           <button type="button" className="dashboard__settings-submit" onClick={onClose}>
-            Готово
+            {layout === 'side' ? 'Скрыть' : 'Готово'}
           </button>
         </div>
       </div>
+  );
+
+  if (layout === 'side') {
+    return <div className={wrapperClass}>{content}</div>;
+  }
+  return (
+    <div className={wrapperClass} onClick={onWrapperClick}>
+      {content}
     </div>
   );
 }

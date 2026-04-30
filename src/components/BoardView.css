@@ -362,6 +362,43 @@
   padding: 1.75rem 1.75rem 1.5rem;
 }
 
+.board-view__styling-side {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 480px;
+  z-index: 250;
+  pointer-events: auto;
+}
+
+.board-view__styling-popup--side {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  max-width: none;
+  background: #131313;
+  border-left: 1px solid #2a2a2a;
+  padding: 1.75rem 1.75rem 1.5rem;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.board-view__styling-align-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+body.board-styling-side-open .board-view__toolbar-right {
+  right: calc(480px + 0.5rem);
+}
+
+body.board-styling-side-open .dashboard__refresh {
+  right: calc(480px + 1.5rem);
+}
+
 .board-view__styling-section-label {
   color: #888;
   font-size: 0.8125rem;
