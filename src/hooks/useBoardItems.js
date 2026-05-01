@@ -201,14 +201,9 @@ export function useBoardItems() {
   const updateItem = useCallback(
     async (id, patch) => {
       if (!user?.id) return;
-      let boardId = null;
-      setItems((prev) =>
-        prev.map((it) => {
-          if (it.id !== id) return it;
-          boardId = it.board_id ?? null;
-          return { ...it, ...patch };
-        })
-      );
+      const existing = itemsRef.current.find((it) => it.id === id);
+      const boardId = existing ? existing.board_id ?? null : null;
+      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
       if (offlineRef.current) {
         const p = pendingRef.current;
         if (p.creates.has(id)) {
@@ -340,12 +335,9 @@ export function useBoardItems() {
   const deleteItem = useCallback(
     async (id) => {
       if (!user?.id) return;
-      let boardId = null;
-      setItems((prev) => {
-        const it = prev.find((x) => x.id === id);
-        if (it) boardId = it.board_id ?? null;
-        return prev.filter((x) => x.id !== id);
-      });
+      const existing = itemsRef.current.find((it) => it.id === id);
+      const boardId = existing ? existing.board_id ?? null : null;
+      setItems((prev) => prev.filter((x) => x.id !== id));
       if (offlineRef.current) {
         const p = pendingRef.current;
         if (p.creates.has(id)) {
