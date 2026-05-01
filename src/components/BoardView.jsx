@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TASK_COLORS } from '../constants';
-import plusIcon from '../assets/plus.svg';
-import plusNavIcon from '../assets/plus-nav.svg';
+import textIcon from '../assets/text.svg';
+import textNavIcon from '../assets/text-nav.svg';
+import verticalIcon from '../assets/vertical.svg';
+import verticalNavIcon from '../assets/vertical-nav.svg';
+import horizontalIcon from '../assets/gorizonal.svg';
+import horizontalNavIcon from '../assets/gorizonal-nav.svg';
 import editIcon from '../assets/edit.svg';
 import editNavIcon from '../assets/edit-nav.svg';
 import deleteIcon from '../assets/delete.svg';
@@ -26,14 +30,37 @@ const ZOOM_PRESETS = [25, 50, 75, 100, 150, 200];
 const ZOOM_MIN = 25;
 const ZOOM_MAX = 200;
 const ZOOM_STEP = 5;
-const PADDING_OPTIONS = [5, 10, 15, 20, 25, 30];
+const PADDING_OPTIONS = [0, 5, 10, 15, 20, 25, 30];
 const TEXT_SCALE_OPTIONS = [0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2];
+const BOARD_TEXT_FONT_WEIGHT_OPTIONS = [
+  { id: 'light', label: 'Light' },
+  { id: 'regular', label: 'Regular' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'semibold', label: 'Semibold' },
+  { id: 'bold', label: 'Bold' },
+];
+const BOARD_TEXT_FONT_WEIGHT_MAP = {
+  light: 300,
+  regular: 400,
+  medium: 500,
+  semibold: 600,
+  bold: 700,
+};
 const DEFAULT_BORDER_COLOR = '#2f2f2f';
 const BORDER_COLOR_OPTIONS = [DEFAULT_BORDER_COLOR, ...TASK_COLORS];
 
 function formatScaleLabel(s) {
   const str = String(s);
   return str.replace('.', ',');
+}
+
+function normalizeBoardTextFontWeight(v) {
+  const s = String(v ?? 'medium').toLowerCase();
+  return BOARD_TEXT_FONT_WEIGHT_MAP[s] != null ? s : 'medium';
+}
+
+function boardTextFontCssWeight(v) {
+  return BOARD_TEXT_FONT_WEIGHT_MAP[normalizeBoardTextFontWeight(v)] ?? 500;
 }
 
 const WORLD_WIDTH = 4000;
@@ -108,6 +135,8 @@ export function BoardView({
   const [stylingId, setStylingId] = useState(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [addHover, setAddHover] = useState(false);
+  const [addVHover, setAddVHover] = useState(false);
+  const [addHHover, setAddHHover] = useState(false);
   const [zoomInHover, setZoomInHover] = useState(false);
   const [zoomOutHover, setZoomOutHover] = useState(false);
   const [alignHover, setAlignHover] = useState({ left: false, top: false, hcenter: false, vcenter: false });
@@ -167,8 +196,39 @@ export function BoardView({
       const viewTopY = canvas.scrollTop / zoomScale + NEW_BLOCK_TOP_OFFSET;
       wy = Math.round(clamp(viewTopY, 0, WORLD_HEIGHT - height));
     }
-    addItem({ x: wx, y: wy, text: 'Новый текст', width, height });
+    addItem({ x: wx, y: wy, text: 'Новый текст', width, height, padding: 0 });
   }, [addItem, zoomScale]);
+
+  const addLine = useCallback(
+    (orientation) => {
+      const canvas = canvasRef.current;
+      const length = 100;
+      const thickness = 1;
+      const width = orientation === 'h' ? length : thickness;
+      const height = orientation === 'h' ? thickness : length;
+      let wx = (WORLD_WIDTH - width) / 2;
+      let wy = NEW_BLOCK_TOP_OFFSET;
+      if (canvas) {
+        const viewCenterX = (canvas.scrollLeft + canvas.clientWidth / 2) / zoomScale;
+        wx = Math.round(clamp(viewCenterX - width / 2, 0, WORLD_WIDTH - width));
+        const viewTopY = canvas.scrollTop / zoomScale + NEW_BLOCK_TOP_OFFSET;
+        wy = Math.round(clamp(viewTopY, 0, WORLD_HEIGHT - height));
+      }
+      addItem({
+        x: wx,
+        y: wy,
+        width,
+        height,
+        kind: orientation === 'h' ? 'line_h' : 'line_v',
+        text: '',
+        text_color: '#ffffff',
+        padding: 0,
+      });
+    },
+    [addItem, zoomScale]
+  );
+  const handleAddVerticalLine = useCallback(() => addLine('v'), [addLine]);
+  const handleAddHorizontalLine = useCallback(() => addLine('h'), [addLine]);
 
   const selectOnly = useCallback((id) => {
     setSelectedIds(new Set(id == null ? [] : [id]));
@@ -327,8 +387,12 @@ export function BoardView({
         }
       } else {
         const g = d.group[0];
-        const minW = 60;
-        const minH = 30;
+        const gItem = items.find((it) => it.id === g.id);
+        const gKind = gItem?.kind ?? 'text';
+        const isLineV = gKind === 'line_v';
+        const isLineH = gKind === 'line_h';
+        const minW = isLineV ? 1 : isLineH ? 10 : 60;
+        const minH = isLineH ? 1 : isLineV ? 10 : 30;
         let x = g.startX;
         let y = g.startY;
         let w = g.startWidth;
@@ -669,7 +733,10 @@ export function BoardView({
         has_border: src.has_border,
         padding: src.padding,
         text_scale: src.text_scale,
+        text_font_weight: src.text_font_weight,
         border_color: src.border_color,
+        border_radius: src.border_radius,
+        kind: src.kind,
       });
     },
     [items, addItem]
@@ -814,8 +881,31 @@ export function BoardView({
           onMouseLeave={() => hasHover && setAddHover(false)}
           onClick={handleAddBlock}
           aria-label="Добавить текстовый блок"
+          title="Добавить текстовый блок"
         >
-          <img src={hasHover && addHover ? plusNavIcon : plusIcon} alt="" />
+          <img src={hasHover && addHover ? textNavIcon : textIcon} alt="" />
+        </button>
+        <button
+          type="button"
+          className="board-view__icon-btn"
+          onMouseEnter={() => hasHover && setAddVHover(true)}
+          onMouseLeave={() => hasHover && setAddVHover(false)}
+          onClick={handleAddVerticalLine}
+          aria-label="Добавить вертикальную линию"
+          title="Добавить вертикальную линию"
+        >
+          <img src={hasHover && addVHover ? verticalNavIcon : verticalIcon} alt="" />
+        </button>
+        <button
+          type="button"
+          className="board-view__icon-btn"
+          onMouseEnter={() => hasHover && setAddHHover(true)}
+          onMouseLeave={() => hasHover && setAddHHover(false)}
+          onClick={handleAddHorizontalLine}
+          aria-label="Добавить горизонтальную линию"
+          title="Добавить горизонтальную линию"
+        >
+          <img src={hasHover && addHHover ? horizontalNavIcon : horizontalIcon} alt="" />
         </button>
       </div>
 
@@ -834,27 +924,18 @@ export function BoardView({
             transform: `scale(${zoomScale})`,
           }}
         >
-          {items.map((it) => (
-            <BoardTextBlock
-              key={it.id}
-              item={it}
-              selected={selectedIds.has(it.id)}
-              editing={editingId === it.id}
-              hovered={hoverId === it.id}
-              onSelect={() => selectOnly(it.id)}
-              onHoverEnter={() => setHoverId(it.id)}
-              onHoverLeave={() => setHoverId((cur) => (cur === it.id ? null : cur))}
-              onBeginDrag={beginDrag}
-              onContextMenu={(e) => openContextMenu(e, it.id)}
-              onStartEdit={() => {
-                setSelectedIds(new Set([it.id]));
-                setEditingId(it.id);
-              }}
-              onCommitText={(text) => {
-                if (text !== it.text) updateItem(it.id, { text });
-                setEditingId((cur) => (cur === it.id ? null : cur));
-              }}
-              onOpenStyling={() => {
+          {items.map((it) => {
+            const commonProps = {
+              key: it.id,
+              item: it,
+              selected: selectedIds.has(it.id),
+              hovered: hoverId === it.id,
+              onSelect: () => selectOnly(it.id),
+              onHoverEnter: () => setHoverId(it.id),
+              onHoverLeave: () => setHoverId((cur) => (cur === it.id ? null : cur)),
+              onBeginDrag: beginDrag,
+              onContextMenu: (e) => openContextMenu(e, it.id),
+              onOpenStyling: () => {
                 if (wideStyling) {
                   setSelectedIds(new Set([it.id]));
                   setStylingId(null);
@@ -862,10 +943,27 @@ export function BoardView({
                   setSelectedIds(new Set());
                   setStylingId(it.id);
                 }
-              }}
-              hasHover={hasHover}
-            />
-          ))}
+              },
+              hasHover,
+            };
+            if (it.kind === 'line_v' || it.kind === 'line_h') {
+              return <BoardLineBlock {...commonProps} />;
+            }
+            return (
+              <BoardTextBlock
+                {...commonProps}
+                editing={editingId === it.id}
+                onStartEdit={() => {
+                  setSelectedIds(new Set([it.id]));
+                  setEditingId(it.id);
+                }}
+                onCommitText={(text) => {
+                  if (text !== it.text) updateItem(it.id, { text });
+                  setEditingId((cur) => (cur === it.id ? null : cur));
+                }}
+              />
+            );
+          })}
           {lasso && lasso.width > 0 && lasso.height > 0 && (
             <div
               className="board-view__lasso"
@@ -1063,6 +1161,7 @@ function BoardTextBlock({
   const borderColor = selected ? '#5A86EE' : item.has_border ? customBorderColor : 'transparent';
 
   const radius = Math.max(0, Number(item.border_radius) || 0);
+  const fw = boardTextFontCssWeight(item.text_font_weight);
 
   const style = {
     left: item.x,
@@ -1074,6 +1173,8 @@ function BoardTextBlock({
     borderRadius: radius,
     padding: item.padding,
     fontSize: `${0.9375 * scale}rem`,
+    fontFamily: "'Gilroy Board', 'Gilroy', system-ui, sans-serif",
+    fontWeight: fw,
   };
 
   return (
@@ -1117,7 +1218,7 @@ function BoardTextBlock({
               commit();
             }
           }}
-          style={{ color: item.text_color }}
+          style={{ color: item.text_color, fontFamily: style.fontFamily, fontWeight: fw }}
         />
       ) : (
         <div className="board-view__block-text">{item.text || <span className="board-view__block-placeholder">Текст</span>}</div>
@@ -1176,6 +1277,82 @@ function BoardTextBlock({
   );
 }
 
+function BoardLineBlock({
+  item,
+  selected,
+  hovered,
+  onHoverEnter,
+  onHoverLeave,
+  onBeginDrag,
+  onContextMenu,
+  onOpenStyling,
+  hasHover,
+}) {
+  const [editHover, setEditHover] = useState(false);
+  const isVertical = item.kind === 'line_v';
+  const dirs = isVertical ? ['n', 's'] : ['e', 'w'];
+  const color = item.text_color || '#ffffff';
+  const outline = selected ? '0 0 0 1px #5A86EE' : 'none';
+
+  const style = {
+    left: item.x,
+    top: item.y,
+    width: item.width,
+    height: item.height,
+    background: color,
+    boxShadow: outline,
+  };
+
+  return (
+    <div
+      className={`board-view__block board-view__line ${isVertical ? 'board-view__line--v' : 'board-view__line--h'} ${
+        selected ? 'board-view__block--selected' : ''
+      }`}
+      style={style}
+      onMouseEnter={onHoverEnter}
+      onMouseLeave={onHoverLeave}
+      onPointerDown={(e) => {
+        if (e.target.closest('.board-view__block-resize')) return;
+        if (e.target.closest('.board-view__block-edit-btn')) return;
+        onBeginDrag(e, item, 'move');
+      }}
+      onContextMenu={(e) => onContextMenu?.(e)}
+    >
+      {(hovered || selected) && (
+        <button
+          type="button"
+          className={`board-view__block-edit-btn ${hovered ? 'board-view__block-edit-btn--hovered' : ''} ${
+            selected ? 'board-view__block-edit-btn--selected' : ''
+          }`}
+          onMouseEnter={() => hasHover && setEditHover(true)}
+          onMouseLeave={() => hasHover && setEditHover(false)}
+          onMouseDown={(e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onOpenStyling();
+          }}
+          aria-label="Настройки линии"
+        >
+          <img src={hasHover && editHover ? editNavIcon : editIcon} alt="" />
+        </button>
+      )}
+
+      {dirs.map((dir) => (
+        <div
+          key={dir}
+          className={`board-view__block-resize board-view__block-resize--${dir} board-view__line-resize`}
+          onPointerDown={(e) => onBeginDrag(e, item, dir)}
+        />
+      ))}
+    </div>
+  );
+}
+
 function allSame(items, key) {
   if (!items.length) return true;
   const first = items[0][key];
@@ -1196,6 +1373,11 @@ function StylingModal({
 }) {
   const [deleteHover, setDeleteHover] = useState(false);
   const isMulti = items.length > 1;
+
+  const allText = items.every((it) => !it.kind || it.kind === 'text');
+  const allLineV = items.every((it) => it.kind === 'line_v');
+  const allLineH = items.every((it) => it.kind === 'line_h');
+  const allLines = items.every((it) => it.kind === 'line_v' || it.kind === 'line_h');
 
   const xMixed = !allSame(items, 'x');
   const yMixed = !allSame(items, 'y');
@@ -1219,11 +1401,16 @@ function StylingModal({
     items.map((it) => ({ v: Number.isFinite(Number(it.text_scale)) ? Number(it.text_scale) : 1 })),
     'v'
   );
+  const fontWeightMixed = !allSame(
+    items.map((it) => ({ v: normalizeBoardTextFontWeight(it.text_font_weight) })),
+    'v'
+  );
 
   const first = items[0];
   const currentRadius = Math.max(0, Math.round(Number(first.border_radius) || 0));
   const currentBorderColor = (first.border_color || DEFAULT_BORDER_COLOR).toLowerCase();
   const currentScale = Number.isFinite(Number(first.text_scale)) ? Number(first.text_scale) : 1;
+  const currentFontWeight = normalizeBoardTextFontWeight(first.text_font_weight);
 
   const [xDraft, setXDraft] = useState(xMixed ? '' : String(first.x));
   const [yDraft, setYDraft] = useState(yMixed ? '' : String(first.y));
@@ -1284,10 +1471,20 @@ function StylingModal({
     });
   };
 
+  const minWFor = (it) => {
+    if (it.kind === 'line_v') return 1;
+    if (it.kind === 'line_h') return 10;
+    return 60;
+  };
+  const minHFor = (it) => {
+    if (it.kind === 'line_h') return 1;
+    if (it.kind === 'line_v') return 10;
+    return 30;
+  };
   const clampX = (n, it) => clamp(n, 0, WORLD_WIDTH - it.width);
   const clampY = (n, it) => clamp(n, 0, WORLD_HEIGHT - it.height);
-  const clampW = (n, it) => clamp(n, 60, WORLD_WIDTH - it.x);
-  const clampH = (n, it) => clamp(n, 30, WORLD_HEIGHT - it.y);
+  const clampW = (n, it) => clamp(n, minWFor(it), WORLD_WIDTH - it.x);
+  const clampH = (n, it) => clamp(n, minHFor(it), WORLD_HEIGHT - it.y);
   const clampR = (n) => clamp(n, 0, radiusMax);
 
   const applyXStep = (delta) => stepAll('x', delta, { clampPerItem: clampX });
@@ -1454,7 +1651,7 @@ function StylingModal({
           </>
         )}
 
-        <div className="board-view__styling-section-label">Цвет текста</div>
+        <div className="board-view__styling-section-label">{allLines ? 'Цвет' : 'Цвет текста'}</div>
         <div className="board-view__styling-colors">
           {TASK_COLORS.map((c) => {
             const selected = !textColorMixed && (first.text_color || '').toLowerCase() === c.toLowerCase();
@@ -1476,87 +1673,107 @@ function StylingModal({
           })}
         </div>
 
-        <label className="board-view__styling-toggle">
-          <input
-            ref={borderCheckboxRef}
-            type="checkbox"
-            checked={!hasBorderMixed && !!first.has_border}
-            onChange={() => {
-              const next = hasBorderMixed ? true : !first.has_border;
-              setAll({ has_border: next });
-            }}
-          />
-          <span>Показать границу{hasBorderMixed ? ' (Mixed)' : ''}</span>
-        </label>
+        {allText && (
+          <>
+            <label className="board-view__styling-toggle">
+              <input
+                ref={borderCheckboxRef}
+                type="checkbox"
+                checked={!hasBorderMixed && !!first.has_border}
+                onChange={() => {
+                  const next = hasBorderMixed ? true : !first.has_border;
+                  setAll({ has_border: next });
+                }}
+              />
+              <span>Показать границу{hasBorderMixed ? ' (Mixed)' : ''}</span>
+            </label>
 
-        <div className="board-view__styling-section-label">Цвет границы</div>
-        <div className="board-view__styling-colors">
-          {BORDER_COLOR_OPTIONS.map((c) => {
-            const selected = !borderColorMixed && currentBorderColor === c.toLowerCase();
-            return (
-              <span
-                key={c}
-                className={`board-view__styling-swatch-wrap ${selected ? 'board-view__styling-swatch-wrap--selected' : ''}`}
-                style={{ '--swatch-color': c }}
-              >
+            <div className="board-view__styling-section-label">Цвет границы</div>
+            <div className="board-view__styling-colors">
+              {BORDER_COLOR_OPTIONS.map((c) => {
+                const selected = !borderColorMixed && currentBorderColor === c.toLowerCase();
+                return (
+                  <span
+                    key={c}
+                    className={`board-view__styling-swatch-wrap ${selected ? 'board-view__styling-swatch-wrap--selected' : ''}`}
+                    style={{ '--swatch-color': c }}
+                  >
+                    <button
+                      type="button"
+                      className="board-view__styling-swatch"
+                      style={{ background: c }}
+                      onClick={() => setAll({ border_color: c })}
+                      aria-label={`Цвет границы ${c}`}
+                    />
+                  </span>
+                );
+              })}
+            </div>
+
+            <div className="board-view__styling-section-label">Внутренний отступ</div>
+            <div className="board-view__styling-paddings">
+              {PADDING_OPTIONS.map((p) => (
                 <button
+                  key={p}
                   type="button"
-                  className="board-view__styling-swatch"
-                  style={{ background: c }}
-                  onClick={() => setAll({ border_color: c })}
-                  aria-label={`Цвет границы ${c}`}
-                />
-              </span>
-            );
-          })}
-        </div>
+                  className={`board-view__styling-pad ${
+                    !paddingMixed && first.padding === p ? 'board-view__styling-pad--active' : ''
+                  }`}
+                  onClick={() => setAll({ padding: p })}
+                >
+                  {p}px
+                </button>
+              ))}
+            </div>
 
-        <div className="board-view__styling-section-label">Внутренний отступ</div>
-        <div className="board-view__styling-paddings">
-          {PADDING_OPTIONS.map((p) => (
-            <button
-              key={p}
-              type="button"
-              className={`board-view__styling-pad ${
-                !paddingMixed && first.padding === p ? 'board-view__styling-pad--active' : ''
-              }`}
-              onClick={() => setAll({ padding: p })}
-            >
-              {p}px
-            </button>
-          ))}
-        </div>
+            <div className="board-view__styling-section-label">Скругление углов</div>
+            <div className="board-view__styling-size-row">
+              {renderSizeField({
+                label: 'Радиус',
+                value: radiusDraft,
+                mixed: radiusMixed,
+                onMinus: () => applyRStep(-1),
+                onPlus: () => applyRStep(1),
+                onChange: setRadiusDraft,
+                onCommit: commitRadius,
+                min: 0,
+                max: radiusMax,
+              })}
+            </div>
 
-        <div className="board-view__styling-section-label">Скругление углов</div>
-        <div className="board-view__styling-size-row">
-          {renderSizeField({
-            label: 'Радиус',
-            value: radiusDraft,
-            mixed: radiusMixed,
-            onMinus: () => applyRStep(-1),
-            onPlus: () => applyRStep(1),
-            onChange: setRadiusDraft,
-            onCommit: commitRadius,
-            min: 0,
-            max: radiusMax,
-          })}
-        </div>
+            <div className="board-view__styling-section-label">Размер текста</div>
+            <div className="board-view__styling-paddings">
+              {TEXT_SCALE_OPTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`board-view__styling-pad ${
+                    !textScaleMixed && Math.abs(currentScale - s) < 0.001 ? 'board-view__styling-pad--active' : ''
+                  }`}
+                  onClick={() => setAll({ text_scale: s })}
+                >
+                  {formatScaleLabel(s)}
+                </button>
+              ))}
+            </div>
 
-        <div className="board-view__styling-section-label">Размер текста</div>
-        <div className="board-view__styling-paddings">
-          {TEXT_SCALE_OPTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`board-view__styling-pad ${
-                !textScaleMixed && Math.abs(currentScale - s) < 0.001 ? 'board-view__styling-pad--active' : ''
-              }`}
-              onClick={() => setAll({ text_scale: s })}
-            >
-              {formatScaleLabel(s)}
-            </button>
-          ))}
-        </div>
+            <div className="board-view__styling-section-label">Толщина шрифта</div>
+            <div className="board-view__styling-paddings">
+              {BOARD_TEXT_FONT_WEIGHT_OPTIONS.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`board-view__styling-pad ${
+                    !fontWeightMixed && currentFontWeight === id ? 'board-view__styling-pad--active' : ''
+                  }`}
+                  onClick={() => setAll({ text_font_weight: id })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="board-view__styling-section-label">Координаты</div>
         <div className="board-view__styling-size-row">
@@ -1584,31 +1801,95 @@ function StylingModal({
           })}
         </div>
 
-        <div className="board-view__styling-section-label">Размер блока</div>
-        <div className="board-view__styling-size-row">
-          {renderSizeField({
-            label: 'Ширина',
-            value: widthDraft,
-            mixed: widthMixed,
-            onMinus: () => applyWStep(-1),
-            onPlus: () => applyWStep(1),
-            onChange: setWidthDraft,
-            onCommit: commitWidth,
-            min: 60,
-            max: WORLD_WIDTH,
-          })}
-          {renderSizeField({
-            label: 'Высота',
-            value: heightDraft,
-            mixed: heightMixed,
-            onMinus: () => applyHStep(-1),
-            onPlus: () => applyHStep(1),
-            onChange: setHeightDraft,
-            onCommit: commitHeight,
-            min: 30,
-            max: WORLD_HEIGHT,
-          })}
-        </div>
+        {allText && (
+          <>
+            <div className="board-view__styling-section-label">Размер блока</div>
+            <div className="board-view__styling-size-row">
+              {renderSizeField({
+                label: 'Ширина',
+                value: widthDraft,
+                mixed: widthMixed,
+                onMinus: () => applyWStep(-1),
+                onPlus: () => applyWStep(1),
+                onChange: setWidthDraft,
+                onCommit: commitWidth,
+                min: 60,
+                max: WORLD_WIDTH,
+              })}
+              {renderSizeField({
+                label: 'Высота',
+                value: heightDraft,
+                mixed: heightMixed,
+                onMinus: () => applyHStep(-1),
+                onPlus: () => applyHStep(1),
+                onChange: setHeightDraft,
+                onCommit: commitHeight,
+                min: 30,
+                max: WORLD_HEIGHT,
+              })}
+            </div>
+          </>
+        )}
+
+        {allLineV && (
+          <>
+            <div className="board-view__styling-section-label">Размер линии</div>
+            <div className="board-view__styling-size-row">
+              {renderSizeField({
+                label: 'Длина',
+                value: heightDraft,
+                mixed: heightMixed,
+                onMinus: () => applyHStep(-1),
+                onPlus: () => applyHStep(1),
+                onChange: setHeightDraft,
+                onCommit: commitHeight,
+                min: 10,
+                max: WORLD_HEIGHT,
+              })}
+              {renderSizeField({
+                label: 'Толщина',
+                value: widthDraft,
+                mixed: widthMixed,
+                onMinus: () => applyWStep(-1),
+                onPlus: () => applyWStep(1),
+                onChange: setWidthDraft,
+                onCommit: commitWidth,
+                min: 1,
+                max: 200,
+              })}
+            </div>
+          </>
+        )}
+
+        {allLineH && (
+          <>
+            <div className="board-view__styling-section-label">Размер линии</div>
+            <div className="board-view__styling-size-row">
+              {renderSizeField({
+                label: 'Длина',
+                value: widthDraft,
+                mixed: widthMixed,
+                onMinus: () => applyWStep(-1),
+                onPlus: () => applyWStep(1),
+                onChange: setWidthDraft,
+                onCommit: commitWidth,
+                min: 10,
+                max: WORLD_WIDTH,
+              })}
+              {renderSizeField({
+                label: 'Толщина',
+                value: heightDraft,
+                mixed: heightMixed,
+                onMinus: () => applyHStep(-1),
+                onPlus: () => applyHStep(1),
+                onChange: setHeightDraft,
+                onCommit: commitHeight,
+                min: 1,
+                max: 200,
+              })}
+            </div>
+          </>
+        )}
 
         <div className="board-view__styling-actions">
           <button

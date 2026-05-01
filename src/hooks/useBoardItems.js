@@ -4,6 +4,13 @@ import { useAuth } from '../contexts/AuthContext';
 
 const OFFLINE_KEY = 'board_offline_mode';
 
+const TEXT_FONT_WEIGHTS = ['light', 'regular', 'medium', 'semibold', 'bold'];
+
+function normalizeTextFontWeight(v) {
+  const s = String(v ?? 'medium').toLowerCase();
+  return TEXT_FONT_WEIGHTS.includes(s) ? s : 'medium';
+}
+
 function genId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -19,20 +26,28 @@ function genId() {
 function normalizeRow(user, patch, idOverride) {
   const id = idOverride || genId();
   const nowIso = new Date().toISOString();
+  const kind = patch.kind ?? 'text';
+  const isLine = kind === 'line_v' || kind === 'line_h';
+  const minW = isLine ? 1 : 40;
+  const minH = isLine ? 1 : 30;
+  const defaultW = kind === 'line_v' ? 1 : kind === 'line_h' ? 100 : 200;
+  const defaultH = kind === 'line_v' ? 100 : kind === 'line_h' ? 1 : 100;
   return {
     id,
     user_id: user.id,
     text: patch.text ?? '',
     x: Math.round(patch.x ?? 40),
     y: Math.round(patch.y ?? 40),
-    width: Math.max(40, Math.round(patch.width ?? 200)),
-    height: Math.max(30, Math.round(patch.height ?? 100)),
+    width: Math.max(minW, Math.round(patch.width ?? defaultW)),
+    height: Math.max(minH, Math.round(patch.height ?? defaultH)),
     text_color: patch.text_color ?? '#ffffff',
     has_border: !!patch.has_border,
-    padding: Math.max(0, Math.round(patch.padding ?? 10)),
+    padding: Math.max(0, Math.round(patch.padding ?? 0)),
     text_scale: patch.text_scale ?? 1,
+    text_font_weight: normalizeTextFontWeight(patch.text_font_weight),
     border_color: patch.border_color ?? '#2f2f2f',
     border_radius: Math.max(0, Math.round(patch.border_radius ?? 0)),
+    kind,
     board_id: patch.board_id ?? null,
     created_at: nowIso,
     updated_at: nowIso,
@@ -237,8 +252,10 @@ export function useBoardItems() {
           has_border: src.has_border,
           padding: src.padding,
           text_scale: src.text_scale,
+          text_font_weight: src.text_font_weight,
           border_color: src.border_color,
           border_radius: src.border_radius,
+          kind: src.kind,
           board_id: src.board_id,
         });
         newRows.push(row);

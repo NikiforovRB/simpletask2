@@ -356,6 +356,55 @@
   cursor: nesw-resize;
 }
 
+.board-view__line {
+  border: none;
+  box-sizing: content-box;
+  padding: 0;
+  cursor: grab;
+  overflow: visible;
+}
+
+.board-view__line.board-view__block--selected {
+  z-index: 2;
+}
+
+/* Expand pointer hit area for thin lines */
+.board-view__line::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  cursor: inherit;
+}
+
+.board-view__line--h::before {
+  inset: -6px 0;
+}
+
+.board-view__line--v::before {
+  inset: 0 -6px;
+}
+
+.board-view__line-resize {
+  z-index: 6;
+}
+
+.board-view__line .board-view__block-edit-btn {
+  top: -1.7rem;
+  right: -1.5rem;
+}
+
+.board-view__line .board-view__block-resize--n,
+.board-view__line .board-view__block-resize--s {
+  left: -4px;
+  right: -4px;
+}
+
+.board-view__line .board-view__block-resize--e,
+.board-view__line .board-view__block-resize--w {
+  top: -4px;
+  bottom: -4px;
+}
+
 .board-view__styling-popup {
   min-width: 420px;
   max-width: 560px;
