@@ -218,10 +218,11 @@ export default function Dashboard() {
     setBoardDots,
   } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
-  const { projects, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
+  const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
   const {
     items: boardItems,
+    loading: boardItemsLoading,
     addItem: addBoardItem,
     updateItem: updateBoardItem,
     updateItemLocal: updateBoardItemLocal,
@@ -324,7 +325,6 @@ export default function Dashboard() {
   const [noDateHover, setNoDateHover] = useState(false);
   const [somedayHover, setSomedayHover] = useState(false);
   const [habitsHover, setHabitsHover] = useState(false);
-  const [boardHover, setBoardHover] = useState(false);
   const [projectHoverId, setProjectHoverId] = useState(null);
   const [eyeHover, setEyeHover] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
@@ -420,19 +420,31 @@ export default function Dashboard() {
       }
       return;
     }
-    if (viewMode === 'board' && activeBoardId) {
+    if (viewMode === 'board') {
+      if (!activeBoardId) {
+        if (projectsLoading || boardItemsLoading) return;
+
+        const firstBoard = projects.find((p) => p.kind === 'board');
+        const hasLegacyItems = boardItems.some((it) => (it.board_id ?? null) === null);
+
+        if (firstBoard && !hasLegacyItems) {
+          setActiveBoardId(firstBoard.id);
+        } else if (!firstBoard && !hasLegacyItems) {
+          setViewMode('plans');
+        }
+        return;
+      }
       if (projects.length && !projects.some((p) => p.id === activeBoardId && p.kind === 'board')) {
         setActiveBoardId(null);
       }
     }
-  }, [viewMode, activeProjectId, activeBoardId, projects]);
+  }, [viewMode, activeProjectId, activeBoardId, projects, projectsLoading, boardItems, boardItemsLoading]);
 
   const handleMenuSelect = useCallback((target) => {
-    const isBuiltinView = ['today', 'plans', 'no_date', 'someday', 'habits', 'board'].includes(target);
+    const isBuiltinView = ['today', 'plans', 'no_date', 'someday', 'habits'].includes(target);
     if (isBuiltinView) {
       setViewMode(target);
       setActiveProjectId(null);
-      if (target === 'board') setActiveBoardId(null);
     } else {
       const project = projects.find((p) => p.id === target);
       if (project && project.kind === 'board') {
@@ -1095,17 +1107,6 @@ export default function Dashboard() {
                 <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
                 <span>Привычки</span>
               </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'board' && !activeBoardId ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setBoardHover(true)}
-                onMouseLeave={() => hasHover && setBoardHover(false)}
-                onClick={() => handleMenuSelect('board')}
-              >
-                <img src={(viewMode === 'board' && !activeBoardId) || (hasHover && boardHover) ? doskaNavIcon : doskaIcon} alt="" />
-                <span>Доска</span>
-                {boardDirtyIds.has(null) && <span className="dashboard-menu__dirty-dot" aria-label="Есть несохранённые изменения" />}
-              </button>
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                 {projects.map((p) => {
                   const isBoard = p.kind === 'board';
@@ -1229,17 +1230,6 @@ export default function Dashboard() {
               >
                 <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
                 <span>Привычки</span>
-              </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'board' && !activeBoardId ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setBoardHover(true)}
-                onMouseLeave={() => hasHover && setBoardHover(false)}
-                onClick={() => handleMenuSelect('board')}
-              >
-                <img src={(viewMode === 'board' && !activeBoardId) || (hasHover && boardHover) ? doskaNavIcon : doskaIcon} alt="" />
-                <span>Доска</span>
-                {boardDirtyIds.has(null) && <span className="dashboard-menu__dirty-dot" aria-label="Есть несохранённые изменения" />}
               </button>
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                 {projects.map((p) => {
