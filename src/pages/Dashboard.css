@@ -424,6 +424,83 @@
   object-fit: contain;
 }
 
+.dashboard__board-pdf-fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: calc(1.5rem + 5rem + 10px);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: #1e1e1e;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 200ms ease, transform 200ms ease;
+}
+
+.dashboard__board-pdf-fab:hover {
+  background: #141414;
+}
+
+.dashboard__board-pdf-fab img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
+/* Board: между PDF, «Редактировать» и «Обновить» — 5px */
+.dashboard--board .dashboard__refresh {
+  right: 1.5rem;
+}
+
+.dashboard--board .dashboard__edit-project-fab {
+  right: calc(1.5rem + 2.5rem + 5px);
+}
+
+.dashboard--board .dashboard__board-pdf-fab {
+  right: calc(1.5rem + 2.5rem + 5px + 2.5rem + 5px);
+}
+
+.dashboard--board.dashboard--board-pdf-only .dashboard__board-pdf-fab {
+  right: calc(1.5rem + 2.5rem + 5px);
+}
+
+.dashboard__board-pdf-popup {
+  min-width: 320px;
+  max-width: 420px;
+}
+
+.dashboard__board-pdf-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.dashboard__board-pdf-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: #e0e0e0;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+}
+
+.dashboard__board-pdf-option input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.dashboard__board-pdf-download {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
 .dashboard__refresh {
   position: fixed;
   bottom: 1.5rem;

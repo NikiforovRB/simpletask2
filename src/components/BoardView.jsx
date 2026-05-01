@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { TASK_COLORS } from '../constants';
 import textIcon from '../assets/text.svg';
 import textNavIcon from '../assets/text-nav.svg';
@@ -128,6 +128,7 @@ export function BoardView({
   setOffline,
   hasPending,
   onSync,
+  exportWorldRef,
 }) {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [editingId, setEditingId] = useState(null);
@@ -165,6 +166,14 @@ export function BoardView({
   const zoomMenuRef = useRef(null);
 
   const zoomScale = zoom / 100;
+
+  useLayoutEffect(() => {
+    if (!exportWorldRef) return undefined;
+    exportWorldRef.current = worldRef.current;
+    return () => {
+      exportWorldRef.current = null;
+    };
+  }, [exportWorldRef]);
 
   useEffect(() => {
     if (!zoomOpen) return;
@@ -918,6 +927,7 @@ export function BoardView({
         <div
           ref={worldRef}
           className="board-view__world"
+          data-board-export-root
           style={{
             width: WORLD_WIDTH,
             height: WORLD_HEIGHT,

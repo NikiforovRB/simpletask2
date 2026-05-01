@@ -98,6 +98,9 @@ import privIcon from '../assets/priv.svg';
 import privNavIcon from '../assets/priv-nav.svg';
 import doskaIcon from '../assets/doska.svg';
 import doskaNavIcon from '../assets/doska-nav.svg';
+import pdfIcon from '../assets/pdf.svg';
+import pdfNavIcon from '../assets/pdf-nav.svg';
+import { BoardPdfExportModal } from '../components/BoardPdfExportModal';
 import './Dashboard.css';
 
 function getDays(baseDate, count) {
@@ -331,6 +334,11 @@ export default function Dashboard() {
   const [exitHover, setExitHover] = useState(false);
   const [refreshHover, setRefreshHover] = useState(false);
   const [editProjectFabHover, setEditProjectFabHover] = useState(false);
+  const [boardPdfFabHover, setBoardPdfFabHover] = useState(false);
+  const [boardPdfModalOpen, setBoardPdfModalOpen] = useState(false);
+  const [boardPdfVariant, setBoardPdfVariant] = useState('dark');
+  const [boardPdfExporting, setBoardPdfExporting] = useState(false);
+  const boardWorldRef = useRef(null);
   const [addProjectModalOpen, setAddProjectModalOpen] = useState(false);
   const [addProjectTitle, setAddProjectTitle] = useState('');
   const [addProjectKind, setAddProjectKind] = useState('project'); // 'project' | 'board'
@@ -981,7 +989,7 @@ export default function Dashboard() {
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
     <div
-      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''} ${viewMode === 'board' ? 'dashboard--board' : ''}`}
+      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''} ${viewMode === 'board' ? 'dashboard--board' : ''} ${viewMode === 'board' && !activeBoardId ? 'dashboard--board-pdf-only' : ''}`}
       style={{
         '--sidebar-width': `${liveMenuWidth}px`,
         '--task-font-weight': String(taskFontWeightToCssNumber(normalizeTaskFontWeight(liveTaskFontWeight))),
@@ -1554,6 +1562,23 @@ export default function Dashboard() {
         </div>
       )}
 
+      {boardPdfModalOpen && viewMode === 'board' && (
+        <BoardPdfExportModal
+          open
+          onClose={() => {
+            if (!boardPdfExporting) setBoardPdfModalOpen(false);
+          }}
+          worldRef={boardWorldRef}
+          items={boardItems.filter((it) => (it.board_id ?? null) === (activeBoardId ?? null))}
+          fileBaseName={projects.find((p) => p.id === activeBoardId)?.title ?? 'Доска'}
+          variant={boardPdfVariant}
+          onVariantChange={setBoardPdfVariant}
+          exporting={boardPdfExporting}
+          setExporting={setBoardPdfExporting}
+          onSuccess={() => setBoardPdfModalOpen(false)}
+        />
+      )}
+
       {(viewMode === 'plans' || viewMode === 'today') && (
         <div className="dashboard__days">
           {days.map((date) => (
@@ -1655,6 +1680,7 @@ export default function Dashboard() {
           setOffline={setBoardOffline}
           hasPending={boardHasPending}
           onSync={syncBoardItems}
+          exportWorldRef={boardWorldRef}
         />
       )}
 
@@ -1678,6 +1704,19 @@ export default function Dashboard() {
           getListCollapsed={getListCollapsed}
           setListCollapsed={setListCollapsed}
         />
+      )}
+
+      {viewMode === 'board' && (
+        <button
+          type="button"
+          className="dashboard__board-pdf-fab"
+          onMouseEnter={() => hasHover && setBoardPdfFabHover(true)}
+          onMouseLeave={() => hasHover && setBoardPdfFabHover(false)}
+          onClick={() => setBoardPdfModalOpen(true)}
+          aria-label="Экспорт в PDF"
+        >
+          <img src={hasHover && boardPdfFabHover ? pdfNavIcon : pdfIcon} alt="" />
+        </button>
       )}
 
       {((viewMode === 'project' && activeProjectId) || (viewMode === 'board' && activeBoardId)) && (

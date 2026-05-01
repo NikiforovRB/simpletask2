@@ -448,6 +448,18 @@ body.board-styling-side-open .dashboard__refresh {
   right: calc(480px + 1.5rem);
 }
 
+body.board-styling-side-open .dashboard__edit-project-fab {
+  right: calc(480px + 1.5rem + 2.5rem + 5px);
+}
+
+body.board-styling-side-open .dashboard__board-pdf-fab {
+  right: calc(480px + 1.5rem + 5rem + 10px);
+}
+
+body.board-styling-side-open .dashboard.dashboard--board-pdf-only .dashboard__board-pdf-fab {
+  right: calc(480px + 1.5rem + 2.5rem + 5px);
+}
+
 .board-view__styling-section-label {
   color: #888;
   font-size: 0.8125rem;
