@@ -122,6 +122,24 @@
   gap: 0.35rem;
 }
 
+.dashboard__board-header-slot {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dashboard__board-header-slot:empty {
+  display: none;
+}
+
+.dashboard__board-header-slot--left {
+  margin-left: 0.25rem;
+}
+
+.dashboard__board-header-slot--right {
+  margin-right: 0.25rem;
+}
+
 .dashboard__icon-btn {
   width: 2rem;
   height: 2rem;

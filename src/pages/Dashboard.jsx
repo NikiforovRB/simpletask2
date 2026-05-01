@@ -231,6 +231,7 @@ export default function Dashboard() {
     updateItemLocal: updateBoardItemLocal,
     deleteItem: deleteBoardItem,
     cloneItems: cloneBoardItems,
+    restoreItem: restoreBoardItem,
     offline: boardOffline,
     setOffline: setBoardOffline,
     hasPending: boardHasPending,
@@ -339,6 +340,8 @@ export default function Dashboard() {
   const [boardPdfVariant, setBoardPdfVariant] = useState('dark');
   const [boardPdfExporting, setBoardPdfExporting] = useState(false);
   const boardWorldRef = useRef(null);
+  const [boardHeaderLeftSlot, setBoardHeaderLeftSlot] = useState(null);
+  const [boardHeaderRightSlot, setBoardHeaderRightSlot] = useState(null);
   const [addProjectModalOpen, setAddProjectModalOpen] = useState(false);
   const [addProjectTitle, setAddProjectTitle] = useState('');
   const [addProjectKind, setAddProjectKind] = useState('project'); // 'project' | 'board'
@@ -1009,6 +1012,12 @@ export default function Dashboard() {
             >
               <img src={hasHover && menuHover ? menuNavIcon : menuIcon} alt="" />
             </button>
+            {viewMode === 'board' && (
+              <div
+                ref={setBoardHeaderLeftSlot}
+                className="dashboard__board-header-slot dashboard__board-header-slot--left"
+              />
+            )}
             {(viewMode === 'plans') && (
               <>
                 <select
@@ -1041,6 +1050,12 @@ export default function Dashboard() {
             )}
           </div>
           <div className="dashboard__header-actions">
+            {viewMode === 'board' && (
+              <div
+                ref={setBoardHeaderRightSlot}
+                className="dashboard__board-header-slot dashboard__board-header-slot--right"
+              />
+            )}
             {viewMode !== 'habits' && viewMode !== 'board' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
@@ -1673,6 +1688,9 @@ export default function Dashboard() {
           updateItemLocal={updateBoardItemLocal}
           deleteItem={deleteBoardItem}
           cloneItems={cloneBoardItems}
+          restoreItem={restoreBoardItem}
+          headerLeftSlot={boardHeaderLeftSlot}
+          headerRightSlot={boardHeaderRightSlot}
           zoom={settings.board_zoom ?? 100}
           setZoom={setBoardZoom}
           hasHover={hasHover}

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { TASK_COLORS } from '../constants';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import textIcon from '../assets/text.svg';
 import textNavIcon from '../assets/text-nav.svg';
 import verticalIcon from '../assets/vertical.svg';
@@ -121,6 +123,7 @@ export function BoardView({
   updateItemLocal,
   deleteItem,
   cloneItems,
+  restoreItem,
   zoom,
   setZoom,
   hasHover,
@@ -129,6 +132,8 @@ export function BoardView({
   hasPending,
   onSync,
   exportWorldRef,
+  headerLeftSlot,
+  headerRightSlot,
 }) {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [editingId, setEditingId] = useState(null);
@@ -164,6 +169,139 @@ export function BoardView({
   const lassoRef = useRef(null);
   const panRef = useRef(null);
   const zoomMenuRef = useRef(null);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
+  const wideHeader = useMediaQuery('(min-width: 501px)');
+
+  const undoStackRef = useRef([]);
+  const undoingRef = useRef(false);
+  const groupBufferRef = useRef(null);
+
+  const pushUndoOp = useCallback((op) => {
+    if (undoingRef.current) return;
+    if (!op) return;
+    if (groupBufferRef.current) {
+      groupBufferRef.current.push(op);
+      return;
+    }
+    const stack = undoStackRef.current;
+    stack.push([op]);
+    while (stack.length > 10) stack.shift();
+  }, []);
+
+  const beginHistoryGroup = useCallback(() => {
+    if (undoingRef.current) return;
+    if (groupBufferRef.current) return;
+    groupBufferRef.current = [];
+  }, []);
+
+  const endHistoryGroup = useCallback(() => {
+    if (undoingRef.current) return;
+    const buf = groupBufferRef.current;
+    groupBufferRef.current = null;
+    if (buf && buf.length) {
+      const stack = undoStackRef.current;
+      stack.push(buf);
+      while (stack.length > 10) stack.shift();
+    }
+  }, []);
+
+  const recordedAddItem = useCallback(
+    async (patch = {}) => {
+      const id = await addItem(patch);
+      if (id) pushUndoOp({ type: 'delete', id });
+      return id;
+    },
+    [addItem, pushUndoOp]
+  );
+
+  const recordedDeleteItem = useCallback(
+    async (id) => {
+      const cur = itemsRef.current.find((it) => it.id === id);
+      if (cur) pushUndoOp({ type: 'restore', row: { ...cur } });
+      await deleteItem(id);
+    },
+    [deleteItem, pushUndoOp]
+  );
+
+  const recordedUpdateItem = useCallback(
+    async (id, patch) => {
+      if (patch && typeof patch === 'object') {
+        const cur = itemsRef.current.find((it) => it.id === id);
+        if (cur) {
+          const oldPatch = {};
+          let any = false;
+          for (const k of Object.keys(patch)) {
+            if (cur[k] !== patch[k]) {
+              oldPatch[k] = cur[k];
+              any = true;
+            }
+          }
+          if (any) pushUndoOp({ type: 'update', id, patch: oldPatch });
+        }
+      }
+      await updateItem(id, patch);
+    },
+    [updateItem, pushUndoOp]
+  );
+
+  const recordedCloneItems = useCallback(
+    (sourceIds, opts) => {
+      const mapping = cloneItems(sourceIds, opts);
+      if (mapping?.length) {
+        pushUndoOp({ type: 'deleteMany', ids: mapping.map((m) => m.newId) });
+      }
+      return mapping;
+    },
+    [cloneItems, pushUndoOp]
+  );
+
+  const undo = useCallback(async () => {
+    if (undoingRef.current) return;
+    const stack = undoStackRef.current;
+    if (!stack.length) return;
+    const ops = stack.pop();
+    undoingRef.current = true;
+    try {
+      for (let i = ops.length - 1; i >= 0; i--) {
+        const op = ops[i];
+        if (!op) continue;
+        if (op.type === 'delete') {
+          await deleteItem(op.id);
+        } else if (op.type === 'deleteMany') {
+          for (const id of op.ids) await deleteItem(id);
+        } else if (op.type === 'restore') {
+          if (typeof restoreItem === 'function') {
+            await restoreItem(op.row);
+          } else if (op.row) {
+            const { id: _drop, user_id: _u, created_at: _c, updated_at: _u2, ...rest } = op.row;
+            await addItem(rest);
+          }
+        } else if (op.type === 'update') {
+          await updateItem(op.id, op.patch);
+        }
+      }
+    } finally {
+      undoingRef.current = false;
+    }
+  }, [addItem, deleteItem, restoreItem, updateItem]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const isUndoCombo = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey;
+      if (!isUndoCombo) return;
+      const key = (e.key || '').toLowerCase();
+      const code = e.code || '';
+      if (key !== 'z' && code !== 'KeyZ') return;
+      const tag = (e.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) return;
+      e.preventDefault();
+      undo();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [undo]);
 
   const zoomScale = zoom / 100;
 
@@ -205,8 +343,8 @@ export function BoardView({
       const viewTopY = canvas.scrollTop / zoomScale + NEW_BLOCK_TOP_OFFSET;
       wy = Math.round(clamp(viewTopY, 0, WORLD_HEIGHT - height));
     }
-    addItem({ x: wx, y: wy, text: 'Новый текст', width, height, padding: 0 });
-  }, [addItem, zoomScale]);
+    recordedAddItem({ x: wx, y: wy, text: 'Новый текст', width, height, padding: 0 });
+  }, [recordedAddItem, zoomScale]);
 
   const addLine = useCallback(
     (orientation) => {
@@ -223,7 +361,7 @@ export function BoardView({
         const viewTopY = canvas.scrollTop / zoomScale + NEW_BLOCK_TOP_OFFSET;
         wy = Math.round(clamp(viewTopY, 0, WORLD_HEIGHT - height));
       }
-      addItem({
+      recordedAddItem({
         x: wx,
         y: wy,
         width,
@@ -234,7 +372,7 @@ export function BoardView({
         padding: 0,
       });
     },
-    [addItem, zoomScale]
+    [recordedAddItem, zoomScale]
   );
   const handleAddVerticalLine = useCallback(() => addLine('v'), [addLine]);
   const handleAddHorizontalLine = useCallback(() => addLine('h'), [addLine]);
@@ -275,7 +413,7 @@ export function BoardView({
 
       let group;
       if (mode === 'move' && e.altKey && typeof cloneItems === 'function') {
-        const mapping = cloneItems(groupIds, { dx: 0, dy: 0 });
+        const mapping = recordedCloneItems(groupIds, { dx: 0, dy: 0 });
         if (!mapping.length) return;
         group = mapping.map(({ newId, row }) => ({
           id: newId,
@@ -323,9 +461,10 @@ export function BoardView({
         moved: false,
         others,
         groupBounds,
+        cloned: mode === 'move' && e.altKey && typeof cloneItems === 'function',
       };
     },
-    [editingId, selectedIds, items, cloneItems]
+    [editingId, selectedIds, items, cloneItems, recordedCloneItems]
   );
 
   useEffect(() => {
@@ -490,15 +629,26 @@ export function BoardView({
       dragRef.current = null;
       setGuides({ v: [], h: [] });
       if (!d.moved) return;
+      const inGroup = !d.cloned;
+      if (inGroup) beginHistoryGroup();
       d.group.forEach((g) => {
         const cur = items.find((it) => it.id === g.id);
         if (!cur) return;
+        if (!d.cloned) {
+          const original = { x: g.startX, y: g.startY };
+          if (d.mode !== 'move') {
+            original.width = g.startWidth;
+            original.height = g.startHeight;
+          }
+          pushUndoOp({ type: 'update', id: g.id, patch: original });
+        }
         if (d.mode === 'move') {
           updateItem(g.id, { x: cur.x, y: cur.y });
         } else {
           updateItem(g.id, { x: cur.x, y: cur.y, width: cur.width, height: cur.height });
         }
       });
+      if (inGroup) endHistoryGroup();
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -508,7 +658,7 @@ export function BoardView({
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
-  }, [items, updateItem, updateItemLocal, zoomScale]);
+  }, [items, updateItem, updateItemLocal, zoomScale, beginHistoryGroup, endHistoryGroup, pushUndoOp]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -519,7 +669,9 @@ export function BoardView({
       if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        Array.from(selectedIds).forEach((id) => deleteItem(id));
+        beginHistoryGroup();
+        Array.from(selectedIds).forEach((id) => recordedDeleteItem(id));
+        endHistoryGroup();
         setSelectedIds(new Set());
         return;
       }
@@ -542,13 +694,15 @@ export function BoardView({
       const cdx = clamp(dx, minDx, maxDx);
       const cdy = clamp(dy, minDy, maxDy);
       if (cdx === 0 && cdy === 0) return;
+      beginHistoryGroup();
       groupItems.forEach((g) => {
-        updateItem(g.id, { x: g.x + cdx, y: g.y + cdy });
+        recordedUpdateItem(g.id, { x: g.x + cdx, y: g.y + cdy });
       });
+      endHistoryGroup();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedIds, editingId, stylingId, items, updateItem, deleteItem]);
+  }, [selectedIds, editingId, stylingId, items, recordedUpdateItem, recordedDeleteItem, beginHistoryGroup, endHistoryGroup]);
 
   const getWorldPoint = useCallback(
     (clientX, clientY) => {
@@ -681,19 +835,20 @@ export function BoardView({
       const ids = Array.from(selectedIds);
       const group = ids.map((id) => items.find((it) => it.id === id)).filter(Boolean);
       if (group.length < 2) return;
+      beginHistoryGroup();
       if (mode === 'left') {
         const x = Math.min(...group.map((g) => g.x));
-        group.forEach((g) => updateItem(g.id, { x }));
+        group.forEach((g) => recordedUpdateItem(g.id, { x }));
       } else if (mode === 'top') {
         const y = Math.min(...group.map((g) => g.y));
-        group.forEach((g) => updateItem(g.id, { y }));
+        group.forEach((g) => recordedUpdateItem(g.id, { y }));
       } else if (mode === 'hcenter') {
         const minY = Math.min(...group.map((g) => g.y));
         const maxY = Math.max(...group.map((g) => g.y + g.height));
         const cy = (minY + maxY) / 2;
         group.forEach((g) => {
           const y = clamp(Math.round(cy - g.height / 2), 0, WORLD_HEIGHT - g.height);
-          updateItem(g.id, { y });
+          recordedUpdateItem(g.id, { y });
         });
       } else if (mode === 'vcenter') {
         const minX = Math.min(...group.map((g) => g.x));
@@ -701,11 +856,12 @@ export function BoardView({
         const cx = (minX + maxX) / 2;
         group.forEach((g) => {
           const x = clamp(Math.round(cx - g.width / 2), 0, WORLD_WIDTH - g.width);
-          updateItem(g.id, { x });
+          recordedUpdateItem(g.id, { x });
         });
       }
+      endHistoryGroup();
     },
-    [selectedIds, items, updateItem]
+    [selectedIds, items, recordedUpdateItem, beginHistoryGroup, endHistoryGroup]
   );
 
   const openContextMenu = useCallback(
@@ -732,7 +888,7 @@ export function BoardView({
       const height = src.height;
       const x = clamp(Math.round(src.x + 20), 0, WORLD_WIDTH - width);
       const y = clamp(Math.round(src.y + 20), 0, WORLD_HEIGHT - height);
-      addItem({
+      recordedAddItem({
         x,
         y,
         width,
@@ -748,7 +904,7 @@ export function BoardView({
         kind: src.kind,
       });
     },
-    [items, addItem]
+    [items, recordedAddItem]
   );
 
   useEffect(() => {
@@ -780,143 +936,162 @@ export function BoardView({
 
   const multiSelected = selectedIds.size >= 2;
 
+  const zoomGroup = (
+    <>
+      <div className="board-view__zoom" ref={zoomMenuRef}>
+        <button
+          type="button"
+          className="board-view__zoom-btn"
+          onClick={() => setZoomOpen((v) => !v)}
+          aria-label="Масштаб"
+        >
+          <span>{zoom}%</span>
+        </button>
+        {zoomOpen && (
+          <div className="board-view__zoom-menu">
+            {ZOOM_PRESETS.map((z) => (
+              <button
+                key={z}
+                type="button"
+                className={`board-view__zoom-option ${z === zoom ? 'board-view__zoom-option--active' : ''}`}
+                onClick={() => {
+                  changeZoom(z);
+                  setZoomOpen(false);
+                }}
+              >
+                {z}%
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        className="board-view__icon-btn"
+        onMouseEnter={() => hasHover && setZoomOutHover(true)}
+        onMouseLeave={() => hasHover && setZoomOutHover(false)}
+        onClick={() => changeZoom(zoom - ZOOM_STEP)}
+        aria-label="Уменьшить масштаб"
+        disabled={zoom <= ZOOM_MIN}
+      >
+        <img src={hasHover && zoomOutHover ? zoomOutNavIcon : zoomOutIcon} alt="" />
+      </button>
+      <button
+        type="button"
+        className="board-view__icon-btn"
+        onMouseEnter={() => hasHover && setZoomInHover(true)}
+        onMouseLeave={() => hasHover && setZoomInHover(false)}
+        onClick={() => changeZoom(zoom + ZOOM_STEP)}
+        aria-label="Увеличить масштаб"
+        disabled={zoom >= ZOOM_MAX}
+      >
+        <img src={hasHover && zoomInHover ? zoomInNavIcon : zoomInIcon} alt="" />
+      </button>
+    </>
+  );
+
+  const addGroup = (
+    <>
+      <button
+        type="button"
+        className="board-view__icon-btn"
+        onMouseEnter={() => hasHover && setAddHover(true)}
+        onMouseLeave={() => hasHover && setAddHover(false)}
+        onClick={handleAddBlock}
+        aria-label="Добавить текстовый блок"
+        title="Добавить текстовый блок"
+      >
+        <img src={hasHover && addHover ? textNavIcon : textIcon} alt="" />
+      </button>
+      <button
+        type="button"
+        className="board-view__icon-btn"
+        onMouseEnter={() => hasHover && setAddVHover(true)}
+        onMouseLeave={() => hasHover && setAddVHover(false)}
+        onClick={handleAddVerticalLine}
+        aria-label="Добавить вертикальную линию"
+        title="Добавить вертикальную линию"
+      >
+        <img src={hasHover && addVHover ? verticalNavIcon : verticalIcon} alt="" />
+      </button>
+      <button
+        type="button"
+        className="board-view__icon-btn"
+        onMouseEnter={() => hasHover && setAddHHover(true)}
+        onMouseLeave={() => hasHover && setAddHHover(false)}
+        onClick={handleAddHorizontalLine}
+        aria-label="Добавить горизонтальную линию"
+        title="Добавить горизонтальную линию"
+      >
+        <img src={hasHover && addHHover ? horizontalNavIcon : horizontalIcon} alt="" />
+      </button>
+    </>
+  );
+
+  const alignGroup = multiSelected && !wideStyling ? (
+    <>
+      <button
+        type="button"
+        className="board-view__icon-btn"
+        onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, left: true }))}
+        onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, left: false }))}
+        onClick={() => alignSelected('left')}
+        aria-label="Выровнять по левой границе"
+        title="Выровнять по левой границе"
+      >
+        <img src={hasHover && alignHover.left ? gridLeftNavIcon : gridLeftIcon} alt="" />
+      </button>
+      <button
+        type="button"
+        className="board-view__icon-btn"
+        onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, top: true }))}
+        onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, top: false }))}
+        onClick={() => alignSelected('top')}
+        aria-label="Выровнять по верхней границе"
+        title="Выровнять по верхней границе"
+      >
+        <img src={hasHover && alignHover.top ? gridTopNavIcon : gridTopIcon} alt="" />
+      </button>
+      <button
+        type="button"
+        className="board-view__icon-btn"
+        onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, hcenter: true }))}
+        onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, hcenter: false }))}
+        onClick={() => alignSelected('hcenter')}
+        aria-label="Выровнять по центру по горизонтали"
+        title="Выровнять по центру по горизонтали"
+      >
+        <img src={hasHover && alignHover.hcenter ? hCenterNavIcon : hCenterIcon} alt="" />
+      </button>
+      <button
+        type="button"
+        className="board-view__icon-btn"
+        onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, vcenter: true }))}
+        onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, vcenter: false }))}
+        onClick={() => alignSelected('vcenter')}
+        aria-label="Выровнять по центру по вертикали"
+        title="Выровнять по центру по вертикали"
+      >
+        <img src={hasHover && alignHover.vcenter ? vCenterNavIcon : vCenterIcon} alt="" />
+      </button>
+    </>
+  ) : null;
+
+  const portalLeft = wideHeader && headerLeftSlot;
+  const portalRight = wideHeader && headerRightSlot;
+
   return (
     <div className="board-view">
-      <div className="board-view__toolbar-left">
-        <div className="board-view__zoom" ref={zoomMenuRef}>
-          <button
-            type="button"
-            className="board-view__zoom-btn"
-            onClick={() => setZoomOpen((v) => !v)}
-            aria-label="Масштаб"
-          >
-            <span>{zoom}%</span>
-          </button>
-          {zoomOpen && (
-            <div className="board-view__zoom-menu">
-              {ZOOM_PRESETS.map((z) => (
-                <button
-                  key={z}
-                  type="button"
-                  className={`board-view__zoom-option ${z === zoom ? 'board-view__zoom-option--active' : ''}`}
-                  onClick={() => {
-                    changeZoom(z);
-                    setZoomOpen(false);
-                  }}
-                >
-                  {z}%
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <button
-          type="button"
-          className="board-view__icon-btn"
-          onMouseEnter={() => hasHover && setZoomOutHover(true)}
-          onMouseLeave={() => hasHover && setZoomOutHover(false)}
-          onClick={() => changeZoom(zoom - ZOOM_STEP)}
-          aria-label="Уменьшить масштаб"
-          disabled={zoom <= ZOOM_MIN}
-        >
-          <img src={hasHover && zoomOutHover ? zoomOutNavIcon : zoomOutIcon} alt="" />
-        </button>
-        <button
-          type="button"
-          className="board-view__icon-btn"
-          onMouseEnter={() => hasHover && setZoomInHover(true)}
-          onMouseLeave={() => hasHover && setZoomInHover(false)}
-          onClick={() => changeZoom(zoom + ZOOM_STEP)}
-          aria-label="Увеличить масштаб"
-          disabled={zoom >= ZOOM_MAX}
-        >
-          <img src={hasHover && zoomInHover ? zoomInNavIcon : zoomInIcon} alt="" />
-        </button>
-      </div>
+      {!portalLeft && <div className="board-view__toolbar-left">{zoomGroup}</div>}
+      {portalLeft && createPortal(<div className="board-view__header-toolbar">{zoomGroup}</div>, headerLeftSlot)}
 
-      <div className="board-view__toolbar-right">
-        {multiSelected && !wideStyling && (
-          <>
-            <button
-              type="button"
-              className="board-view__icon-btn"
-              onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, left: true }))}
-              onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, left: false }))}
-              onClick={() => alignSelected('left')}
-              aria-label="Выровнять по левой границе"
-              title="Выровнять по левой границе"
-            >
-              <img src={hasHover && alignHover.left ? gridLeftNavIcon : gridLeftIcon} alt="" />
-            </button>
-            <button
-              type="button"
-              className="board-view__icon-btn"
-              onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, top: true }))}
-              onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, top: false }))}
-              onClick={() => alignSelected('top')}
-              aria-label="Выровнять по верхней границе"
-              title="Выровнять по верхней границе"
-            >
-              <img src={hasHover && alignHover.top ? gridTopNavIcon : gridTopIcon} alt="" />
-            </button>
-            <button
-              type="button"
-              className="board-view__icon-btn"
-              onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, hcenter: true }))}
-              onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, hcenter: false }))}
-              onClick={() => alignSelected('hcenter')}
-              aria-label="Выровнять по центру по горизонтали"
-              title="Выровнять по центру по горизонтали"
-            >
-              <img src={hasHover && alignHover.hcenter ? hCenterNavIcon : hCenterIcon} alt="" />
-            </button>
-            <button
-              type="button"
-              className="board-view__icon-btn"
-              onMouseEnter={() => hasHover && setAlignHover((h) => ({ ...h, vcenter: true }))}
-              onMouseLeave={() => hasHover && setAlignHover((h) => ({ ...h, vcenter: false }))}
-              onClick={() => alignSelected('vcenter')}
-              aria-label="Выровнять по центру по вертикали"
-              title="Выровнять по центру по вертикали"
-            >
-              <img src={hasHover && alignHover.vcenter ? vCenterNavIcon : vCenterIcon} alt="" />
-            </button>
-          </>
-        )}
-        <button
-          type="button"
-          className="board-view__icon-btn"
-          onMouseEnter={() => hasHover && setAddHover(true)}
-          onMouseLeave={() => hasHover && setAddHover(false)}
-          onClick={handleAddBlock}
-          aria-label="Добавить текстовый блок"
-          title="Добавить текстовый блок"
-        >
-          <img src={hasHover && addHover ? textNavIcon : textIcon} alt="" />
-        </button>
-        <button
-          type="button"
-          className="board-view__icon-btn"
-          onMouseEnter={() => hasHover && setAddVHover(true)}
-          onMouseLeave={() => hasHover && setAddVHover(false)}
-          onClick={handleAddVerticalLine}
-          aria-label="Добавить вертикальную линию"
-          title="Добавить вертикальную линию"
-        >
-          <img src={hasHover && addVHover ? verticalNavIcon : verticalIcon} alt="" />
-        </button>
-        <button
-          type="button"
-          className="board-view__icon-btn"
-          onMouseEnter={() => hasHover && setAddHHover(true)}
-          onMouseLeave={() => hasHover && setAddHHover(false)}
-          onClick={handleAddHorizontalLine}
-          aria-label="Добавить горизонтальную линию"
-          title="Добавить горизонтальную линию"
-        >
-          <img src={hasHover && addHHover ? horizontalNavIcon : horizontalIcon} alt="" />
-        </button>
-      </div>
+      {(alignGroup || !portalRight) && (
+        <div className="board-view__toolbar-right">
+          {alignGroup}
+          {!portalRight && addGroup}
+        </div>
+      )}
+      {portalRight && createPortal(<div className="board-view__header-toolbar">{addGroup}</div>, headerRightSlot)}
 
       <div
         className="board-view__canvas"
@@ -968,7 +1143,7 @@ export function BoardView({
                   setEditingId(it.id);
                 }}
                 onCommitText={(text) => {
-                  if (text !== it.text) updateItem(it.id, { text });
+                  if (text !== it.text) recordedUpdateItem(it.id, { text });
                   setEditingId((cur) => (cur === it.id ? null : cur));
                 }}
               />
@@ -1047,7 +1222,7 @@ export function BoardView({
                 next.delete(id);
                 return next;
               });
-              deleteItem(id);
+              recordedDeleteItem(id);
             }}
           >
             <svg
@@ -1101,7 +1276,7 @@ export function BoardView({
               setStylingId(null);
             }
           }}
-          updateItem={updateItem}
+          updateItem={recordedUpdateItem}
           onDelete={() => {
             const ids = panelItems.map((it) => it.id);
             if (wideStyling) {
@@ -1114,7 +1289,9 @@ export function BoardView({
                 return next;
               });
             }
-            ids.forEach((id) => deleteItem(id));
+            beginHistoryGroup();
+            ids.forEach((id) => recordedDeleteItem(id));
+            endHistoryGroup();
           }}
           showAlign={wideStyling && multiPanel}
           onAlign={alignSelected}

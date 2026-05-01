@@ -232,6 +232,56 @@ export function useBoardItems() {
     [user?.id, touchPending]
   );
 
+  const restoreItem = useCallback(
+    async (row) => {
+      if (!user?.id) return null;
+      if (!row || !row.id) return null;
+      const nowIso = new Date().toISOString();
+      const safeRow = {
+        ...row,
+        user_id: user.id,
+        updated_at: nowIso,
+        created_at: row.created_at || nowIso,
+        text_font_weight: normalizeTextFontWeight(row.text_font_weight),
+        kind: row.kind ?? 'text',
+      };
+      setItems((prev) => {
+        if (prev.some((it) => it.id === safeRow.id)) return prev;
+        const merged = [...prev, safeRow].sort((a, b) => {
+          const aT = a.created_at || '';
+          const bT = b.created_at || '';
+          return aT < bT ? -1 : aT > bT ? 1 : 0;
+        });
+        return merged;
+      });
+      if (offlineRef.current) {
+        const p = pendingRef.current;
+        if (p.deletes.has(safeRow.id)) {
+          p.deletes.delete(safeRow.id);
+        } else {
+          p.creates.set(safeRow.id, safeRow);
+        }
+        touchPending();
+        return safeRow.id;
+      }
+      const insertPromise = supabase
+        .from('board_items')
+        .insert(safeRow)
+        .then(({ error }) => {
+          if (error) {
+            setItems((prev) => prev.filter((it) => it.id !== safeRow.id));
+          }
+        })
+        .finally(() => {
+          pendingInsertsRef.current.delete(safeRow.id);
+        });
+      pendingInsertsRef.current.set(safeRow.id, insertPromise);
+      await insertPromise;
+      return safeRow.id;
+    },
+    [user, touchPending]
+  );
+
   const cloneItems = useCallback(
     (sourceIds, { dx = 0, dy = 0 } = {}) => {
       if (!user?.id) return [];
@@ -369,6 +419,7 @@ export function useBoardItems() {
     updateItemLocal,
     deleteItem,
     cloneItems,
+    restoreItem,
     refetch: fetchAll,
     offline,
     setOffline,

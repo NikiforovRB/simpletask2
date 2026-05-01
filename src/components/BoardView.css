@@ -22,6 +22,12 @@
   border: none;
 }
 
+.board-view__header-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .board-view__toolbar-left {
   left: 0.5rem;
 }
