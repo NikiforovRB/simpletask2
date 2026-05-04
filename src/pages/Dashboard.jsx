@@ -1285,7 +1285,21 @@ export default function Dashboard() {
                 +
                 <span className="dashboard-menu__add-project-text">Добавить проект</span>
               </button>
-              <div className="dashboard-menu__mobile-font-row">{renderFontMenuButton()}</div>
+              <div className="dashboard-menu__mobile-font-row">
+                {renderFontMenuButton()}
+                {projects.length > 1 && (
+                  <button
+                    type="button"
+                    className="dashboard-menu__order-btn"
+                    onMouseEnter={() => hasHover && setMenuOrderBtnHover(true)}
+                    onMouseLeave={() => hasHover && setMenuOrderBtnHover(false)}
+                    onClick={openMenuOrderModal}
+                    aria-label="Изменить порядок пунктов в меню"
+                  >
+                    <img src={hasHover && menuOrderBtnHover ? dragNavIcon : dragIcon} alt="" />
+                  </button>
+                )}
+              </div>
             </nav>
           </div>
         )

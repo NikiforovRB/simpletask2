@@ -1160,6 +1160,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
+    gap: 5px;
     position: fixed;
     left: 50%;
     bottom: 22px;
@@ -1168,7 +1169,8 @@
     padding: 0;
   }
 
-  .dashboard-menu--mobile .dashboard-menu__mobile-font-row .dashboard-menu__font-btn {
+  .dashboard-menu--mobile .dashboard-menu__mobile-font-row .dashboard-menu__font-btn,
+  .dashboard-menu--mobile .dashboard-menu__mobile-font-row .dashboard-menu__order-btn {
     margin-left: 0;
   }
 }
