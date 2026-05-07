@@ -67,7 +67,18 @@ export function formatMinutesToHabitTime(mins) {
 
 /** Типы-заметки без оценки "успех/провал" (нет счётчика серии) */
 export function isInfoHabitType(type) {
-  return type === 'just_time' || type === 'just_text';
+  return type === 'just_time' || type === 'just_text' || type === 'just_text_color';
+}
+
+/**
+ * Цвет текста для "Просто текст с цветом":
+ *   - начинается с "-" → серый #666666;
+ *   - в остальных случаях → зелёный #00b956.
+ */
+export function getJustTextColor(text) {
+  const s = typeof text === 'string' ? text.trimStart() : '';
+  if (s.startsWith('-')) return '#666666';
+  return '#00b956';
 }
 
 /** true = соблюдено, false = нет, null = нет данных / нельзя оценить */
@@ -100,7 +111,7 @@ export function isSatisfied(habit, rawEntry) {
     return userMin <= limitMin;
   }
 
-  // just_time / just_text — это просто заметки, успеха/провала нет
+  // just_time / just_text / just_text_color — это просто заметки, успеха/провала нет
   return null;
 }
 

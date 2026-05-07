@@ -20,6 +20,7 @@ import {
   isInfoHabitType,
   parseTimeToMinutes,
   formatMinutesToHabitTime,
+  getJustTextColor,
 } from '../lib/habitsLogic';
 
 const INFO_HABIT_COLOR = '#666666';
@@ -275,6 +276,32 @@ function JustTextCell({ entry, onCommit }) {
       type="text"
       className="habits-view__cell habits-view__cell--input habits-view__cell--text"
       style={{ color: INFO_HABIT_COLOR }}
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => {
+        const raw = local;
+        if ((raw || '').trim() === '') {
+          onCommit(null);
+          return;
+        }
+        onCommit({ text: raw });
+      }}
+    />
+  );
+}
+
+function JustTextColorCell({ entry, onCommit }) {
+  const saved = typeof entry?.text === 'string' ? entry.text : '';
+  const [local, setLocal] = useState(saved);
+  useEffect(() => {
+    setLocal(saved);
+  }, [saved]);
+  const color = local ? getJustTextColor(local) : INFO_HABIT_COLOR;
+  return (
+    <input
+      type="text"
+      className="habits-view__cell habits-view__cell--input habits-view__cell--text"
+      style={{ color }}
       value={local}
       onChange={(e) => setLocal(e.target.value)}
       onBlur={() => {
@@ -735,6 +762,7 @@ export function HabitsView({
                         <JustTimeCell habit={habit} entry={entry} dateStr={ds} onOpen={openTimePicker} />
                       )}
                       {habit.type === 'just_text' && <JustTextCell entry={entry} onCommit={setVal} />}
+                      {habit.type === 'just_text_color' && <JustTextColorCell entry={entry} onCommit={setVal} />}
                     </div>
                   );
                 })
@@ -888,6 +916,18 @@ export function HabitsView({
               </span>
             );
           }
+          if (habit.type === 'just_text_color') {
+            if (!entry.text) return null;
+            return (
+              <span
+                className="habits-view__stats-text"
+                style={{ color: getJustTextColor(entry.text) }}
+                title={entry.text}
+              >
+                {entry.text}
+              </span>
+            );
+          }
           return null;
         };
         return (
@@ -1034,6 +1074,7 @@ export function HabitsView({
                 { id: 'not_later', label: 'Не позже (время)' },
                 { id: 'just_time', label: 'Просто время' },
                 { id: 'just_text', label: 'Просто текст' },
+                { id: 'just_text_color', label: 'Просто текст с цветом' },
               ].map((t) => (
                 <button
                   key={t.id}
