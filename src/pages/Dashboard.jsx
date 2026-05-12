@@ -246,6 +246,7 @@ export default function Dashboard() {
     itemsByKind: goalPlanItemsByKind,
     notes: goalPlanNotes,
     addItem: addGoalPlanItem,
+    addItemAfter: addGoalPlanItemAfter,
     updateItem: updateGoalPlanItem,
     toggleComplete: toggleGoalPlanItem,
     deleteItem: deleteGoalPlanItem,
@@ -1680,6 +1681,7 @@ export default function Dashboard() {
           itemsByKind={goalPlanItemsByKind}
           notes={goalPlanNotes}
           addItem={addGoalPlanItem}
+          addItemAfter={addGoalPlanItemAfter}
           updateItem={updateGoalPlanItem}
           toggleComplete={toggleGoalPlanItem}
           deleteItem={deleteGoalPlanItem}

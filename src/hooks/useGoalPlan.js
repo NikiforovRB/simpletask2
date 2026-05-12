@@ -144,6 +144,118 @@ export function useGoalPlan() {
     [user?.id]
   );
 
+  /**
+   * Insert a new item directly AFTER the item identified by `afterId` in the
+   * same list (same kind + parent_id + entry_date). Re-indexes the list's
+   * positions so the result is the natural 0..N continuous ordering.
+   * Falls back to `addItem` (append at end) if `afterId` cannot be found.
+   */
+  const addItemAfter = useCallback(
+    async ({
+      afterId,
+      kind,
+      parent_id = null,
+      entry_date = null,
+      text = '',
+      text_color = null,
+    }) => {
+      if (!user?.id) return null;
+      if (!VALID_KINDS.has(kind)) return null;
+      const all = stateRef.current?.items || [];
+
+      const sameList = (it) =>
+        it.kind === kind &&
+        (it.parent_id ?? null) === (parent_id ?? null) &&
+        (kind !== 'day' || (it.entry_date ?? null) === (entry_date ?? null));
+
+      const list = all.filter(sameList).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      const idx = list.findIndex((it) => it.id === afterId);
+      if (idx === -1) {
+        return await addItem({ kind, parent_id, entry_date, text, text_color });
+      }
+
+      const newId =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `tmp-${Math.random().toString(16).slice(2)}`;
+
+      const row = {
+        id: newId,
+        user_id: user.id,
+        kind,
+        parent_id: parent_id || null,
+        text: typeof text === 'string' ? text : '',
+        position: idx + 1,
+        entry_date: kind === 'day' ? entry_date : null,
+        goal_id: null,
+        text_color: text_color || null,
+      };
+      const optimistic = {
+        ...row,
+        completed_at: null,
+        created_at: new Date().toISOString(),
+      };
+
+      // Build the new ordering with the optimistic item inserted right after `afterId`,
+      // then re-index positions so they're continuous 0..N.
+      const newOrder = [...list];
+      newOrder.splice(idx + 1, 0, optimistic);
+      const newPos = new Map(newOrder.map((it, i) => [it.id, i]));
+
+      setState((prev) => ({
+        ...prev,
+        items: [
+          ...prev.items.map((it) =>
+            newPos.has(it.id) && it.id !== newId ? { ...it, position: newPos.get(it.id) } : it
+          ),
+          optimistic,
+        ],
+      }));
+
+      const { data, error } = await supabase
+        .from('goal_plan_items')
+        .insert(row)
+        .select()
+        .single();
+
+      if (error || !data) {
+        // Rollback the optimistic insert.
+        setState((prev) => ({
+          ...prev,
+          items: prev.items.filter((it) => it.id !== newId),
+        }));
+        return null;
+      }
+
+      // Persist position changes for shifted items whose position actually moved.
+      const positionUpdates = list
+        .map((it) => ({ id: it.id, position: newPos.get(it.id) }))
+        .filter((u) => {
+          const orig = list.find((o) => o.id === u.id);
+          return orig && (orig.position ?? 0) !== u.position;
+        });
+
+      await Promise.all(
+        positionUpdates.map(({ id, position }) =>
+          supabase
+            .from('goal_plan_items')
+            .update({ position })
+            .eq('id', id)
+            .eq('user_id', user.id)
+        )
+      );
+
+      // Merge server defaults onto the client-generated id (preserve id to keep focus).
+      setState((prev) => ({
+        ...prev,
+        items: prev.items.map((it) => (it.id === newId ? { ...it, ...data } : it)),
+      }));
+
+      return newId;
+    },
+    [user?.id, addItem]
+  );
+
   const toggleComplete = useCallback(
     async (id) => {
       const cur = state.items.find((it) => it.id === id);
@@ -283,6 +395,7 @@ export function useGoalPlan() {
     allItems: state.items,
     notes: state.notes,
     addItem,
+    addItemAfter,
     updateItem,
     toggleComplete,
     deleteItem,

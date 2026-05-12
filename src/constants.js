@@ -1,5 +1,6 @@
 export const TASK_COLORS = [
   '#ffffff',
+  '#d1d1d1',
   '#f33737',
   '#666666',
   '#5a86ee',

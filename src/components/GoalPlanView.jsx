@@ -572,6 +572,7 @@ function Section({
   collapsed,
   onToggleCollapsed,
   onAdd,
+  onCreateAfter,
   onCommit,
   onDelete,
   onToggle,
@@ -624,7 +625,7 @@ function Section({
                 onDelete={(id) => onDelete(id)}
                 onToggle={(id) => onToggle?.(id)}
                 onChangeColor={(id, c) => onChangeColor(id, c)}
-                onAddSibling={() => onAdd()}
+                onCreateAfter={onCreateAfter}
                 placeholder={def.placeholder}
               />
             ))}
@@ -647,7 +648,7 @@ function SectionItem({
   onDelete,
   onToggle,
   onChangeColor,
-  onAddSibling,
+  onCreateAfter,
   placeholder,
 }) {
   const [subCollapsed, setSubCollapsed] = useState(false);
@@ -669,7 +670,7 @@ function SectionItem({
         onDelete={() => onDelete(item.id)}
         onToggle={() => onToggle(item.id)}
         onChangeColor={(c) => onChangeColor(item.id, c)}
-        onKeyboardCreateBelow={onAddSibling}
+        onKeyboardCreateBelow={() => onCreateAfter?.(item)}
         onKeyboardCreateSubtask={
           showSubtasks
             ? () => {
@@ -695,7 +696,7 @@ function SectionItem({
                 onDelete={() => onDelete(sub.id)}
                 onToggle={() => onToggle(sub.id)}
                 onChangeColor={(c) => onChangeColor(sub.id, c)}
-                onKeyboardCreateBelow={onAddSubtask}
+                onKeyboardCreateBelow={() => onCreateAfter?.(sub)}
                 placeholder="Подзадача"
               />
             ))}
@@ -771,6 +772,7 @@ function DayColumn({
   onSetNote,
   onAddDayTask,
   onAddSubtask,
+  onCreateAfter,
   onCommit,
   onDelete,
   onToggle,
@@ -811,7 +813,7 @@ function DayColumn({
               containerId={containerId}
               subtasks={dayByParent.get(it.id) || []}
               onAddSubtask={() => onAddSubtask(it.id, ds)}
-              onAddSibling={onAddDayTask}
+              onCreateAfter={onCreateAfter}
               onCommit={(id, text) => onCommit(id, text)}
               onDelete={(id) => onDelete(id)}
               onToggle={(id) => onToggle(id)}
@@ -840,7 +842,7 @@ function DayItemTree({
   containerId,
   subtasks,
   onAddSubtask,
-  onAddSibling,
+  onCreateAfter,
   onCommit,
   onDelete,
   onToggle,
@@ -871,7 +873,7 @@ function DayItemTree({
         onToggle={() => onToggle(item.id)}
         onChangeColor={(c) => onChangeColor(item.id, c)}
         onChangeDate={(d) => onChangeDate(item.id, d)}
-        onKeyboardCreateBelow={onAddSibling}
+        onKeyboardCreateBelow={() => onCreateAfter?.(item)}
         onKeyboardCreateSubtask={() => {
           setSubCollapsed(false);
           onAddSubtask();
@@ -893,7 +895,7 @@ function DayItemTree({
                 onDelete={() => onDelete(sub.id)}
                 onToggle={() => onToggle(sub.id)}
                 onChangeColor={(c) => onChangeColor(sub.id, c)}
-                onKeyboardCreateBelow={onAddSubtask}
+                onKeyboardCreateBelow={() => onCreateAfter?.(sub)}
                 placeholder="Подзадача"
               />
             ))}
@@ -923,6 +925,7 @@ export function GoalPlanView({
   itemsByKind,
   notes,
   addItem,
+  addItemAfter,
   updateItem,
   toggleComplete,
   deleteItem,
@@ -1119,6 +1122,23 @@ export function GoalPlanView({
     [addItem]
   );
 
+  /** Insert a new sibling directly after the given item (Enter-key behavior).
+   * Falls back to appending at end of the same list when the helper isn't
+   * available or the after-item can't be found. */
+  const insertItemAfter = useCallback(
+    (afterItem) => {
+      if (!afterItem) return;
+      const kind = afterItem.kind;
+      const parent_id = afterItem.parent_id || null;
+      const entry_date = kind === 'day' ? afterItem.entry_date || null : null;
+      if (typeof addItemAfter === 'function') {
+        return addItemAfter({ afterId: afterItem.id, kind, parent_id, entry_date, text: '' });
+      }
+      return addItem({ kind, parent_id, entry_date, text: '' });
+    },
+    [addItem, addItemAfter]
+  );
+
   const handleChangeColor = useCallback(
     (id, color) => updateItem(id, { text_color: color }),
     [updateItem]
@@ -1183,6 +1203,7 @@ export function GoalPlanView({
                     collapsed={!!collapsed[def.kind]}
                     onToggleCollapsed={() => toggleCollapsed(def.kind)}
                     onAdd={(parentId) => handleAddSection(def.kind, parentId)}
+                    onCreateAfter={insertItemAfter}
                     onCommit={(id, text) => updateItem(id, { text })}
                     onDelete={(id) => deleteItem(id)}
                     onToggle={def.showCheckbox ? (id) => toggleComplete(id) : null}
@@ -1208,6 +1229,7 @@ export function GoalPlanView({
                   onSetNote={(d, patch) => setDayNote(d, patch)}
                   onAddDayTask={() => handleAddDayTask(ds)}
                   onAddSubtask={handleAddDaySubtask}
+                  onCreateAfter={insertItemAfter}
                   onCommit={(id, text) => updateItem(id, { text })}
                   onDelete={(id) => deleteItem(id)}
                   onToggle={(id) => toggleComplete(id)}
