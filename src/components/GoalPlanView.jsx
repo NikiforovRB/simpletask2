@@ -12,11 +12,28 @@ import { CSS } from '@dnd-kit/utilities';
 import { formatDayLabel, toLocalDateString, TASK_COLORS } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DropSlot, parseSlotId } from './DropSlot';
+import { CalendarPopover } from './CalendarPopover';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import dragIcon from '../assets/drag.svg';
 import dragNavIcon from '../assets/drag-nav.svg';
+import trashIcon from '../assets/delete.svg';
+import trashHoverIcon from '../assets/delete-nav.svg';
+import calIcon from '../assets/cal.svg';
+import calNavIcon from '../assets/cal-nav.svg';
 import './GoalPlanView.css';
+
+const MONTH_RU_SHORT = [
+  'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
+  'июл', 'авг', 'сен', 'окт', 'ноя', 'дек',
+];
+
+function shortDateLabel(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T12:00:00');
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getDate()} ${MONTH_RU_SHORT[d.getMonth()]}`;
+}
 
 const SECTION_DEFS = [
   { kind: 'goal', title: 'Мои цели', placeholder: 'Новая цель', showCheckbox: false, showSubtasks: false },
@@ -50,11 +67,89 @@ function ChevronIcon({ collapsed, size = 14 }) {
   );
 }
 
-function CrossIcon() {
+function DeleteButton({ onClick }) {
+  const [hover, setHover] = useState(false);
   return (
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
+    <button
+      type="button"
+      className="goal-plan__row-delete"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      aria-label="Удалить"
+      title="Удалить"
+    >
+      <img src={hover ? trashHoverIcon : trashIcon} alt="" />
+    </button>
+  );
+}
+
+function DateButton({ value, onChange, clearable = true, showLabel = true }) {
+  const [hover, setHover] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const hasDate = !!value;
+  // Active color when hovered, open, or when a visible date label indicates
+  // an assigned date. Day items pass showLabel=false because their day column
+  // already conveys the date, so the icon stays neutral by default.
+  const showActive = hover || open || (hasDate && showLabel);
+  return (
+    <div
+      className="goal-plan__date-wrap"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        className={classNames(
+          'goal-plan__date-btn',
+          hasDate && showLabel && 'goal-plan__date-btn--set'
+        )}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Назначить дату"
+        title={hasDate ? `Дата: ${shortDateLabel(value)}` : 'Назначить дату'}
+      >
+        <img src={showActive ? calNavIcon : calIcon} alt="" />
+        {hasDate && showLabel && (
+          <span className="goal-plan__date-label">{shortDateLabel(value)}</span>
+        )}
+      </button>
+      {open && (
+        <>
+          <div
+            className="goal-plan__calendar-backdrop"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={() => setOpen(false)}
+          />
+          <div
+            className="goal-plan__calendar-popover"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <CalendarPopover
+              value={value || null}
+              onChange={(dateStr) => {
+                onChange(dateStr);
+                setOpen(false);
+              }}
+              onClose={() => setOpen(false)}
+            />
+            {clearable && hasDate && (
+              <button
+                type="button"
+                className="goal-plan__date-clear"
+                onClick={() => {
+                  onChange(null);
+                  setOpen(false);
+                }}
+              >
+                Убрать дату
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -188,15 +283,30 @@ function GoalEditableText({
   className = '',
   autoFocus = false,
   onKeyboardCreateBelow,
+  onKeyboardCreateSubtask,
   style,
 }) {
   const [local, setLocal] = useState(value || '');
   const [editing, setEditing] = useState(autoFocus);
   const inputRef = useRef(null);
+  // Suppresses the empty-row deletion that would otherwise happen on the
+  // synthetic blur fired when we programmatically exit edit mode after Tab.
+  const suppressBlurEmptyRef = useRef(false);
 
   useEffect(() => {
     if (!editing) setLocal(value || '');
   }, [value, editing]);
+
+  const resize = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  useLayoutEffect(() => {
+    if (editing) resize();
+  }, [editing, local]);
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -214,7 +324,7 @@ function GoalEditableText({
   const commit = () => {
     const trimmed = (local || '').replace(/\s+$/g, '');
     if (trimmed === '' && (value || '') === '') {
-      onBlurEmpty?.();
+      if (!suppressBlurEmptyRef.current) onBlurEmpty?.();
       setEditing(false);
       return;
     }
@@ -240,20 +350,37 @@ function GoalEditableText({
   }
 
   return (
-    <input
+    <textarea
       ref={inputRef}
-      type="text"
+      rows={1}
       className={classNames('goal-plan__input', className)}
       value={local}
       placeholder={placeholder}
-      onChange={(e) => setLocal(e.target.value)}
+      onChange={(e) => {
+        setLocal(e.target.value);
+      }}
       onBlur={commit}
       style={style}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           commit();
           onKeyboardCreateBelow?.();
+        } else if (e.key === 'Tab' && !e.shiftKey && onKeyboardCreateSubtask) {
+          e.preventDefault();
+          // Persist current text (without triggering the empty-row deletion),
+          // exit edit mode, then ask the parent to add a subtask. The new
+          // subtask will autoFocus because it has no text.
+          const trimmed = (local || '').replace(/\s+$/g, '');
+          if (trimmed && trimmed !== (value || '')) onCommit(trimmed);
+          suppressBlurEmptyRef.current = true;
+          setEditing(false);
+          onKeyboardCreateSubtask();
+          // Re-arm the flag on the next tick — after React has flushed the
+          // unmount blur, but before any future edit cycle.
+          setTimeout(() => {
+            suppressBlurEmptyRef.current = false;
+          }, 0);
         } else if (e.key === 'Escape') {
           e.preventDefault();
           setLocal(value || '');
@@ -265,7 +392,7 @@ function GoalEditableText({
   );
 }
 
-function CompletionToggle({ completed, onToggle }) {
+function CompletionToggle({ completed, onToggle, hasSubtasks }) {
   return (
     <button
       type="button"
@@ -273,7 +400,14 @@ function CompletionToggle({ completed, onToggle }) {
       onClick={onToggle}
       aria-label={completed ? 'Отменить выполнение' : 'Отметить выполнение'}
     >
-      {completed && <CheckIcon />}
+      {completed ? (
+        <CheckIcon />
+      ) : hasSubtasks ? (
+        <span className="goal-plan__check-subtask-hint" aria-hidden>
+          <span />
+          <span />
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -291,10 +425,15 @@ function SortableItemRow({
   onDelete,
   onToggle,
   onKeyboardCreateBelow,
+  onKeyboardCreateSubtask,
   onChangeColor,
+  onChangeDate,
   placeholder,
   allowColor,
   allowSubtasks,
+  allowDate,
+  dateClearable = true,
+  dateShowLabel = true,
 }) {
   const sortable = useSortable({
     id: item.id,
@@ -328,7 +467,13 @@ function SortableItemRow({
         sortable.isDragging && 'goal-plan__row--dragging'
       )}
     >
-      {showCheckbox && <CompletionToggle completed={completed} onToggle={onToggle} />}
+      {showCheckbox && (
+        <CompletionToggle
+          completed={completed}
+          onToggle={onToggle}
+          hasSubtasks={!!(allowSubtasks && hasSubtasks)}
+        />
+      )}
       <div className="goal-plan__row-text">
         <GoalEditableText
           value={item.text}
@@ -338,65 +483,71 @@ function SortableItemRow({
             if (!item.text) onDelete();
           }}
           onKeyboardCreateBelow={onKeyboardCreateBelow}
+          onKeyboardCreateSubtask={onKeyboardCreateSubtask}
           autoFocus={!item.text}
           style={textStyle}
         />
       </div>
-      {allowSubtasks && hasSubtasks && (
-        <button
-          type="button"
-          className="goal-plan__subtask-toggle"
-          onClick={onToggleSubtasksCollapsed}
-          aria-label={subtasksCollapsed ? 'Раскрыть подзадачи' : 'Свернуть подзадачи'}
-          title={subtasksCollapsed ? 'Раскрыть подзадачи' : 'Свернуть подзадачи'}
-        >
-          <ChevronIcon collapsed={subtasksCollapsed} size={12} />
-        </button>
-      )}
-      {allowColor && (
-        <div className="goal-plan__color-wrap">
+      <div className="goal-plan__row-actions">
+        {allowSubtasks && hasSubtasks && (
           <button
             type="button"
-            className="goal-plan__color-btn"
-            onMouseDown={(e) => e.stopPropagation()}
+            className="goal-plan__subtask-toggle"
             onClick={(e) => {
-              e.stopPropagation();
-              setColorOpen((v) => !v);
+              onToggleSubtasksCollapsed();
+              e.currentTarget.blur();
             }}
-            aria-label="Изменить цвет"
-            title="Изменить цвет"
-            style={{ background: item.text_color || '#ffffff' }}
-          />
-          {colorOpen && (
-            <ColorPicker
-              value={item.text_color}
-              onChange={(c) => onChangeColor(c)}
-              onClose={() => setColorOpen(false)}
+            aria-label={subtasksCollapsed ? 'Раскрыть подзадачи' : 'Свернуть подзадачи'}
+            title={subtasksCollapsed ? 'Раскрыть подзадачи' : 'Свернуть подзадачи'}
+          >
+            <ChevronIcon collapsed={subtasksCollapsed} size={12} />
+          </button>
+        )}
+        {allowColor && (
+          <div className="goal-plan__color-wrap">
+            <button
+              type="button"
+              className="goal-plan__color-btn"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                setColorOpen((v) => !v);
+              }}
+              aria-label="Изменить цвет"
+              title="Изменить цвет"
+              style={{ background: item.text_color || '#ffffff' }}
             />
-          )}
-        </div>
-      )}
-      {allowSubtasks && onAddSubtask && (
-        <button
-          type="button"
-          className="goal-plan__row-icon-btn"
-          onClick={onAddSubtask}
-          aria-label="Добавить подзадачу"
-          title="Добавить подзадачу"
-        >
-          <PlusIconBtnInner />
-        </button>
-      )}
-      <button
-        type="button"
-        className="goal-plan__row-delete"
-        onClick={onDelete}
-        aria-label="Удалить"
-        title="Удалить"
-      >
-        <CrossIcon />
-      </button>
-      {draggable && <DragHandle attributes={sortable.attributes} listeners={sortable.listeners} />}
+            {colorOpen && (
+              <ColorPicker
+                value={item.text_color}
+                onChange={(c) => onChangeColor(c)}
+                onClose={() => setColorOpen(false)}
+              />
+            )}
+          </div>
+        )}
+        {allowSubtasks && onAddSubtask && (
+          <button
+            type="button"
+            className="goal-plan__row-icon-btn"
+            onClick={onAddSubtask}
+            aria-label="Добавить подзадачу"
+            title="Добавить подзадачу"
+          >
+            <PlusIconBtnInner />
+          </button>
+        )}
+        {allowDate && onChangeDate && (
+          <DateButton
+            value={item.entry_date || null}
+            onChange={(d) => onChangeDate(d)}
+            clearable={dateClearable}
+            showLabel={dateShowLabel}
+          />
+        )}
+        <DeleteButton onClick={onDelete} />
+        {draggable && <DragHandle attributes={sortable.attributes} listeners={sortable.listeners} />}
+      </div>
     </div>
   );
 }
@@ -519,6 +670,14 @@ function SectionItem({
         onToggle={() => onToggle(item.id)}
         onChangeColor={(c) => onChangeColor(item.id, c)}
         onKeyboardCreateBelow={onAddSibling}
+        onKeyboardCreateSubtask={
+          showSubtasks
+            ? () => {
+                setSubCollapsed(false);
+                onAddSubtask();
+              }
+            : undefined
+        }
         placeholder={placeholder}
       />
       {showSubtasks && !subCollapsed && subtasks.length > 0 && (
@@ -616,6 +775,7 @@ function DayColumn({
   onDelete,
   onToggle,
   onChangeColor,
+  onChangeDate,
 }) {
   const ds = toLocalDateString(date);
   const containerId = `gpday::${ds}`;
@@ -656,6 +816,7 @@ function DayColumn({
               onDelete={(id) => onDelete(id)}
               onToggle={(id) => onToggle(id)}
               onChangeColor={(id, c) => onChangeColor(id, c)}
+              onChangeDate={(id, d) => onChangeDate(id, d)}
             />
           ))}
           <DropSlot id={containerId} index={dayItems.length} />
@@ -684,6 +845,7 @@ function DayItemTree({
   onDelete,
   onToggle,
   onChangeColor,
+  onChangeDate,
 }) {
   const [subCollapsed, setSubCollapsed] = useState(false);
   const subsContainerId = `gpsub-day::${item.id}`;
@@ -696,6 +858,9 @@ function DayItemTree({
         showCheckbox
         draggable
         allowColor
+        allowDate
+        dateClearable={false}
+        dateShowLabel={false}
         allowSubtasks
         hasSubtasks={subtasks.length > 0}
         subtasksCollapsed={subCollapsed}
@@ -705,7 +870,12 @@ function DayItemTree({
         onDelete={() => onDelete(item.id)}
         onToggle={() => onToggle(item.id)}
         onChangeColor={(c) => onChangeColor(item.id, c)}
+        onChangeDate={(d) => onChangeDate(item.id, d)}
         onKeyboardCreateBelow={onAddSibling}
+        onKeyboardCreateSubtask={() => {
+          setSubCollapsed(false);
+          onAddSubtask();
+        }}
         placeholder="Задача дня"
       />
       {!subCollapsed && subtasks.length > 0 && (
@@ -734,6 +904,20 @@ function DayItemTree({
   );
 }
 
+const SIDEBAR_MIN = 240;
+const SIDEBAR_MAX = 560;
+const SIDEBAR_DEFAULT = 320;
+
+function loadSidebarWidth() {
+  try {
+    const v = parseInt(localStorage.getItem('goal_plan_sidebar_width'), 10);
+    if (Number.isFinite(v) && v >= SIDEBAR_MIN && v <= SIDEBAR_MAX) return v;
+  } catch {
+    /* ignore */
+  }
+  return SIDEBAR_DEFAULT;
+}
+
 export function GoalPlanView({
   days,
   itemsByKind,
@@ -748,7 +932,43 @@ export function GoalPlanView({
 }) {
   const [collapsed, setCollapsed] = useState({});
   const [activeDragId, setActiveDragId] = useState(null);
+  const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('goal_plan_sidebar_width', String(sidebarWidth));
+    } catch {
+      /* ignore */
+    }
+  }, [sidebarWidth]);
+
+  const handleResizePointerDown = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startW = sidebarWidth;
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+      const onMove = (ev) => {
+        const dx = ev.clientX - startX;
+        const next = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, startW + dx));
+        setSidebarWidth(next);
+      };
+      const onUp = () => {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    },
+    [sidebarWidth]
+  );
 
   const toggleCollapsed = (kind) => setCollapsed((s) => ({ ...s, [kind]: !s[kind] }));
 
@@ -904,6 +1124,16 @@ export function GoalPlanView({
     [updateItem]
   );
 
+  /** Day-item date change moves the item to the new day's plan (top position),
+   * re-indexing positions in both source and target days. */
+  const handleChangeDateDay = useCallback(
+    (id, dateStr) => {
+      if (!dateStr) return;
+      moveDayItem(id, dateStr, 0);
+    },
+    [moveDayItem]
+  );
+
   const isWide = useMediaQuery('(min-width: 900px)');
 
   const activeDragItem = useMemo(() => {
@@ -925,7 +1155,20 @@ export function GoalPlanView({
         onDragCancel={() => setActiveDragId(null)}
       >
         <div className="goal-plan__layout">
-          <aside className="goal-plan__sidebar">
+          <aside
+            className="goal-plan__sidebar"
+            style={isWide ? { flex: `0 0 ${sidebarWidth}px` } : undefined}
+          >
+            {isWide && (
+              <div
+                className="goal-plan__resize-handle"
+                onPointerDown={handleResizePointerDown}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Изменить ширину"
+                title="Перетащите, чтобы изменить ширину"
+              />
+            )}
             <div className="goal-plan__sidebar-inner">
               {SECTION_DEFS.map((def) => {
                 const items = def.kind === 'action'
@@ -969,6 +1212,7 @@ export function GoalPlanView({
                   onDelete={(id) => deleteItem(id)}
                   onToggle={(id) => toggleComplete(id)}
                   onChangeColor={handleChangeColor}
+                  onChangeDate={handleChangeDateDay}
                 />
               );
             })}

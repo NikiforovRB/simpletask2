@@ -7,9 +7,17 @@ export function slotId(containerId, index) {
 
 export function parseSlotId(overId) {
   if (typeof overId !== 'string' || !overId.startsWith('slot::')) return null;
-  const parts = overId.split('::');
-  if (parts.length !== 3) return null;
-  return { containerId: parts[1], index: parseInt(parts[2], 10) };
+  // The containerId may itself contain "::" (e.g. "gpday::2026-05-15"), so we
+  // can't split on every "::". The index is always the suffix after the LAST
+  // "::"; everything between the leading "slot::" and that last separator is
+  // the containerId.
+  const lastSep = overId.lastIndexOf('::');
+  if (lastSep < 'slot::'.length) return null;
+  const containerId = overId.slice('slot::'.length, lastSep);
+  if (!containerId) return null;
+  const idx = parseInt(overId.slice(lastSep + 2), 10);
+  if (!Number.isFinite(idx)) return null;
+  return { containerId, index: idx };
 }
 
 export function DropSlot({ id, index, children }) {
