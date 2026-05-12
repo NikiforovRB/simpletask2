@@ -40,9 +40,11 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useProjects } from '../hooks/useProjects';
 import { useHabits } from '../hooks/useHabits';
 import { useBoardItems } from '../hooks/useBoardItems';
+import { useGoalPlan } from '../hooks/useGoalPlan';
 import { DayCard } from '../components/DayCard';
 import { HabitsView } from '../components/HabitsView';
 import { BoardView } from '../components/BoardView';
+import { GoalPlanView } from '../components/GoalPlanView';
 import { NoDateList } from '../components/NoDateList';
 import { SomedayList } from '../components/SomedayList';
 import { ProjectList } from '../components/ProjectList';
@@ -67,6 +69,8 @@ import starIcon from '../assets/star.svg';
 import starNavIcon from '../assets/star-nav.svg';
 import calendarIcon from '../assets/calendar.svg';
 import calendarNavIcon from '../assets/calendar-nav.svg';
+import goalIcon from '../assets/goal.svg';
+import goalNavIcon from '../assets/goal-nav.svg';
 import layersIcon from '../assets/layers.svg';
 import layersNavIcon from '../assets/layers-nav.svg';
 import archiveIcon from '../assets/archive.svg';
@@ -238,6 +242,17 @@ export default function Dashboard() {
     dirtyBoardIds: boardDirtyIds,
     sync: syncBoardItems,
   } = useBoardItems();
+  const {
+    itemsByKind: goalPlanItemsByKind,
+    notes: goalPlanNotes,
+    addItem: addGoalPlanItem,
+    updateItem: updateGoalPlanItem,
+    toggleComplete: toggleGoalPlanItem,
+    deleteItem: deleteGoalPlanItem,
+    reorderItems: reorderGoalPlanItems,
+    moveDayItem: moveGoalPlanDayItem,
+    setDayNote: setGoalPlanDayNote,
+  } = useGoalPlan();
   const [dateOffset, setDateOffset] = useState(() => {
     try {
       const v = localStorage.getItem('dashboard_date_offset');
@@ -260,11 +275,11 @@ export default function Dashboard() {
       if (!raw) return 'plans';
       const parsed = JSON.parse(raw);
       const v = parsed?.viewMode;
-      return ['today', 'plans', 'no_date', 'someday', 'habits', 'board', 'project'].includes(v) ? v : 'plans';
+      return ['today', 'plans', 'goal_plan', 'no_date', 'someday', 'habits', 'board', 'project'].includes(v) ? v : 'plans';
     } catch {
       return 'plans';
     }
-  }); // 'today' | 'plans' | 'no_date' | 'someday' | 'habits' | 'project'
+  }); // 'today' | 'plans' | 'goal_plan' | 'no_date' | 'someday' | 'habits' | 'project'
   const [dateTodayHover, setDateTodayHover] = useState(false);
 
   const [menuOpen, setMenuOpen] = useState(() => {
@@ -303,6 +318,7 @@ export default function Dashboard() {
   const completedVisibleListKey = useMemo(() => {
     if (viewMode === 'today') return 'today';
     if (viewMode === 'plans') return 'plans';
+    if (viewMode === 'goal_plan') return 'goal_plan';
     if (viewMode === 'no_date') return 'no_date';
     if (viewMode === 'someday') return 'someday';
     if (viewMode === 'habits') return 'habits';
@@ -326,6 +342,7 @@ export default function Dashboard() {
   const [menuHover, setMenuHover] = useState(false);
   const [todayHover, setTodayHover] = useState(false);
   const [plansHover, setPlansHover] = useState(false);
+  const [goalPlanHover, setGoalPlanHover] = useState(false);
   const [noDateHover, setNoDateHover] = useState(false);
   const [somedayHover, setSomedayHover] = useState(false);
   const [habitsHover, setHabitsHover] = useState(false);
@@ -452,7 +469,7 @@ export default function Dashboard() {
   }, [viewMode, activeProjectId, activeBoardId, projects, projectsLoading, boardItems, boardItemsLoading]);
 
   const handleMenuSelect = useCallback((target) => {
-    const isBuiltinView = ['today', 'plans', 'no_date', 'someday', 'habits'].includes(target);
+    const isBuiltinView = ['today', 'plans', 'goal_plan', 'no_date', 'someday', 'habits'].includes(target);
     if (isBuiltinView) {
       setViewMode(target);
       setActiveProjectId(null);
@@ -1018,7 +1035,7 @@ export default function Dashboard() {
                 className="dashboard__board-header-slot dashboard__board-header-slot--left"
               />
             )}
-            {(viewMode === 'plans') && (
+            {(viewMode === 'plans' || viewMode === 'goal_plan') && (
               <>
                 <select
                   value={settings.days_count}
@@ -1056,7 +1073,7 @@ export default function Dashboard() {
                 className="dashboard__board-header-slot dashboard__board-header-slot--right"
               />
             )}
-            {viewMode !== 'habits' && viewMode !== 'board' && (
+            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'goal_plan' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
@@ -1099,6 +1116,16 @@ export default function Dashboard() {
               >
                 <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
                 <span>Планы</span>
+              </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'goal_plan' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setGoalPlanHover(true)}
+                onMouseLeave={() => hasHover && setGoalPlanHover(false)}
+                onClick={() => handleMenuSelect('goal_plan')}
+              >
+                <img src={viewMode === 'goal_plan' || (hasHover && goalPlanHover) ? goalNavIcon : goalIcon} alt="" />
+                <span>Планы с целями</span>
               </button>
               <button
                 type="button"
@@ -1223,6 +1250,16 @@ export default function Dashboard() {
               >
                 <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
                 <span>Планы</span>
+              </button>
+              <button
+                type="button"
+                className={`dashboard-menu__item ${viewMode === 'goal_plan' ? 'dashboard-menu__item--active' : ''}`}
+                onMouseEnter={() => hasHover && setGoalPlanHover(true)}
+                onMouseLeave={() => hasHover && setGoalPlanHover(false)}
+                onClick={() => handleMenuSelect('goal_plan')}
+              >
+                <img src={viewMode === 'goal_plan' || (hasHover && goalPlanHover) ? goalNavIcon : goalIcon} alt="" />
+                <span>Планы с целями</span>
               </button>
               <button
                 type="button"
@@ -1635,6 +1672,21 @@ export default function Dashboard() {
             />
           ))}
         </div>
+      )}
+
+      {viewMode === 'goal_plan' && (
+        <GoalPlanView
+          days={days}
+          itemsByKind={goalPlanItemsByKind}
+          notes={goalPlanNotes}
+          addItem={addGoalPlanItem}
+          updateItem={updateGoalPlanItem}
+          toggleComplete={toggleGoalPlanItem}
+          deleteItem={deleteGoalPlanItem}
+          reorderItems={reorderGoalPlanItems}
+          moveDayItem={moveGoalPlanDayItem}
+          setDayNote={setGoalPlanDayNote}
+        />
       )}
 
       {viewMode === 'no_date' && (
