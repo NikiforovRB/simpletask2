@@ -618,6 +618,7 @@ function Section({
   onDelete,
   onToggle,
   onChangeColor,
+  onUpdate,
   showCheckbox,
   showSubtasks,
 }) {
@@ -670,6 +671,7 @@ function Section({
                 onToggle={(id) => onToggle?.(id)}
                 onChangeColor={(id, c) => onChangeColor(id, c)}
                 onCreateAfter={onCreateAfter}
+                onUpdate={onUpdate}
                 placeholder={def.placeholder}
               />
             ))}
@@ -693,9 +695,15 @@ function SectionItem({
   onToggle,
   onChangeColor,
   onCreateAfter,
+  onUpdate,
   placeholder,
 }) {
-  const [subCollapsed, setSubCollapsed] = useState(false);
+  // Persisted collapsed state — driven by the item field so it survives reloads.
+  const subCollapsed = !!item.subtasks_collapsed;
+  const setSubCollapsed = (next) => {
+    const value = typeof next === 'function' ? next(subCollapsed) : !!next;
+    if (value !== subCollapsed) onUpdate?.(item.id, { subtasks_collapsed: value });
+  };
   const subsContainerId = `gpsub-action::${item.id}`;
   return (
     <div className="goal-plan__tree">
@@ -825,6 +833,7 @@ function DayColumn({
   onToggle,
   onChangeColor,
   onChangeDate,
+  onUpdate,
 }) {
   const ds = toLocalDateString(date);
   const containerId = `gpday::${ds}`;
@@ -867,6 +876,7 @@ function DayColumn({
               onToggle={(id) => onToggle(id)}
               onChangeColor={(id, c) => onChangeColor(id, c)}
               onChangeDate={(id, d) => onChangeDate(id, d)}
+              onUpdate={onUpdate}
             />
           ))}
           <DropSlot id={containerId} index={dayItems.length} />
@@ -897,8 +907,14 @@ function DayItemTree({
   onToggle,
   onChangeColor,
   onChangeDate,
+  onUpdate,
 }) {
-  const [subCollapsed, setSubCollapsed] = useState(false);
+  // Persisted collapsed state — driven by the item field so it survives reloads.
+  const subCollapsed = !!item.subtasks_collapsed;
+  const setSubCollapsed = (next) => {
+    const value = typeof next === 'function' ? next(subCollapsed) : !!next;
+    if (value !== subCollapsed) onUpdate?.(item.id, { subtasks_collapsed: value });
+  };
   const subsContainerId = `gpsub-day::${item.id}`;
   return (
     <div className="goal-plan__tree goal-plan__tree--day">
@@ -1279,6 +1295,7 @@ export function GoalPlanView({
                     onDelete={(id) => deleteItem(id)}
                     onToggle={def.showCheckbox ? (id) => toggleComplete(id) : null}
                     onChangeColor={handleChangeColor}
+                    onUpdate={updateItem}
                     showCheckbox={def.showCheckbox}
                     showSubtasks={def.showSubtasks}
                   />
@@ -1306,6 +1323,7 @@ export function GoalPlanView({
                   onToggle={(id) => toggleComplete(id)}
                   onChangeColor={handleChangeColor}
                   onChangeDate={handleChangeDateDay}
+                  onUpdate={updateItem}
                 />
               );
             })}
