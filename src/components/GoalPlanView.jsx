@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -841,6 +841,7 @@ function DayColumn({
   onChangeDate,
   onUpdate,
   onContextMenu,
+  isDragging,
 }) {
   const ds = toLocalDateString(date);
   const containerId = `gpday::${ds}`;
@@ -885,6 +886,7 @@ function DayColumn({
               onChangeDate={(id, d) => onChangeDate(id, d)}
               onUpdate={onUpdate}
               onContextMenu={onContextMenu}
+              isDragging={isDragging}
             />
           ))}
           <DropSlot id={containerId} index={dayItems.length} />
@@ -917,6 +919,7 @@ function DayItemTree({
   onChangeDate,
   onUpdate,
   onContextMenu,
+  isDragging,
 }) {
   // Persisted collapsed state — driven by the item field so it survives reloads.
   const subCollapsed = !!item.subtasks_collapsed;
@@ -925,6 +928,11 @@ function DayItemTree({
     if (value !== subCollapsed) onUpdate?.(item.id, { subtasks_collapsed: value });
   };
   const subsContainerId = `gpsub-day::${item.id}`;
+  // While a drag is active we render the subtask drop zone even for items
+  // that have no subtasks yet, so the user can drop an item into an empty
+  // subtask list. Outside of drag the empty zone stays hidden to avoid
+  // adding visual gaps below the row.
+  const showSubtasks = !subCollapsed && (subtasks.length > 0 || isDragging);
   return (
     <div className="goal-plan__tree goal-plan__tree--day">
       <DropSlot id={containerId} index={index} />
@@ -955,26 +963,29 @@ function DayItemTree({
         onContextMenu={(e) => onContextMenu?.(e, item)}
         placeholder="Задача дня"
       />
-      {!subCollapsed && subtasks.length > 0 && (
+      {showSubtasks && (
         <div className="goal-plan__subtasks">
           <SortableContext items={subtasks.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-            {subtasks.map((sub) => (
-              <SortableItemRow
-                key={sub.id}
-                item={sub}
-                containerId={subsContainerId}
-                showCheckbox
-                draggable
-                allowColor
-                onCommit={(text) => onCommit(sub.id, text)}
-                onDelete={() => onDelete(sub.id)}
-                onToggle={() => onToggle(sub.id)}
-                onChangeColor={(c) => onChangeColor(sub.id, c)}
-                onKeyboardCreateBelow={() => onCreateAfter?.(sub)}
-                onContextMenu={(e) => onContextMenu?.(e, sub)}
-                placeholder="Подзадача"
-              />
+            {subtasks.map((sub, i) => (
+              <Fragment key={sub.id}>
+                <DropSlot id={subsContainerId} index={i} />
+                <SortableItemRow
+                  item={sub}
+                  containerId={subsContainerId}
+                  showCheckbox
+                  draggable
+                  allowColor
+                  onCommit={(text) => onCommit(sub.id, text)}
+                  onDelete={() => onDelete(sub.id)}
+                  onToggle={() => onToggle(sub.id)}
+                  onChangeColor={(c) => onChangeColor(sub.id, c)}
+                  onKeyboardCreateBelow={() => onCreateAfter?.(sub)}
+                  onContextMenu={(e) => onContextMenu?.(e, sub)}
+                  placeholder="Подзадача"
+                />
+              </Fragment>
             ))}
+            <DropSlot id={subsContainerId} index={subtasks.length} />
           </SortableContext>
         </div>
       )}
@@ -1154,35 +1165,56 @@ export function GoalPlanView({
       if (!activeData) return;
       const { item: activeItem, containerId: activeContainer } = activeData;
 
-      // Drop on a slot
+      // Resolve a container id (gpday:: / gpsub-day::) to `{ date, parentId }`.
+      // Returns null for non-day containers (sidebar lists, action subtasks).
+      const resolveDayContainer = (containerId) => {
+        if (typeof containerId !== 'string') return null;
+        if (containerId.startsWith('gpday::')) {
+          return { date: containerId.slice('gpday::'.length), parentId: null };
+        }
+        if (containerId.startsWith('gpsub-day::')) {
+          const parentId = containerId.slice('gpsub-day::'.length);
+          const parent = (itemsByKind.day || []).find((it) => it.id === parentId);
+          if (!parent) return null;
+          return { date: parent.entry_date, parentId };
+        }
+        return null;
+      };
+
+      // Disallow placing an item that has its own subtasks into another
+      // subtask list — the UI only renders one level of nesting and the
+      // deeper subtasks would become hidden orphans.
+      const willCreateDeepNesting = (target) => {
+        if (!target?.parentId) return false;
+        return (itemsByKind.day || []).some((it) => it.parent_id === activeItem.id);
+      };
+
+      // ---- Drop on a slot (empty drop indicator) ----
       const slot = parseSlotId(over.id);
       if (slot) {
-        // Cross-day move (top-level day items only)
-        if (
-          activeItem.kind === 'day' &&
-          !activeItem.parent_id &&
-          slot.containerId.startsWith('gpday::')
-        ) {
-          const targetDate = slot.containerId.slice('gpday::'.length);
-          // If reordering within the same day, adjust index because the source
-          // is being removed from before the target.
-          let idx = slot.index;
-          if (targetDate === activeItem.entry_date) {
-            const sourceList = (dayItemsByDate.get(targetDate) || []).map((it) => it.id);
-            const srcIdx = sourceList.indexOf(activeItem.id);
-            if (srcIdx !== -1 && srcIdx < idx) idx -= 1;
-          }
-          moveDayItem(activeItem.id, targetDate, idx);
+        if (activeItem.kind !== 'day') return;
+        const target = resolveDayContainer(slot.containerId);
+        if (!target) return;
+        if (willCreateDeepNesting(target)) return;
+        // Same-list reorder: account for the source row being removed from
+        // before the target index when moving down.
+        let idx = slot.index;
+        if (slot.containerId === activeContainer) {
+          const sourceList = getContainerItems(activeContainer).map((it) => it.id);
+          const srcIdx = sourceList.indexOf(activeItem.id);
+          if (srcIdx !== -1 && srcIdx < idx) idx -= 1;
         }
+        moveDayItem(activeItem.id, target.date, idx, target.parentId);
         return;
       }
 
-      // Drop on another item — sort within container or cross-day
+      // ---- Drop on another item ----
       const overData = over.data?.current;
       if (!overData) return;
       const { item: overItem, containerId: overContainer } = overData;
 
-      // Same container reorder
+      // Same container reorder — covers all sidebar lists, action subtasks,
+      // day top-level lists and day subtask lists alike.
       if (overContainer === activeContainer) {
         const list = getContainerItems(activeContainer);
         const ids = list.map((it) => it.id);
@@ -1193,19 +1225,16 @@ export function GoalPlanView({
         return;
       }
 
-      // Cross-day (day top-level only)
-      if (
-        activeItem.kind === 'day' &&
-        !activeItem.parent_id &&
-        overContainer.startsWith('gpday::')
-      ) {
-        const targetDate = overContainer.slice('gpday::'.length);
-        const list = getContainerItems(overContainer);
-        const targetIdx = Math.max(0, list.findIndex((it) => it.id === overItem.id));
-        moveDayItem(activeItem.id, targetDate, targetIdx);
-      }
+      // Cross-container moves — only meaningful between day lists.
+      if (activeItem.kind !== 'day') return;
+      const target = resolveDayContainer(overContainer);
+      if (!target) return;
+      if (willCreateDeepNesting(target)) return;
+      const list = getContainerItems(overContainer);
+      const targetIdx = Math.max(0, list.findIndex((it) => it.id === overItem.id));
+      moveDayItem(activeItem.id, target.date, targetIdx, target.parentId);
     },
-    [dayItemsByDate, getContainerItems, moveDayItem, reorderItems]
+    [itemsByKind, getContainerItems, moveDayItem, reorderItems]
   );
 
   const handleAddSection = useCallback(
@@ -1389,6 +1418,7 @@ export function GoalPlanView({
                   onChangeDate={handleChangeDateDay}
                   onUpdate={updateItem}
                   onContextMenu={handleRowContextMenu}
+                  isDragging={!!activeDragId}
                 />
               );
             })}

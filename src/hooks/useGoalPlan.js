@@ -296,50 +296,73 @@ export function useGoalPlan() {
   );
 
   /**
-   * Move a day item to a different day (and/or position). Top-level items
-   * stay top-level; subtasks are promoted to top-level on the target day
-   * (their `parent_id` is cleared so they show up directly in the day list).
-   * Reassigns positions in both source and target days so the result matches
-   * the optimistic ordering.
+   * Move a day item to another list — possibly across days and/or in/out of a
+   * parent's subtask list. `targetParentId` selects the destination list:
+   *   - `null` → top-level on `targetDate`
+   *   - <uuid> → subtask list of that parent (must be a day item on the same
+   *              `targetDate`; we don't validate that here, callers do).
+   *
+   * Reassigns positions in both source and target lists to maintain a clean
+   * 0..N ordering matching the optimistic state.
    */
   const moveDayItem = useCallback(
-    async (itemId, targetDate, targetIndex) => {
+    async (itemId, targetDate, targetIndex, targetParentId = null) => {
       if (!user?.id) return;
       const all = stateRef.current?.items || [];
       const item = all.find((it) => it.id === itemId);
       if (!item || item.kind !== 'day') return;
-      const sourceDate = item.entry_date;
-      const wasSubtask = !!item.parent_id;
-      // Only treat as in-place reorder when both source and target are the
-      // same top-level day list. Promoting a subtask is never "same day".
-      const sameDay = sourceDate === targetDate && !wasSubtask;
+      if (targetParentId && targetParentId === itemId) return; // self-reference
 
-      const inDay = (date) =>
+      const sourceDate = item.entry_date;
+      const sourceParent = item.parent_id || null;
+      const targetParent = targetParentId || null;
+      const sameList = sourceDate === targetDate && sourceParent === targetParent;
+
+      const inList = (date, parentId) =>
         all
-          .filter((it) => it.kind === 'day' && !it.parent_id && it.entry_date === date)
+          .filter(
+            (it) =>
+              it.kind === 'day' &&
+              (it.parent_id || null) === (parentId || null) &&
+              it.entry_date === date
+          )
           .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
-      const targetList = inDay(targetDate).filter((it) => it.id !== itemId);
+      const targetList = inList(targetDate, targetParent).filter((it) => it.id !== itemId);
       const clampedIdx = Math.max(0, Math.min(targetIndex, targetList.length));
-      targetList.splice(clampedIdx, 0, { ...item, entry_date: targetDate, parent_id: null });
+      targetList.splice(clampedIdx, 0, {
+        ...item,
+        entry_date: targetDate,
+        parent_id: targetParent,
+      });
 
       const updates = [];
       const stateById = new Map();
 
       targetList.forEach((it, idx) => {
         if (it.id === itemId) {
-          // The moved item — always persist the parent_id clear too.
-          stateById.set(it.id, { entry_date: targetDate, position: idx, parent_id: null });
-          updates.push({ id: it.id, entry_date: targetDate, position: idx, parent_id: null });
+          // Moved item — persist new entry_date, parent_id, position.
+          stateById.set(it.id, {
+            entry_date: targetDate,
+            position: idx,
+            parent_id: targetParent,
+          });
+          updates.push({
+            id: it.id,
+            entry_date: targetDate,
+            position: idx,
+            parent_id: targetParent,
+          });
         } else {
+          // Siblings in the target list — only positions change.
           stateById.set(it.id, { entry_date: targetDate, position: idx });
           updates.push({ id: it.id, entry_date: targetDate, position: idx });
         }
       });
 
-      if (!sameDay && !wasSubtask) {
-        // Source-day top-level list re-index (the moved item lived there).
-        const sourceList = inDay(sourceDate).filter((it) => it.id !== itemId);
+      if (!sameList) {
+        // Re-index the source list (the moved item was removed from it).
+        const sourceList = inList(sourceDate, sourceParent).filter((it) => it.id !== itemId);
         sourceList.forEach((it, idx) => {
           stateById.set(it.id, { entry_date: sourceDate, position: idx });
           updates.push({ id: it.id, entry_date: sourceDate, position: idx });
