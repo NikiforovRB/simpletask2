@@ -249,6 +249,12 @@ function ColorPicker({ value, onChange, onClose }) {
 
 function AutoGrowTextarea({ value, onChange, onBlur, placeholder, className = '', style }) {
   const ref = useRef(null);
+  // On touch devices we require two consecutive taps to focus the textarea so
+  // we don't unintentionally pop up the on-screen keyboard from a single tap.
+  // The first pointerdown is consumed for row activation; only the second
+  // within the window allows the textarea to receive focus.
+  const isTouch = useMediaQuery('(hover: none)');
+  const lastTapRef = useRef(0);
   const resize = () => {
     const el = ref.current;
     if (!el) return;
@@ -258,6 +264,18 @@ function AutoGrowTextarea({ value, onChange, onBlur, placeholder, className = ''
   useLayoutEffect(() => {
     resize();
   }, [value]);
+  const handlePointerDown = (e) => {
+    if (!isTouch) return;
+    const el = ref.current;
+    if (el && document.activeElement === el) return;
+    const now = Date.now();
+    if (now - lastTapRef.current < 400) {
+      lastTapRef.current = 0;
+      return;
+    }
+    lastTapRef.current = now;
+    e.preventDefault();
+  };
   return (
     <textarea
       ref={ref}
@@ -266,6 +284,8 @@ function AutoGrowTextarea({ value, onChange, onBlur, placeholder, className = ''
       value={value}
       placeholder={placeholder}
       style={style}
+      onPointerDown={handlePointerDown}
+      onMouseDown={handlePointerDown}
       onChange={(e) => {
         onChange(e.target.value);
         resize();
@@ -292,6 +312,11 @@ function GoalEditableText({
   // Suppresses the empty-row deletion that would otherwise happen on the
   // synthetic blur fired when we programmatically exit edit mode after Tab.
   const suppressBlurEmptyRef = useRef(false);
+  // Touch double-tap detection — desktop uses a single click to enter edit
+  // mode, but on touch devices we require two consecutive taps within a short
+  // window to avoid opening the keyboard on every accidental tap.
+  const isTouch = useMediaQuery('(hover: none)');
+  const lastTapRef = useRef(0);
 
   useEffect(() => {
     if (!editing) setLocal(value || '');
@@ -333,11 +358,26 @@ function GoalEditableText({
   };
 
   if (!editing) {
+    const handleInlineClick = () => {
+      if (!isTouch) {
+        setEditing(true);
+        return;
+      }
+      // Touch: enter edit only on the second tap inside a 400ms window. The
+      // first tap is consumed by the row-activation (revealing the toolbar).
+      const now = Date.now();
+      if (now - lastTapRef.current < 400) {
+        lastTapRef.current = 0;
+        setEditing(true);
+      } else {
+        lastTapRef.current = now;
+      }
+    };
     return (
       <button
         type="button"
         className={classNames('goal-plan__inline', className)}
-        onClick={() => setEditing(true)}
+        onClick={handleInlineClick}
         style={style}
       >
         {value ? (
@@ -461,6 +501,7 @@ function SortableItemRow({
     <div
       ref={sortable.setNodeRef}
       style={style}
+      data-gp-touch-key={`row::${item.id}`}
       className={classNames(
         'goal-plan__row',
         completed && 'goal-plan__row--done',
@@ -583,7 +624,10 @@ function Section({
   const containerId = `gpsec::${def.kind}`;
   return (
     <section className="goal-plan__section">
-      <header className="goal-plan__section-head">
+      <header
+        className="goal-plan__section-head"
+        data-gp-touch-key={`sec::${def.kind}`}
+      >
         <span className="goal-plan__section-title">{def.title}</span>
         <div className="goal-plan__section-head-tools">
           <PlusButton
@@ -707,7 +751,7 @@ function SectionItem({
   );
 }
 
-function DayNoteField({ valueFromProps, colorFromProps, placeholder, onCommitText, onCommitColor, variant }) {
+function DayNoteField({ valueFromProps, colorFromProps, placeholder, onCommitText, onCommitColor, variant, dateStr }) {
   const [val, setVal] = useState(valueFromProps || '');
   const lastSeed = useRef(valueFromProps || '');
   const [colorOpen, setColorOpen] = useState(false);
@@ -725,7 +769,10 @@ function DayNoteField({ valueFromProps, colorFromProps, placeholder, onCommitTex
   }, [colorOpen]);
   const textStyle = colorFromProps ? { color: colorFromProps } : undefined;
   return (
-    <div className={`goal-plan__day-note-row goal-plan__day-note-row--${variant}`}>
+    <div
+      className={`goal-plan__day-note-row goal-plan__day-note-row--${variant}`}
+      data-gp-touch-key={`note::${dateStr || ''}::${variant}`}
+    >
       <AutoGrowTextarea
         className={`goal-plan__day-note--${variant}`}
         value={val}
@@ -797,6 +844,7 @@ function DayColumn({
       </header>
       <DayNoteField
         variant="start"
+        dateStr={ds}
         valueFromProps={note?.start_text || ''}
         colorFromProps={note?.start_color || null}
         placeholder="Текст в начале дня"
@@ -826,6 +874,7 @@ function DayColumn({
       </SortableContext>
       <DayNoteField
         variant="end"
+        dateStr={ds}
         valueFromProps={note?.end_text || ''}
         colorFromProps={note?.end_color || null}
         placeholder="Текст в конце дня"
@@ -937,6 +986,28 @@ export function GoalPlanView({
   const [activeDragId, setActiveDragId] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  // Touch activation: on devices that don't support hover, manage an
+  // `.is-touch-active` class imperatively on the last-tapped container that
+  // exposes hover-only controls (rows, section heads, day-note rows). The
+  // class is what CSS uses to reveal those controls.
+  const isTouch = useMediaQuery('(hover: none)');
+  useEffect(() => {
+    if (!isTouch) return undefined;
+    let lastEl = null;
+    const handleDown = (e) => {
+      const el = e.target.closest('[data-gp-touch-key]');
+      if (el === lastEl) return;
+      if (lastEl) lastEl.classList.remove('is-touch-active');
+      if (el) el.classList.add('is-touch-active');
+      lastEl = el;
+    };
+    document.addEventListener('pointerdown', handleDown, true);
+    return () => {
+      if (lastEl) lastEl.classList.remove('is-touch-active');
+      document.removeEventListener('pointerdown', handleDown, true);
+    };
+  }, [isTouch]);
 
   useEffect(() => {
     try {

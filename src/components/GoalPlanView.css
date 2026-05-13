@@ -3,6 +3,10 @@
   font-family: 'Gilroy', sans-serif;
   font-weight: 500;
   color: #e0e0e0;
+  /* Suppress iOS Safari's 300ms double-tap-zoom so our explicit double-tap
+     gesture (to enter edit mode) registers as two clean clicks instead of
+     being swallowed by the browser's zoom heuristic. */
+  touch-action: manipulation;
 }
 
 .goal-plan,
@@ -129,18 +133,23 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
 }
 
 @media (hover: hover) {
-  .goal-plan__section-head-tools {
-    opacity: 0;
-    transition: opacity 0.12s ease;
-    pointer-events: none;
-  }
   .goal-plan__section-head:hover .goal-plan__section-head-tools {
     opacity: 1;
     pointer-events: auto;
   }
+}
+
+/* Touch devices: reveal the section-head tools when the user taps the header
+   (the global pointerdown handler in GoalPlanView toggles `.is-touch-active`). */
+.goal-plan__section-head.is-touch-active .goal-plan__section-head-tools {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .goal-plan__section-toggle {
@@ -215,11 +224,13 @@
   min-height: 28px;
 }
 
-.goal-plan__row:hover {
+.goal-plan__row:hover,
+.goal-plan__row.is-touch-active {
   background: #1c1c1c;
 }
 
-.goal-plan__day .goal-plan__row:hover {
+.goal-plan__day .goal-plan__row:hover,
+.goal-plan__day .goal-plan__row.is-touch-active {
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -233,8 +244,10 @@
   text-decoration: line-through;
 }
 
-/* Floating actions toolbar — appears above the text on hover (PC),
-   always visible on touch devices. */
+/* Floating actions toolbar — appears above the text on hover (PC) or on tap
+   (mobile). Hidden by default; revealed via hover, .is-touch-active (added by
+   the global pointerdown handler), or :focus-within (so the toolbar stays
+   visible while the row's textarea is being edited). */
 .goal-plan__row-actions {
   position: absolute;
   top: 0;
@@ -247,6 +260,9 @@
   border-radius: 6px;
   z-index: 5;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
 }
 
 .goal-plan__day .goal-plan__row-actions {
@@ -254,15 +270,16 @@
 }
 
 @media (hover: hover) {
-  .goal-plan__row-actions {
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.12s ease;
-  }
   .goal-plan__row:hover .goal-plan__row-actions {
     opacity: 1;
     pointer-events: auto;
   }
+}
+
+.goal-plan__row.is-touch-active .goal-plan__row-actions,
+.goal-plan__row:focus-within .goal-plan__row-actions {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .goal-plan__subtask-toggle {
@@ -683,8 +700,9 @@
 }
 
 .goal-plan__day-note::placeholder {
-  color: #4a4a4a;
+  color: transparent;
   font-style: normal;
+  transition: color 0.12s ease;
 }
 
 .goal-plan__day-note:focus {
@@ -693,14 +711,14 @@
 }
 
 @media (hover: hover) {
-  .goal-plan__day-note::placeholder {
-    color: transparent;
-    transition: color 0.12s ease;
-  }
-  .goal-plan__day-note-row:hover .goal-plan__day-note::placeholder,
-  .goal-plan__day-note:focus::placeholder {
+  .goal-plan__day-note-row:hover .goal-plan__day-note::placeholder {
     color: #4a4a4a;
   }
+}
+
+.goal-plan__day-note-row.is-touch-active .goal-plan__day-note::placeholder,
+.goal-plan__day-note:focus::placeholder {
+  color: #4a4a4a;
 }
 
 .goal-plan__day-note--start,
@@ -712,12 +730,21 @@
   margin-top: 8px;
   flex: 0 0 12px;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.12s;
 }
 
-.goal-plan__day-note-row:hover .goal-plan__color-btn--note,
+@media (hover: hover) {
+  .goal-plan__day-note-row:hover .goal-plan__color-btn--note {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.goal-plan__day-note-row.is-touch-active .goal-plan__color-btn--note,
 .goal-plan__color-wrap--note:focus-within .goal-plan__color-btn--note {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .goal-plan__color-wrap--note .goal-plan__color-picker {
