@@ -282,6 +282,17 @@
   pointer-events: auto;
 }
 
+/* While a textarea is focused anywhere in the section the user is editing
+   text — hide every hover-revealed control (row toolbars, section heads,
+   day-note color picker) so the cursor stays unobstructed. The rule lives
+   here next to the show rules so the relationship is obvious. */
+.goal-plan:has(textarea:focus) .goal-plan__row-actions,
+.goal-plan:has(textarea:focus) .goal-plan__section-head-tools,
+.goal-plan:has(textarea:focus) .goal-plan__color-btn--note {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .goal-plan__subtask-toggle {
   width: 18px;
   height: 18px;
