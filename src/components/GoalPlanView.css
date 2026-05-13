@@ -334,6 +334,15 @@
   margin-top: 3px;
 }
 
+/* On touch devices the textarea/text baseline sits slightly lower than the
+   checkbox visual centre, so nudge the checkbox up ~2px to keep it optically
+   aligned with the row content. Desktop stays at the original offset. */
+@media (hover: none) {
+  .goal-plan__check {
+    margin-top: 1px;
+  }
+}
+
 .goal-plan__check:hover {
   background: #3a3a3a;
 }
