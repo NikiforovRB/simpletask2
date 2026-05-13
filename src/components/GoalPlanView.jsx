@@ -21,6 +21,10 @@ import trashIcon from '../assets/delete.svg';
 import trashHoverIcon from '../assets/delete-nav.svg';
 import calIcon from '../assets/cal.svg';
 import calNavIcon from '../assets/cal-nav.svg';
+import starIcon from '../assets/star.svg';
+import zavtraIcon from '../assets/zavtra.svg';
+import poslezavtraIcon from '../assets/poslezavtra.svg';
+import ctxDeleteIcon from '../assets/delete-nav2.svg';
 import './GoalPlanView.css';
 
 const MONTH_RU_SHORT = [
@@ -468,6 +472,7 @@ function SortableItemRow({
   onKeyboardCreateSubtask,
   onChangeColor,
   onChangeDate,
+  onContextMenu,
   placeholder,
   allowColor,
   allowSubtasks,
@@ -507,6 +512,7 @@ function SortableItemRow({
         completed && 'goal-plan__row--done',
         sortable.isDragging && 'goal-plan__row--dragging'
       )}
+      onContextMenu={onContextMenu}
     >
       {showCheckbox && (
         <CompletionToggle
@@ -834,6 +840,7 @@ function DayColumn({
   onChangeColor,
   onChangeDate,
   onUpdate,
+  onContextMenu,
 }) {
   const ds = toLocalDateString(date);
   const containerId = `gpday::${ds}`;
@@ -877,6 +884,7 @@ function DayColumn({
               onChangeColor={(id, c) => onChangeColor(id, c)}
               onChangeDate={(id, d) => onChangeDate(id, d)}
               onUpdate={onUpdate}
+              onContextMenu={onContextMenu}
             />
           ))}
           <DropSlot id={containerId} index={dayItems.length} />
@@ -908,6 +916,7 @@ function DayItemTree({
   onChangeColor,
   onChangeDate,
   onUpdate,
+  onContextMenu,
 }) {
   // Persisted collapsed state — driven by the item field so it survives reloads.
   const subCollapsed = !!item.subtasks_collapsed;
@@ -943,6 +952,7 @@ function DayItemTree({
           setSubCollapsed(false);
           onAddSubtask();
         }}
+        onContextMenu={(e) => onContextMenu?.(e, item)}
         placeholder="Задача дня"
       />
       {!subCollapsed && subtasks.length > 0 && (
@@ -961,6 +971,7 @@ function DayItemTree({
                 onToggle={() => onToggle(sub.id)}
                 onChangeColor={(c) => onChangeColor(sub.id, c)}
                 onKeyboardCreateBelow={() => onCreateAfter?.(sub)}
+                onContextMenu={(e) => onContextMenu?.(e, sub)}
                 placeholder="Подзадача"
               />
             ))}
@@ -1002,6 +1013,9 @@ export function GoalPlanView({
   const [activeDragId, setActiveDragId] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  // Context menu (right-click on day items / subtasks). `{ x, y, item }`.
+  const [ctxMenu, setCtxMenu] = useState(null);
+  const ctxMenuRef = useRef(null);
 
   // Touch activation: on devices that don't support hover, manage an
   // `.is-touch-active` class imperatively on the last-tapped container that
@@ -1241,6 +1255,56 @@ export function GoalPlanView({
     [moveDayItem]
   );
 
+  // Right-click context menu for day items / subtasks.
+  const handleRowContextMenu = useCallback((e, item) => {
+    if (!item || item.kind !== 'day') return;
+    e.preventDefault();
+    setCtxMenu({ x: e.clientX, y: e.clientY, item });
+  }, []);
+
+  // Reposition the menu so it stays inside the viewport.
+  useEffect(() => {
+    if (!ctxMenu || !ctxMenuRef.current) return;
+    const menu = ctxMenuRef.current;
+    const rect = menu.getBoundingClientRect();
+    let nextX = ctxMenu.x;
+    let nextY = ctxMenu.y;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    if (rect.right > vw - 8) nextX = Math.max(8, vw - rect.width - 8);
+    if (rect.bottom > vh - 8) nextY = Math.max(8, ctxMenu.y - rect.height);
+    if (nextX !== ctxMenu.x || nextY !== ctxMenu.y) {
+      setCtxMenu((prev) => (prev ? { ...prev, x: nextX, y: nextY } : prev));
+    }
+  }, [ctxMenu]);
+
+  const ctxMoveToOffset = useCallback(
+    (offsetDays) => {
+      if (!ctxMenu?.item) return;
+      const d = new Date();
+      d.setDate(d.getDate() + offsetDays);
+      const ds = toLocalDateString(d);
+      moveDayItem(ctxMenu.item.id, ds, Number.MAX_SAFE_INTEGER);
+      setCtxMenu(null);
+    },
+    [ctxMenu, moveDayItem]
+  );
+
+  const ctxSetColor = useCallback(
+    (color) => {
+      if (!ctxMenu?.item) return;
+      updateItem(ctxMenu.item.id, { text_color: color });
+      setCtxMenu(null);
+    },
+    [ctxMenu, updateItem]
+  );
+
+  const ctxDelete = useCallback(() => {
+    if (!ctxMenu?.item) return;
+    deleteItem(ctxMenu.item.id);
+    setCtxMenu(null);
+  }, [ctxMenu, deleteItem]);
+
   const isWide = useMediaQuery('(min-width: 900px)');
 
   const activeDragItem = useMemo(() => {
@@ -1324,6 +1388,7 @@ export function GoalPlanView({
                   onChangeColor={handleChangeColor}
                   onChangeDate={handleChangeDateDay}
                   onUpdate={updateItem}
+                  onContextMenu={handleRowContextMenu}
                 />
               );
             })}
@@ -1337,6 +1402,84 @@ export function GoalPlanView({
           ) : null}
         </DragOverlay>
       </DndContext>
+      {ctxMenu && (
+        <>
+          <div
+            className="goal-plan__ctxmenu-backdrop"
+            aria-hidden
+            onClick={() => setCtxMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setCtxMenu(null);
+            }}
+          />
+          <div
+            ref={ctxMenuRef}
+            className="goal-plan__ctxmenu"
+            style={{ left: ctxMenu.x, top: ctxMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <div className="goal-plan__ctxmenu-colors">
+              {TASK_COLORS.map((c) => {
+                const cur = (ctxMenu.item.text_color || '#ffffff').toLowerCase();
+                const selected = cur === c.toLowerCase();
+                return (
+                  <span
+                    key={c}
+                    className={classNames(
+                      'goal-plan__ctxmenu-color-wrap',
+                      selected && 'goal-plan__ctxmenu-color-wrap--selected'
+                    )}
+                    style={{ '--swatch-color': c }}
+                  >
+                    <button
+                      type="button"
+                      className="goal-plan__ctxmenu-color"
+                      style={{ background: c }}
+                      onClick={() => ctxSetColor(c)}
+                      aria-label={`Цвет ${c}`}
+                    />
+                  </span>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              className="goal-plan__ctxmenu-item"
+              onClick={() => ctxMoveToOffset(0)}
+            >
+              <img src={starIcon} alt="" className="goal-plan__ctxmenu-icon" />
+              <span>Сегодня</span>
+            </button>
+            <button
+              type="button"
+              className="goal-plan__ctxmenu-item"
+              onClick={() => ctxMoveToOffset(1)}
+            >
+              <img src={zavtraIcon} alt="" className="goal-plan__ctxmenu-icon" />
+              <span>Завтра</span>
+            </button>
+            <button
+              type="button"
+              className="goal-plan__ctxmenu-item"
+              onClick={() => ctxMoveToOffset(2)}
+            >
+              <img src={poslezavtraIcon} alt="" className="goal-plan__ctxmenu-icon" />
+              <span>Послезавтра</span>
+            </button>
+            <div className="goal-plan__ctxmenu-separator" aria-hidden />
+            <button
+              type="button"
+              className="goal-plan__ctxmenu-item goal-plan__ctxmenu-item--danger"
+              onClick={ctxDelete}
+            >
+              <img src={ctxDeleteIcon} alt="" className="goal-plan__ctxmenu-icon" />
+              <span>Удалить</span>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

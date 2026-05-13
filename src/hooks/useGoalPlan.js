@@ -296,18 +296,23 @@ export function useGoalPlan() {
   );
 
   /**
-   * Move a top-level day item to a different day (and/or position).
-   * Reassigns positions in both the source and target days so the result
-   * matches the optimistic ordering.
+   * Move a day item to a different day (and/or position). Top-level items
+   * stay top-level; subtasks are promoted to top-level on the target day
+   * (their `parent_id` is cleared so they show up directly in the day list).
+   * Reassigns positions in both source and target days so the result matches
+   * the optimistic ordering.
    */
   const moveDayItem = useCallback(
     async (itemId, targetDate, targetIndex) => {
       if (!user?.id) return;
       const all = stateRef.current?.items || [];
       const item = all.find((it) => it.id === itemId);
-      if (!item || item.kind !== 'day' || item.parent_id) return;
+      if (!item || item.kind !== 'day') return;
       const sourceDate = item.entry_date;
-      const sameDay = sourceDate === targetDate;
+      const wasSubtask = !!item.parent_id;
+      // Only treat as in-place reorder when both source and target are the
+      // same top-level day list. Promoting a subtask is never "same day".
+      const sameDay = sourceDate === targetDate && !wasSubtask;
 
       const inDay = (date) =>
         all
@@ -316,17 +321,24 @@ export function useGoalPlan() {
 
       const targetList = inDay(targetDate).filter((it) => it.id !== itemId);
       const clampedIdx = Math.max(0, Math.min(targetIndex, targetList.length));
-      targetList.splice(clampedIdx, 0, { ...item, entry_date: targetDate });
+      targetList.splice(clampedIdx, 0, { ...item, entry_date: targetDate, parent_id: null });
 
       const updates = [];
       const stateById = new Map();
 
       targetList.forEach((it, idx) => {
-        stateById.set(it.id, { entry_date: targetDate, position: idx });
-        updates.push({ id: it.id, entry_date: targetDate, position: idx });
+        if (it.id === itemId) {
+          // The moved item — always persist the parent_id clear too.
+          stateById.set(it.id, { entry_date: targetDate, position: idx, parent_id: null });
+          updates.push({ id: it.id, entry_date: targetDate, position: idx, parent_id: null });
+        } else {
+          stateById.set(it.id, { entry_date: targetDate, position: idx });
+          updates.push({ id: it.id, entry_date: targetDate, position: idx });
+        }
       });
 
-      if (!sameDay) {
+      if (!sameDay && !wasSubtask) {
+        // Source-day top-level list re-index (the moved item lived there).
         const sourceList = inDay(sourceDate).filter((it) => it.id !== itemId);
         sourceList.forEach((it, idx) => {
           stateById.set(it.id, { entry_date: sourceDate, position: idx });
@@ -340,13 +352,15 @@ export function useGoalPlan() {
       }));
 
       await Promise.all(
-        updates.map((u) =>
-          supabase
+        updates.map((u) => {
+          const payload = { entry_date: u.entry_date, position: u.position };
+          if (u.parent_id !== undefined) payload.parent_id = u.parent_id;
+          return supabase
             .from('goal_plan_items')
-            .update({ entry_date: u.entry_date, position: u.position })
+            .update(payload)
             .eq('id', u.id)
-            .eq('user_id', user.id)
-        )
+            .eq('user_id', user.id);
+        })
       );
     },
     [user?.id]
