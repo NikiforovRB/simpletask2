@@ -1688,6 +1688,8 @@ export default function Dashboard() {
           reorderItems={reorderGoalPlanItems}
           moveDayItem={moveGoalPlanDayItem}
           setDayNote={setGoalPlanDayNote}
+          getListCollapsed={getListCollapsed}
+          setListCollapsed={setListCollapsed}
         />
       )}
 

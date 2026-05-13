@@ -1019,8 +1019,9 @@ export function GoalPlanView({
   reorderItems,
   moveDayItem,
   setDayNote,
+  getListCollapsed,
+  setListCollapsed,
 }) {
-  const [collapsed, setCollapsed] = useState({});
   const [activeDragId, setActiveDragId] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -1085,7 +1086,16 @@ export function GoalPlanView({
     [sidebarWidth]
   );
 
-  const toggleCollapsed = (kind) => setCollapsed((s) => ({ ...s, [kind]: !s[kind] }));
+  // Sidebar section collapsed state is persisted to the `user_list_collapsed`
+  // table via the shared `useListCollapsed` hook (created at the page level
+  // and passed in). We namespace each kind under `goal_plan_section::<kind>`.
+  const sectionCollapseKey = (kind) => `goal_plan_section::${kind}`;
+  const isSectionCollapsed = (kind) =>
+    !!getListCollapsed?.(sectionCollapseKey(kind));
+  const toggleCollapsed = (kind) => {
+    const next = !isSectionCollapsed(kind);
+    setListCollapsed?.(sectionCollapseKey(kind), next);
+  };
 
   /** Action subtasks grouped by parent. */
   const byParent = useMemo(() => {
@@ -1380,7 +1390,7 @@ export function GoalPlanView({
                     def={def}
                     items={items}
                     byParent={byParent}
-                    collapsed={!!collapsed[def.kind]}
+                    collapsed={isSectionCollapsed(def.kind)}
                     onToggleCollapsed={() => toggleCollapsed(def.kind)}
                     onAdd={(parentId) => handleAddSection(def.kind, parentId)}
                     onCreateAfter={insertItemAfter}
