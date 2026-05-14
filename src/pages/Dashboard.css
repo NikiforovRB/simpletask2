@@ -470,6 +470,40 @@
   object-fit: contain;
 }
 
+/* Visibility-settings button for «Планы с целями». Sits 5px to the left of
+   the refresh FAB (matching the board PDF/edit/refresh row spacing). */
+.dashboard__goal-plan-vis-fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: calc(1.5rem + 2.5rem + 5px);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: #1e1e1e;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 200ms ease, transform 200ms ease;
+}
+
+.dashboard__goal-plan-vis-fab:hover {
+  background: #141414;
+}
+
+.dashboard__goal-plan-vis-fab:active {
+  transform: translateY(1px);
+}
+
+.dashboard__goal-plan-vis-fab img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
 /* Board: между PDF, «Редактировать» и «Обновить» — 5px */
 .dashboard--board .dashboard__refresh {
   right: 1.5rem;

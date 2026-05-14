@@ -105,6 +105,7 @@ import doskaNavIcon from '../assets/doska-nav.svg';
 import pdfIcon from '../assets/pdf.svg';
 import pdfNavIcon from '../assets/pdf-nav.svg';
 import { BoardPdfExportModal } from '../components/BoardPdfExportModal';
+import { GoalPlanVisibilityModal } from '../components/GoalPlanVisibilityModal';
 import './Dashboard.css';
 
 function getDays(baseDate, count) {
@@ -355,6 +356,8 @@ export default function Dashboard() {
   const [editProjectFabHover, setEditProjectFabHover] = useState(false);
   const [boardPdfFabHover, setBoardPdfFabHover] = useState(false);
   const [boardPdfModalOpen, setBoardPdfModalOpen] = useState(false);
+  const [goalPlanVisFabHover, setGoalPlanVisFabHover] = useState(false);
+  const [goalPlanVisModalOpen, setGoalPlanVisModalOpen] = useState(false);
   const [boardPdfVariant, setBoardPdfVariant] = useState('dark');
   const [boardPdfExporting, setBoardPdfExporting] = useState(false);
   const boardWorldRef = useRef(null);
@@ -1824,9 +1827,31 @@ export default function Dashboard() {
         </button>
       )}
 
+      {viewMode === 'goal_plan' && (
+        <button
+          type="button"
+          className="dashboard__goal-plan-vis-fab"
+          onMouseEnter={() => hasHover && setGoalPlanVisFabHover(true)}
+          onMouseLeave={() => hasHover && setGoalPlanVisFabHover(false)}
+          onClick={() => setGoalPlanVisModalOpen(true)}
+          aria-label="Отображение"
+        >
+          <img src={hasHover && goalPlanVisFabHover ? eyeNavIcon : eyeIcon} alt="" />
+        </button>
+      )}
+
       <button type="button" className="dashboard__refresh" onMouseEnter={() => hasHover && setRefreshHover(true)} onMouseLeave={() => hasHover && setRefreshHover(false)} onClick={() => window.location.reload()} aria-label="Обновить">
         <img src={hasHover && refreshHover ? refreshNavIcon : refreshIcon} alt="" />
       </button>
+
+      {goalPlanVisModalOpen && (
+        <GoalPlanVisibilityModal
+          open
+          onClose={() => setGoalPlanVisModalOpen(false)}
+          getListCollapsed={getListCollapsed}
+          setListCollapsed={setListCollapsed}
+        />
+      )}
 
       <DragOverlay
         dropAnimation={{

@@ -1,0 +1,94 @@
+.goal-plan-vis__popup {
+  min-width: 320px;
+  max-width: 380px;
+  padding: 1rem 1.25rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid #2a2a2a;
+}
+
+.goal-plan-vis__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  cursor: pointer;
+  color: #e0e0e0;
+  font-size: 0.9375rem;
+  font-family: inherit;
+}
+
+.goal-plan-vis__row--indent {
+  padding-left: 1rem;
+  color: #c8c8c8;
+}
+
+.goal-plan-vis__group {
+  border-left: 1px solid #2a2a2a;
+  margin: 0.2rem 0 0.3rem 0.4rem;
+  padding-left: 0.6rem;
+  transition: opacity 180ms ease;
+}
+
+.goal-plan-vis__group--muted {
+  opacity: 0.45;
+}
+
+.goal-plan-vis__sep {
+  height: 1px;
+  background: #2a2a2a;
+  margin: 0.55rem 0;
+}
+
+.goal-plan-vis__label {
+  flex: 1;
+  line-height: 1.3;
+}
+
+.goal-plan-vis__switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex: 0 0 auto;
+  display: inline-block;
+}
+
+.goal-plan-vis__switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.goal-plan-vis__switch-track {
+  position: absolute;
+  inset: 0;
+  background: #2f2f2f;
+  border-radius: 999px;
+  transition: background 160ms ease;
+  pointer-events: none;
+}
+
+.goal-plan-vis__switch--on .goal-plan-vis__switch-track {
+  background: #5a86ee;
+}
+
+.goal-plan-vis__switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #f0f0f0;
+  border-radius: 50%;
+  transition: transform 160ms ease, background 160ms ease;
+  pointer-events: none;
+}
+
+.goal-plan-vis__switch--on .goal-plan-vis__switch-thumb {
+  transform: translateX(16px);
+  background: #ffffff;
+}

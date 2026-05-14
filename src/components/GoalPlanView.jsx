@@ -1,5 +1,11 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
+  GP_VIS_SIDEBAR,
+  GP_VIS_DAY_NOTE_START,
+  GP_VIS_DAY_NOTE_END,
+  gpVisSectionKey,
+} from './GoalPlanVisibilityModal';
+import {
   DndContext,
   DragOverlay,
   PointerSensor,
@@ -842,6 +848,8 @@ function DayColumn({
   onUpdate,
   onContextMenu,
   isDragging,
+  showStartNote,
+  showEndNote,
 }) {
   const ds = toLocalDateString(date);
   const containerId = `gpday::${ds}`;
@@ -859,15 +867,17 @@ function DayColumn({
           <div className="goal-plan__day-progress-bar" style={{ width: `${progress}%` }} />
         </div>
       </header>
-      <DayNoteField
-        variant="start"
-        dateStr={ds}
-        valueFromProps={note?.start_text || ''}
-        colorFromProps={note?.start_color || null}
-        placeholder="Текст в начале дня"
-        onCommitText={(v) => onSetNote(ds, { start_text: v })}
-        onCommitColor={(c) => onSetNote(ds, { start_color: c })}
-      />
+      {showStartNote && (
+        <DayNoteField
+          variant="start"
+          dateStr={ds}
+          valueFromProps={note?.start_text || ''}
+          colorFromProps={note?.start_color || null}
+          placeholder="Текст в начале дня"
+          onCommitText={(v) => onSetNote(ds, { start_text: v })}
+          onCommitColor={(c) => onSetNote(ds, { start_color: c })}
+        />
+      )}
       <SortableContext items={dayItems.map((it) => it.id)} strategy={verticalListSortingStrategy}>
         <div className="goal-plan__day-tasks">
           {dayItems.map((it, i) => (
@@ -892,15 +902,17 @@ function DayColumn({
           <DropSlot id={containerId} index={dayItems.length} />
         </div>
       </SortableContext>
-      <DayNoteField
-        variant="end"
-        dateStr={ds}
-        valueFromProps={note?.end_text || ''}
-        colorFromProps={note?.end_color || null}
-        placeholder="Текст в конце дня"
-        onCommitText={(v) => onSetNote(ds, { end_text: v })}
-        onCommitColor={(c) => onSetNote(ds, { end_color: c })}
-      />
+      {showEndNote && (
+        <DayNoteField
+          variant="end"
+          dateStr={ds}
+          valueFromProps={note?.end_text || ''}
+          colorFromProps={note?.end_color || null}
+          placeholder="Текст в конце дня"
+          onCommitText={(v) => onSetNote(ds, { end_text: v })}
+          onCommitColor={(c) => onSetNote(ds, { end_color: c })}
+        />
+      )}
     </section>
   );
 }
@@ -1096,6 +1108,14 @@ export function GoalPlanView({
     const next = !isSectionCollapsed(kind);
     setListCollapsed?.(sectionCollapseKey(kind), next);
   };
+
+  // Per-element visibility (controlled by the visibility modal). The hook
+  // stores `true` for hidden elements; absent / `false` keeps the default
+  // visible state, so toggles in the modal feel natural to the user.
+  const isSidebarVisible = !getListCollapsed?.(GP_VIS_SIDEBAR);
+  const isSectionVisible = (kind) => !getListCollapsed?.(gpVisSectionKey(kind));
+  const showStartNote = !getListCollapsed?.(GP_VIS_DAY_NOTE_START);
+  const showEndNote = !getListCollapsed?.(GP_VIS_DAY_NOTE_END);
 
   /** Action subtasks grouped by parent. */
   const byParent = useMemo(() => {
@@ -1365,47 +1385,49 @@ export function GoalPlanView({
         onDragCancel={() => setActiveDragId(null)}
       >
         <div className="goal-plan__layout">
-          <aside
-            className="goal-plan__sidebar"
-            style={isWide ? { flex: `0 0 ${sidebarWidth}px` } : undefined}
-          >
-            {isWide && (
-              <div
-                className="goal-plan__resize-handle"
-                onPointerDown={handleResizePointerDown}
-                role="separator"
-                aria-orientation="vertical"
-                aria-label="Изменить ширину"
-                title="Перетащите, чтобы изменить ширину"
-              />
-            )}
-            <div className="goal-plan__sidebar-inner">
-              {SECTION_DEFS.map((def) => {
-                const items = def.kind === 'action'
-                  ? (itemsByKind.action || []).filter((it) => !it.parent_id)
-                  : itemsByKind[def.kind] || [];
-                return (
-                  <Section
-                    key={def.kind}
-                    def={def}
-                    items={items}
-                    byParent={byParent}
-                    collapsed={isSectionCollapsed(def.kind)}
-                    onToggleCollapsed={() => toggleCollapsed(def.kind)}
-                    onAdd={(parentId) => handleAddSection(def.kind, parentId)}
-                    onCreateAfter={insertItemAfter}
-                    onCommit={(id, text) => updateItem(id, { text })}
-                    onDelete={(id) => deleteItem(id)}
-                    onToggle={def.showCheckbox ? (id) => toggleComplete(id) : null}
-                    onChangeColor={handleChangeColor}
-                    onUpdate={updateItem}
-                    showCheckbox={def.showCheckbox}
-                    showSubtasks={def.showSubtasks}
-                  />
-                );
-              })}
-            </div>
-          </aside>
+          {isSidebarVisible && (
+            <aside
+              className="goal-plan__sidebar"
+              style={isWide ? { flex: `0 0 ${sidebarWidth}px` } : undefined}
+            >
+              {isWide && (
+                <div
+                  className="goal-plan__resize-handle"
+                  onPointerDown={handleResizePointerDown}
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Изменить ширину"
+                  title="Перетащите, чтобы изменить ширину"
+                />
+              )}
+              <div className="goal-plan__sidebar-inner">
+                {SECTION_DEFS.filter((def) => isSectionVisible(def.kind)).map((def) => {
+                  const items = def.kind === 'action'
+                    ? (itemsByKind.action || []).filter((it) => !it.parent_id)
+                    : itemsByKind[def.kind] || [];
+                  return (
+                    <Section
+                      key={def.kind}
+                      def={def}
+                      items={items}
+                      byParent={byParent}
+                      collapsed={isSectionCollapsed(def.kind)}
+                      onToggleCollapsed={() => toggleCollapsed(def.kind)}
+                      onAdd={(parentId) => handleAddSection(def.kind, parentId)}
+                      onCreateAfter={insertItemAfter}
+                      onCommit={(id, text) => updateItem(id, { text })}
+                      onDelete={(id) => deleteItem(id)}
+                      onToggle={def.showCheckbox ? (id) => toggleComplete(id) : null}
+                      onChangeColor={handleChangeColor}
+                      onUpdate={updateItem}
+                      showCheckbox={def.showCheckbox}
+                      showSubtasks={def.showSubtasks}
+                    />
+                  );
+                })}
+              </div>
+            </aside>
+          )}
           <div className={classNames('goal-plan__days', !isWide && 'goal-plan__days--stack')}>
             {days.map((date) => {
               const ds = toLocalDateString(date);
@@ -1429,6 +1451,8 @@ export function GoalPlanView({
                   onUpdate={updateItem}
                   onContextMenu={handleRowContextMenu}
                   isDragging={!!activeDragId}
+                  showStartNote={showStartNote}
+                  showEndNote={showEndNote}
                 />
               );
             })}
