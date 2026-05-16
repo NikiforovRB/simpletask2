@@ -33,7 +33,7 @@ const ZOOM_MIN = 25;
 const ZOOM_MAX = 200;
 const ZOOM_STEP = 5;
 const PADDING_OPTIONS = [0, 5, 10, 15, 20, 25, 30];
-const TEXT_SCALE_OPTIONS = [0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2];
+const TEXT_SCALE_OPTIONS = [0.6, 0.8, 0.9, 1, 1.2, 1.4, 1.6, 1.8, 2];
 const BOARD_TEXT_FONT_WEIGHT_OPTIONS = [
   { id: 'light', label: 'Light' },
   { id: 'regular', label: 'Regular' },
