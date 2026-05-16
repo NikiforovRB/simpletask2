@@ -516,6 +516,18 @@ body.board-styling-side-open .dashboard.dashboard--board-pdf-only .dashboard__bo
   border-color: var(--swatch-color, #5a86ee);
 }
 
+/* Light theme: the first palette swatch (`#ffffff`) is remapped to a black
+   chip by the global safety net in index.css, so its active/hover ring also
+   needs to flip from white (invisible on the white panel) to black. The
+   `--swatch-color` custom property is the source of truth for the ring color,
+   so we override it on the wrappers that carry the white inline value. This
+   applies uniformly to text-color and line-color swatches because both share
+   the same class. */
+[data-theme="light"] .board-view__styling-swatch-wrap[style*="--swatch-color:#ffffff"],
+[data-theme="light"] .board-view__styling-swatch-wrap[style*="--swatch-color: #ffffff"] {
+  --swatch-color: #000000;
+}
+
 .board-view__styling-swatch {
   width: 1.25rem;
   height: 1.25rem;

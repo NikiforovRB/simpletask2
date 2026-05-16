@@ -289,16 +289,12 @@ input, button, select {
 [data-theme="light"] [style*="color: #fff;"],
 [data-theme="light"] [style*="color:#e0e0e0"],
 [data-theme="light"] [style*="color: #e0e0e0"],
-[data-theme="light"] [style*="color:#d1d1d1"],
-[data-theme="light"] [style*="color: #d1d1d1"],
 [data-theme="light"] [style*="color: rgb(255, 255, 255)"],
 [data-theme="light"] [style*="color:rgb(255, 255, 255)"],
 [data-theme="light"] [style*="color: rgb(255,255,255)"],
 [data-theme="light"] [style*="color:rgb(255,255,255)"],
 [data-theme="light"] [style*="color: rgb(224, 224, 224)"],
-[data-theme="light"] [style*="color:rgb(224, 224, 224)"],
-[data-theme="light"] [style*="color: rgb(209, 209, 209)"],
-[data-theme="light"] [style*="color:rgb(209, 209, 209)"] {
+[data-theme="light"] [style*="color:rgb(224, 224, 224)"] {
   color: #000000 !important;
 }
 
