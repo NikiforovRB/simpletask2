@@ -86,6 +86,99 @@
   box-sizing: border-box;
 }
 
+/* ============================================================
+   THEME TOKENS
+   ------------------------------------------------------------
+   Default values describe the long-standing dark theme. The
+   `[data-theme="light"]` block below overrides them with a
+   light-mode palette. Components reference these tokens via
+   CSS custom properties (var(--token, fallback)) so unrefactored
+   call-sites keep their dark hexes as fallbacks.
+   ============================================================ */
+:root {
+  /* App-wide surfaces */
+  --bg-app: #000000;
+  --bg-surface: #111111;
+  --bg-surface-2: #141414;
+  --bg-surface-3: #181818;
+  --bg-surface-4: #1a1a1a;
+  --bg-elev: #1e1e1e;
+  --bg-elev-2: #1c1c1c;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-hover-strong: rgba(255, 255, 255, 0.1);
+  --bg-active: rgba(90, 134, 238, 0.18);
+
+  /* Text */
+  --text-primary: #e0e0e0;
+  --text-strong: #ffffff;
+  --text-secondary: #aaaaaa;
+  --text-muted: #888888;
+  --text-dim: #666666;
+  --text-faint: #4a4a4a;
+  --text-on-accent: #ffffff;
+
+  /* Borders / separators */
+  --border: #2a2a2a;
+  --border-strong: #2f2f2f;
+  --border-muted: #1f1f1f;
+  --divider: #2a2a2a;
+
+  /* Brand / state */
+  --accent: #5a86ee;
+  --accent-soft: rgba(90, 134, 238, 0.18);
+  --accent-glow: rgba(90, 134, 238, 0.35);
+  --success: #15c466;
+  --danger: #f33737;
+  --danger-soft: rgba(243, 55, 55, 0.12);
+
+  /* Modals / overlays */
+  --overlay: rgba(0, 0, 0, 0.5);
+  --shadow-elev: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="light"] {
+  /* Two-tone surface system: pure white canvas + a single #f5f5f5 chip color
+     for everything else (sidebars, menus, popovers, modals, FABs, hover
+     toolbars). All elevation tokens collapse to #f5f5f5 to enforce the
+     uniform look spec'd by the design. */
+  --bg-app: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-surface-2: #f5f5f5;
+  --bg-surface-3: #f5f5f5;
+  --bg-surface-4: #f5f5f5;
+  --bg-elev: #f5f5f5;
+  --bg-elev-2: #f5f5f5;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-hover-strong: rgba(0, 0, 0, 0.08);
+  --bg-active: rgba(90, 134, 238, 0.12);
+
+  --text-primary: #000000;
+  --text-strong: #000000;
+  --text-secondary: #555555;
+  --text-muted: #777777;
+  --text-dim: #999999;
+  --text-faint: #b5b5b5;
+  --text-on-accent: #ffffff;
+
+  --border: #e1e1e1;
+  --border-strong: #d2d2d2;
+  --border-muted: #ececec;
+  --divider: #e2e2e2;
+
+  --accent: #3b6fe6;
+  --accent-soft: rgba(59, 111, 230, 0.14);
+  --accent-glow: rgba(59, 111, 230, 0.3);
+  --success: #0c9e4f;
+  --danger: #d33030;
+  --danger-soft: rgba(211, 48, 48, 0.1);
+
+  --overlay: rgba(20, 20, 20, 0.32);
+  --shadow-elev: 0 4px 16px rgba(0, 0, 0, 0.14);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.12);
+  color-scheme: light;
+}
+
 html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
@@ -93,8 +186,8 @@ html {
 
 body {
   margin: 0;
-  background: #000000;
-  color: #e0e0e0;
+  background: var(--bg-app);
+  color: var(--text-primary);
   font-family: 'Gilroy', system-ui, sans-serif;
   line-height: 1.4;
 }
@@ -104,8 +197,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000000;
-  color: #666;
+  background: var(--bg-app);
+  color: var(--text-dim);
   font-size: 0.9375rem;
 }
 
@@ -179,3 +272,59 @@ input, button, select {
 *::-webkit-scrollbar {
   display: none;
 }
+
+/* Light-theme safety net for user-picked colors that are too bright for a
+   white background. The default `text_color` for new tasks is `#ffffff`,
+   plus white/near-white are valid palette choices — both become invisible on
+   light surfaces. We catch the most common inline-style forms emitted by
+   React and remap them to pure black.
+
+   Modern browsers serialize hex inline-style values to `rgb()` per CSSOM
+   spec, so we list both the hex and the rgb forms; either may appear in
+   `getAttribute('style')` depending on render path (SSR strings vs. CSSOM
+   assignments). */
+[data-theme="light"] [style*="color:#ffffff"],
+[data-theme="light"] [style*="color: #ffffff"],
+[data-theme="light"] [style*="color:#fff;"],
+[data-theme="light"] [style*="color: #fff;"],
+[data-theme="light"] [style*="color:#e0e0e0"],
+[data-theme="light"] [style*="color: #e0e0e0"],
+[data-theme="light"] [style*="color:#d1d1d1"],
+[data-theme="light"] [style*="color: #d1d1d1"],
+[data-theme="light"] [style*="color: rgb(255, 255, 255)"],
+[data-theme="light"] [style*="color:rgb(255, 255, 255)"],
+[data-theme="light"] [style*="color: rgb(255,255,255)"],
+[data-theme="light"] [style*="color:rgb(255,255,255)"],
+[data-theme="light"] [style*="color: rgb(224, 224, 224)"],
+[data-theme="light"] [style*="color:rgb(224, 224, 224)"],
+[data-theme="light"] [style*="color: rgb(209, 209, 209)"],
+[data-theme="light"] [style*="color:rgb(209, 209, 209)"] {
+  color: #000000 !important;
+}
+
+/* Same idea for swatch / background-color picker chips: pure-white chips on
+   a white background are invisible. Render them as solid black so the
+   "white text" choice clearly maps to the actual rendered text colour in
+   this theme. */
+[data-theme="light"] [style*="background:#ffffff"],
+[data-theme="light"] [style*="background: #ffffff"],
+[data-theme="light"] [style*="background-color:#ffffff"],
+[data-theme="light"] [style*="background-color: #ffffff"],
+[data-theme="light"] [style*="background: rgb(255, 255, 255)"],
+[data-theme="light"] [style*="background:rgb(255, 255, 255)"],
+[data-theme="light"] [style*="background-color: rgb(255, 255, 255)"],
+[data-theme="light"] [style*="background-color:rgb(255, 255, 255)"] {
+  background-color: #000000 !important;
+  box-shadow: none;
+}
+
+/* Recolour our default-gray icon set (drag handles, delete buttons, menu
+   glyphs, plus/minus/chevrons, …) to pure black in light theme so they read
+   crisply on white surfaces. The selector targets every `<img>` whose src
+   ends with `.svg` AND whose filename does not match any of our naming
+   conventions for already-coloured variants (hover/active nav glyphs,
+   habit lightning states, completed checkboxes, brand/accent copies). */
+[data-theme="light"] img[src*=".svg"]:not([src*="nav"]):not([src*="molnia"]):not([src*="check"]):not([src*="kvcomplete"]):not([src*="kvblue"]):not([src*="chp-comp"]):not([src*="pdf-pdf"]):not([src*="favicon"]):not([src*="react"]):not([src*="net.svg"]):not([src*="net-"]) {
+  filter: brightness(0);
+}
+

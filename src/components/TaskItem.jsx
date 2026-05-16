@@ -3,14 +3,6 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
 import { TASK_COLORS, DEFAULT_TASK_COLOR } from '../constants';
-import kvIcon from '../assets/kv.svg';
-import kvNavIcon from '../assets/kv-nav.svg';
-import chpIcon from '../assets/chp.svg';
-import chpNavIcon from '../assets/chp-nav.svg';
-import kvCompleteIcon from '../assets/kvcomplete.svg';
-import kvCompleteNavIcon from '../assets/kvcompletenav.svg';
-import chpCompIcon from '../assets/chp-comp.svg';
-import chpCompNavIcon from '../assets/chp-comp-nav.svg';
 import podIcon from '../assets/pod.svg';
 import podNavIcon from '../assets/pod-nav.svg';
 import deleteIcon from '../assets/delete.svg';
@@ -194,7 +186,6 @@ export function TaskItem({
   const isParent = subtasks.length > 0;
   const subtasksCollapsed = task.subtasks_collapsed ?? false;
   const topStyle = task.top_style ?? 0;
-  const [checkHover, setCheckHover] = useState(false);
   const [podHover, setPodHover] = useState(false);
   const [deleteHover, setDeleteHover] = useState(false);
   const [calendarHover, setCalendarHover] = useState(false);
@@ -215,10 +206,6 @@ export function TaskItem({
   const clearRed = () => {
     onUpdate(task.id, { text_color: '#ffffff' });
   };
-
-  const checkIcon = isCompleted
-    ? (isParent ? (hasHover && checkHover ? chpCompNavIcon : chpCompIcon) : (hasHover && checkHover ? kvCompleteNavIcon : kvCompleteIcon))
-    : (isParent ? (hasHover && checkHover ? chpNavIcon : chpIcon) : (hasHover && checkHover ? kvNavIcon : kvIcon));
 
   const handleContextMenu = (e) => {
     if (onTaskContextMenu) {
@@ -253,13 +240,27 @@ export function TaskItem({
       <div className="task-item__row">
         <button
           type="button"
-          className="task-item__checkbox"
+          className={`task-item__checkbox ${isCompleted ? 'task-item__checkbox--done' : ''}`}
           onClick={handleComplete}
-          onMouseEnter={() => hasHover && setCheckHover(true)}
-          onMouseLeave={() => hasHover && setCheckHover(false)}
           aria-label={isCompleted ? 'Вернуть в список' : 'Выполнено'}
         >
-          <img src={checkIcon} alt="" />
+          {isCompleted ? (
+            <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
+              <path
+                d="M3 8.5l3 3 7-7"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ) : isParent ? (
+            <span className="task-item__checkbox-subtask-hint" aria-hidden>
+              <span />
+              <span />
+            </span>
+          ) : null}
         </button>
         {showLightning && (
           <button

@@ -1,8 +1,8 @@
 .dashboard {
   --sidebar-width: 220px;
   min-height: 100vh;
-  background: #000000;
-  color: #e0e0e0;
+  background: var(--bg-app);
+  color: var(--text-primary);
   padding: 1rem;
   padding-bottom: 3rem;
   padding-left: 18px;
@@ -60,9 +60,9 @@
 }
 
 .dashboard__select {
-  background: #1e1e1e;
+  background: var(--bg-elev);
   border: none;
-  color: #666666;
+  color: var(--text-dim);
   padding: 0 0.5rem;
   font-size: 0.9375rem;
   border-radius: 6px;
@@ -83,7 +83,7 @@
 .dashboard__shift-btn {
   width: 2.25rem;
   height: 2.25rem;
-  background: #1e1e1e;
+  background: var(--bg-elev);
   border: none;
   padding: 0;
   cursor: pointer;
@@ -103,13 +103,13 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #888;
+  background: var(--text-muted);
   display: block;
   transition: background 0.15s ease, transform 0.1s ease;
 }
 
 .dashboard__shift-btn--today .dashboard__shift-today-dot--hover {
-  background: #5a86ee;
+  background: var(--accent);
 }
 
 .dashboard__shift-btn--today:active .dashboard__shift-today-dot {
@@ -186,11 +186,11 @@
 .dashboard__context-menu {
   position: fixed;
   z-index: 201;
-  background: #1e1e1e;
+  background: var(--bg-elev);
   border-radius: 8px;
   padding: 0.25rem 0;
   min-width: 180px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-elev);
 }
 
 .dashboard__context-menu-colors {
@@ -229,7 +229,7 @@
 
 .dashboard__context-menu-separator {
   height: 1px;
-  background: #666666;
+  background: var(--divider);
   margin: 0.2rem 0.75rem;
 }
 
@@ -240,7 +240,7 @@
   width: 100%;
   background: none;
   border: none;
-  color: #e0e0e0;
+  color: var(--text-primary);
   padding: 0.5rem 0.75rem;
   font-size: 0.9375rem;
   cursor: pointer;
@@ -248,7 +248,7 @@
 }
 
 .dashboard__context-menu-item--danger {
-  color: #f46b6b;
+  color: var(--danger);
 }
 
 .dashboard__context-menu-item-icon {
@@ -258,13 +258,13 @@
 }
 
 .dashboard__context-menu-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover-strong);
 }
 
 .dashboard__settings-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay);
   z-index: 100;
   display: flex;
   align-items: center;
@@ -272,7 +272,8 @@
 }
 
 .dashboard__settings-popup {
-  background: #111;
+  background: var(--bg-surface);
+  color: var(--text-primary);
   padding: 1.25rem;
   min-width: 220px;
 }
@@ -286,13 +287,13 @@
 }
 
 .dashboard__settings-title {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.8125rem;
   margin-bottom: 0.75rem;
 }
 
 .dashboard__confirm-text {
-  color: #e0e0e0;
+  color: var(--text-primary);
   font-size: 0.9375rem;
   margin-bottom: 0.75rem;
 }
@@ -303,7 +304,7 @@
   text-align: left;
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   padding: 0.5rem 0;
   font-size: 0.9375rem;
   cursor: pointer;
@@ -311,11 +312,11 @@
 }
 
 .dashboard__settings-option:hover {
-  color: #fff;
+  color: var(--text-strong);
 }
 
 .dashboard__settings-option--active {
-  color: #5a86ee;
+  color: var(--accent);
 }
 
 .dashboard__kind-toggle {
@@ -326,9 +327,9 @@
 
 .dashboard__kind-toggle-option {
   flex: 1 1 0;
-  background: #1e1e1e;
-  color: #888;
-  border: 1px solid #2f2f2f;
+  background: var(--bg-elev);
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
   padding: 0.5rem 0.75rem;
   font-size: 0.9375rem;
   border-radius: 6px;
@@ -339,21 +340,21 @@
 }
 
 .dashboard__kind-toggle-option:hover {
-  color: #e0e0e0;
+  color: var(--text-primary);
 }
 
 .dashboard__kind-toggle-option--active {
-  color: #fff;
-  border-color: #5a86ee;
+  color: var(--text-strong);
+  border-color: var(--accent);
 }
 
 .dashboard__settings-input {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  background: #1e1e1e;
-  border: 1px solid #2f2f2f;
-  color: #e0e0e0;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
   padding: 0.5rem 0.75rem;
   font-size: 0.9375rem;
   margin-bottom: 0.75rem;
@@ -363,14 +364,14 @@
 
 .dashboard__settings-input:focus {
   outline: none;
-  border-color: #5a86ee;
+  border-color: var(--accent);
 }
 
 .dashboard__settings-submit {
   display: block;
   width: 100%;
-  background: #666666;
-  color: #fff;
+  background: var(--text-dim);
+  color: var(--text-on-accent);
   border: none;
   padding: 0.5rem 0.75rem;
   font-size: 0.9375rem;
@@ -380,7 +381,7 @@
 }
 
 .dashboard__settings-submit:hover {
-  background: #5a86ee;
+  background: var(--accent);
 }
 
 .dashboard__settings-edit-actions {
@@ -396,8 +397,8 @@
 .dashboard__settings-delete {
   flex: 1;
   background: transparent;
-  color: #666666;
-  border: 1px solid #2f2f2f;
+  color: var(--text-dim);
+  border: 1px solid var(--border-strong);
   padding: 0.5rem 0.75rem;
   font-size: 0.9375rem;
   border-radius: 6px;
@@ -406,8 +407,8 @@
 }
 
 .dashboard__settings-delete:hover {
-  color: #f33737;
-  border-color: #f33737;
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .dashboard__edit-project-fab {
@@ -417,7 +418,7 @@
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 50%;
-  background: #1e1e1e;
+  background: var(--bg-elev);
   border: none;
   padding: 0;
   cursor: pointer;
@@ -429,7 +430,7 @@
 }
 
 .dashboard__edit-project-fab:hover {
-  background: #141414;
+  background: var(--bg-surface-2);
 }
 
 .dashboard__edit-project-fab:active {
@@ -449,7 +450,7 @@
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 50%;
-  background: #1e1e1e;
+  background: var(--bg-elev);
   border: none;
   padding: 0;
   cursor: pointer;
@@ -461,7 +462,7 @@
 }
 
 .dashboard__board-pdf-fab:hover {
-  background: #141414;
+  background: var(--bg-surface-2);
 }
 
 .dashboard__board-pdf-fab img {
@@ -479,7 +480,7 @@
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 50%;
-  background: #1e1e1e;
+  background: var(--bg-elev);
   border: none;
   padding: 0;
   cursor: pointer;
@@ -491,7 +492,7 @@
 }
 
 .dashboard__goal-plan-vis-fab:hover {
-  background: #141414;
+  background: var(--bg-surface-2);
 }
 
 .dashboard__goal-plan-vis-fab:active {
@@ -538,7 +539,7 @@
   align-items: flex-start;
   gap: 0.5rem;
   cursor: pointer;
-  color: #e0e0e0;
+  color: var(--text-primary);
   font-size: 0.9375rem;
   line-height: 1.35;
 }
@@ -560,7 +561,7 @@
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 50%;
-  background: #1e1e1e;
+  background: var(--bg-elev);
   border: none;
   padding: 0;
   cursor: pointer;
@@ -585,14 +586,15 @@
 .dashboard-menu-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay);
   z-index: 90;
   display: flex;
   align-items: stretch;
 }
 
 .dashboard-menu {
-  background: #141414;
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
   padding: 1rem 0.75rem;
   display: flex;
   flex-direction: column;
@@ -628,7 +630,7 @@
   height: 2.75rem;
   border: none;
   background: none;
-  color: #666666;
+  color: var(--text-dim);
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
@@ -636,7 +638,7 @@
 }
 
 .dashboard-menu__close:hover {
-  color: #5a86ee;
+  color: var(--accent);
 }
 
 .dashboard-menu--side {
@@ -667,7 +669,7 @@
   gap: 0.35rem;
   padding: 0.5rem 0.75rem 0.25rem;
   flex-shrink: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--bg-hover);
 }
 
 .dashboard-menu__add-project--in-bottom {
@@ -686,8 +688,8 @@
 }
 
 .dashboard-menu__bottom-tools .dashboard-menu__add-project:hover {
-  color: #5a86ee;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--accent);
+  background: var(--bg-hover);
 }
 
 .dashboard-menu__width-btn {
@@ -702,13 +704,13 @@
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  color: #666666;
+  color: var(--text-dim);
   transition: color 0.15s ease, background 0.15s ease;
 }
 
 .dashboard-menu__width-btn:hover {
-  color: #5a86ee;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--accent);
+  background: var(--bg-hover);
 }
 
 .dashboard-menu__width-btn img {
@@ -729,14 +731,14 @@
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  color: #666666;
+  color: var(--text-dim);
   transition: color 0.15s ease, background 0.15s ease;
   flex-shrink: 0;
 }
 
 .dashboard-menu__font-btn:hover {
-  color: #5a86ee;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--accent);
+  background: var(--bg-hover);
 }
 
 .dashboard-menu__font-btn img {
@@ -757,20 +759,27 @@
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  color: #666666;
+  color: var(--text-dim);
   transition: color 0.15s ease, background 0.15s ease;
   flex-shrink: 0;
 }
 
 .dashboard-menu__order-btn:hover {
-  color: #5a86ee;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--accent);
+  background: var(--bg-hover);
 }
 
 .dashboard-menu__order-btn img {
   width: 1.1rem;
   height: 1.1rem;
   object-fit: contain;
+}
+
+.dashboard-menu__theme-btn img {
+  /* Sun/moon icons are slightly more visually busy than the line icons used
+     elsewhere — pull them in a hair to match the apparent size. */
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 /* Мобильное меню: иконка шрифта под «Добавить проект» (в т.ч. при ширине &lt; 500px) */
@@ -803,9 +812,9 @@
   min-width: 4.5rem;
   padding: 0.45rem 0.65rem;
   border-radius: 8px;
-  border: 1px solid #333;
-  background: #1e1e1e;
-  color: #e0e0e0;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+  color: var(--text-primary);
   font-size: 0.875rem;
   cursor: pointer;
   font-family: inherit;
@@ -813,14 +822,14 @@
 }
 
 .dashboard__font-chip:hover {
-  border-color: #5a86ee;
-  color: #5a86ee;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .dashboard__font-chip--active {
-  border-color: #5a86ee;
-  background: rgba(90, 134, 238, 0.15);
-  color: #5a86ee;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* «Размер шрифта»: квадратные кнопки (ширина = высота, высота как у ряда «Толщина») */
@@ -851,7 +860,7 @@
 .dashboard__menu-width-value {
   font-size: 1.25rem;
   font-variant-numeric: tabular-nums;
-  color: #e0e0e0;
+  color: var(--text-primary);
   min-width: 5.5rem;
   text-align: center;
 }
@@ -860,9 +869,9 @@
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 12px;
-  border: 1px solid #333;
-  background: #1e1e1e;
-  color: #5a86ee;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+  color: var(--accent);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -872,8 +881,8 @@
 }
 
 .dashboard__menu-width-step:hover {
-  background: rgba(90, 134, 238, 0.12);
-  border-color: #5a86ee;
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .dashboard__menu-width-step:active {
@@ -893,7 +902,7 @@
   padding: 0.45rem 0.65rem;
   background: transparent;
   border-radius: 8px;
-  color: #e0e0e0;
+  color: var(--text-primary);
   font-size: 0.9375rem;
   max-width: 240px;
 }
@@ -968,7 +977,7 @@
   padding-left: calc(0.25rem + 4px);
   background: none;
   border: none;
-  color: #666666;
+  color: var(--text-dim);
   font-size: 0.9375rem;
   cursor: pointer;
   text-align: left;
@@ -978,8 +987,8 @@
 }
 
 .dashboard-menu__item:hover {
-  color: #5A86EE;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--accent);
+  background: var(--bg-hover);
 }
 
 .dashboard-menu__item:active {
@@ -993,8 +1002,8 @@
 }
 
 .dashboard-menu__item--active {
-  color: #5A86EE;
-  background: rgba(90, 134, 238, 0.12);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .dashboard-menu__dirty-dot {
@@ -1002,7 +1011,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #666666;
+  background: var(--text-dim);
   margin-left: auto;
   flex: 0 0 6px;
 }
@@ -1019,7 +1028,7 @@
   height: 2rem;
   background: none;
   border: none;
-  color: #666666;
+  color: var(--text-dim);
   font-size: 1.5rem;
   cursor: pointer;
   padding: 0;
@@ -1028,7 +1037,7 @@
 }
 
 .dashboard-menu__add-project:hover {
-  color: #5a86ee;
+  color: var(--accent);
 }
 
 .dashboard-menu__add-project-text {
@@ -1094,10 +1103,10 @@
   align-items: center;
   gap: 0.55rem;
   padding: 0.55rem 0.75rem;
-  background: #1a1a1a;
-  border: 1px solid #2f2f2f;
+  background: var(--bg-surface-4);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  color: #e0e0e0;
+  color: var(--text-primary);
   font-size: 0.9375rem;
   user-select: none;
   cursor: grab;
@@ -1109,11 +1118,11 @@
 }
 
 .dashboard-menu__order-row--dragging {
-  background: #141414;
+  background: var(--bg-surface-2);
 }
 
 .dashboard-menu__order-row--overlay {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-elev);
   cursor: grabbing;
 }
 
@@ -1139,12 +1148,59 @@
   justify-content: center;
   padding: 0.2rem 0.35rem;
   opacity: 0.6;
+  cursor: grab;
+  touch-action: none;
+}
+
+.dashboard-menu__order-handle:active {
+  cursor: grabbing;
 }
 
 .dashboard-menu__order-handle img {
   width: 0.9rem;
   height: 0.9rem;
   object-fit: contain;
+}
+
+/* Visibility eye toggle inside the menu-order modal rows. */
+.dashboard-menu__order-vis {
+  flex-shrink: 0;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background 150ms ease, opacity 150ms ease;
+}
+
+.dashboard-menu__order-vis:hover {
+  background: var(--bg-hover);
+}
+
+.dashboard-menu__order-vis img {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+}
+
+.dashboard-menu__order-vis--off {
+  opacity: 0.55;
+}
+
+.dashboard-menu__order-row--builtin {
+  cursor: default;
+}
+
+.dashboard-menu__order-divider {
+  height: 1px;
+  background: var(--divider);
+  margin: 0.25rem 0;
 }
 
 @media (max-width: 599px) {
@@ -1164,19 +1220,19 @@
     margin: 0;
     padding: 0.5rem 0.9rem;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--bg-hover);
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    color: #666666;
+    color: var(--text-dim);
     transition: background 260ms ease, transform 260ms ease;
     z-index: 95;
   }
 
   .dashboard-menu--mobile .dashboard-menu__add-project:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #5A86EE;
+    background: var(--bg-hover-strong);
+    color: var(--accent);
     transform: translateX(-50%);
   }
 
@@ -1187,7 +1243,7 @@
   .dashboard-menu--mobile .dashboard-menu__add-project-text {
     display: inline;
     font-size: 0.95rem;
-    color: #666666;
+    color: var(--text-dim);
   }
 
   .dashboard-menu--mobile .dashboard-menu__mobile-font-row {

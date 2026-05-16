@@ -2,7 +2,7 @@
   width: 100%;
   font-family: 'Gilroy', sans-serif;
   font-weight: 500;
-  color: #e0e0e0;
+  color: var(--text-primary);
   /* Suppress iOS Safari's 300ms double-tap-zoom so our explicit double-tap
      gesture (to enter edit mode) registers as two clean clicks instead of
      being swallowed by the browser's zoom heuristic. */
@@ -22,7 +22,7 @@
 }
 
 /*
- * Sidebar: unified #141414 background, floating panel that has a 20px gap
+ * Sidebar: unified bg-surface-2 background, floating panel that has a 20px gap
  * from the viewport's left edge and the viewport's bottom edge.
  * Dashboard already adds 16px padding around its content, so we add an extra
  * 4px margin on left & bottom to land at exactly 20px gap from the viewport.
@@ -30,7 +30,7 @@
  */
 .goal-plan__sidebar {
   flex: 0 0 320px;
-  background: #141414;
+  background: var(--bg-surface-2);
   margin: 0 0 4px 4px;
   padding: 0;
   align-self: stretch;
@@ -64,7 +64,7 @@
 @media (hover: hover) {
   .goal-plan__resize-handle:hover::after,
   .goal-plan__resize-handle:active::after {
-    background: #5a86ee;
+    background: var(--accent);
   }
 }
 
@@ -123,7 +123,7 @@
 
 .goal-plan__section-title {
   font-size: 14px;
-  color: #666666;
+  color: var(--text-dim);
   letter-spacing: 0.01em;
   flex: 1;
   min-width: 0;
@@ -161,13 +161,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #666666;
+  color: var(--text-dim);
   cursor: pointer;
   transition: color 0.15s ease;
 }
 
 .goal-plan__section-toggle:hover {
-  color: #5a86ee;
+  color: var(--accent);
 }
 
 .goal-plan__chevron-svg {
@@ -180,7 +180,7 @@
 
 .goal-plan__section-divider {
   height: 1px;
-  background: #2d2d2d;
+  background: var(--divider);
   margin: 8px 0 0 0;
 }
 
@@ -226,21 +226,21 @@
 
 .goal-plan__row:hover,
 .goal-plan__row.is-touch-active {
-  background: #1c1c1c;
+  background: var(--bg-elev-2);
 }
 
 .goal-plan__day .goal-plan__row:hover,
 .goal-plan__day .goal-plan__row.is-touch-active {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-hover);
 }
 
 .goal-plan__row--dragging {
-  background: #232323;
+  background: var(--bg-hover-strong);
 }
 
 .goal-plan__row--done .goal-plan__inline-text,
 .goal-plan__row--done .goal-plan__input {
-  color: #777 !important;
+  color: var(--text-muted) !important;
   text-decoration: line-through;
 }
 
@@ -256,17 +256,17 @@
   align-items: center;
   gap: 2px;
   padding: 3px 4px;
-  background: #1c1c1c;
+  background: var(--bg-elev-2);
   border-radius: 6px;
   z-index: 5;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-sm);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease;
 }
 
 .goal-plan__day .goal-plan__row-actions {
-  background: #181818;
+  background: var(--bg-surface-3);
 }
 
 @media (hover: hover) {
@@ -302,14 +302,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #999999;
+  color: var(--text-secondary);
   cursor: pointer;
   flex: 0 0 18px;
   transition: color 0.12s ease;
 }
 
 .goal-plan__subtask-toggle:hover {
-  color: #5a86ee;
+  color: var(--accent);
 }
 
 .goal-plan__check-subtask-hint {
@@ -328,19 +328,23 @@
   border-radius: 1px;
 }
 
+[data-theme="light"] .goal-plan__check-subtask-hint span {
+  background: rgba(0, 0, 0, 0.3);
+}
+
 .goal-plan__check {
   flex: 0 0 16px;
   width: 16px;
   height: 16px;
   border-radius: 4px;
   border: none;
-  background: #2a2a2a;
+  background: var(--border);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  color: #141414;
+  color: var(--bg-surface-2);
   transition: background 0.12s;
   margin-top: 3px;
 }
@@ -355,13 +359,13 @@
 }
 
 .goal-plan__check:hover {
-  background: #3a3a3a;
+  background: var(--border-strong);
 }
 
 .goal-plan__check--done,
 .goal-plan__check--done:hover {
-  background: #15c466;
-  color: #141414;
+  background: var(--success);
+  color: var(--bg-surface-2);
 }
 
 .goal-plan__row-text {
@@ -375,7 +379,7 @@
   text-align: left;
   background: transparent;
   border: none;
-  color: #d8d8d8;
+  color: var(--text-primary);
   padding: 2px 2px 2px 0;
   cursor: text;
   font: inherit;
@@ -391,7 +395,7 @@
 }
 
 .goal-plan__inline-placeholder {
-  color: #555;
+  color: var(--text-faint);
 }
 
 .goal-plan__input {
@@ -399,7 +403,7 @@
   box-sizing: border-box;
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: var(--text-strong);
   padding: 2px 2px 2px 0;
   font: inherit;
   font-size: 14px;
@@ -414,14 +418,14 @@
 }
 
 .goal-plan__input::placeholder {
-  color: #555;
+  color: var(--text-faint);
 }
 
 .goal-plan__row-delete,
 .goal-plan__row-icon-btn {
   background: transparent;
   border: none;
-  color: #999999;
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 0 2px;
   line-height: 0;
@@ -479,7 +483,7 @@
 
 .goal-plan__empty {
   font-size: 13px;
-  color: #555;
+  color: var(--text-faint);
   padding: 6px 0;
   cursor: pointer;
 }
@@ -530,10 +534,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  background: #1e1e1e;
+  background: var(--bg-elev);
   padding: 6px;
   border-radius: 8px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-elev);
   width: 132px;
 }
 
@@ -559,11 +563,11 @@
 }
 
 .goal-plan__color-dot:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-hover);
 }
 
 .goal-plan__color-dot--selected {
-  background: rgba(90, 134, 238, 0.18);
+  background: var(--accent-soft);
 }
 
 /* ============ DATE BUTTON ============ */
@@ -584,7 +588,7 @@
   height: 22px;
   border-radius: 4px;
   cursor: pointer;
-  color: #999999;
+  color: var(--text-secondary);
   transition: color 0.12s, background 0.12s;
 }
 
@@ -596,18 +600,18 @@
 }
 
 .goal-plan__date-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-hover);
 }
 
 .goal-plan__date-label {
   font-size: 12px;
-  color: #5a86ee;
+  color: var(--accent);
   line-height: 1;
   white-space: nowrap;
 }
 
 .goal-plan__date-btn--set .goal-plan__date-label {
-  color: #5a86ee;
+  color: var(--accent);
 }
 
 .goal-plan__calendar-backdrop {
@@ -622,9 +626,9 @@
   top: calc(100% + 6px);
   right: 0;
   z-index: 71;
-  background: #1e1e1e;
+  background: var(--bg-elev);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-elev);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -634,18 +638,18 @@
 .goal-plan__date-clear {
   background: transparent;
   border: none;
-  color: #f33737;
+  color: var(--danger);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
   padding: 8px 12px;
-  border-top: 1px solid #2a2a2a;
+  border-top: 1px solid var(--border);
   text-align: center;
   transition: background 0.12s;
 }
 
 .goal-plan__date-clear:hover {
-  background: rgba(243, 55, 55, 0.12);
+  background: var(--danger-soft);
 }
 
 /* ============ DAY COLUMN ============ */
@@ -675,7 +679,7 @@
 .goal-plan__day-title {
   margin: 0;
   font-size: 14px;
-  color: #666666;
+  color: var(--text-dim);
   flex: 1;
   min-width: 0;
 }
@@ -683,14 +687,14 @@
 .goal-plan__day-progress {
   width: 100%;
   height: 4px;
-  background: #1f1f1f;
+  background: var(--border-muted);
   border-radius: 3px;
   overflow: hidden;
 }
 
 .goal-plan__day-progress-bar {
   height: 100%;
-  background: #15c466;
+  background: var(--success);
   transition: width 0.2s ease;
 }
 
@@ -707,7 +711,7 @@
   box-sizing: border-box;
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: var(--text-strong);
   padding: 4px 0;
   font: inherit;
   font-size: 13px;
@@ -726,19 +730,19 @@
 }
 
 .goal-plan__day-note:focus {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-strong);
+  background: var(--bg-hover);
 }
 
 @media (hover: hover) {
   .goal-plan__day-note-row:hover .goal-plan__day-note::placeholder {
-    color: #4a4a4a;
+    color: var(--text-faint);
   }
 }
 
 .goal-plan__day-note-row.is-touch-active .goal-plan__day-note::placeholder,
 .goal-plan__day-note:focus::placeholder {
-  color: #4a4a4a;
+  color: var(--text-faint);
 }
 
 .goal-plan__day-note--start,
@@ -791,11 +795,11 @@
 .goal-plan__ctxmenu {
   position: fixed;
   z-index: 201;
-  background: #1e1e1e;
+  background: var(--bg-elev);
   border-radius: 8px;
   padding: 0.25rem 0;
   min-width: 180px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-elev);
   font-family: 'Gilroy', sans-serif;
   font-weight: 500;
 }
@@ -838,7 +842,7 @@
 
 .goal-plan__ctxmenu-separator {
   height: 1px;
-  background: #666666;
+  background: var(--divider);
   margin: 0.2rem 0.75rem;
 }
 
@@ -849,7 +853,7 @@
   width: 100%;
   background: none;
   border: none;
-  color: #e0e0e0;
+  color: var(--text-primary);
   padding: 0.5rem 0.75rem;
   font-size: 0.9375rem;
   cursor: pointer;
@@ -858,7 +862,7 @@
 }
 
 .goal-plan__ctxmenu-item--danger {
-  color: #f46b6b;
+  color: var(--danger);
 }
 
 .goal-plan__ctxmenu-icon {
@@ -868,20 +872,40 @@
 }
 
 .goal-plan__ctxmenu-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover-strong);
 }
 
 /* ============ DRAG OVERLAY ============ */
 
 .goal-plan__drag-overlay {
-  background: #1e1e1e;
-  color: #ffffff;
+  background: var(--bg-elev);
+  color: var(--text-strong);
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-elev);
   max-width: 320px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The two-tone light theme (white canvas + #f5f5f5 chip surfaces) is now
+   driven entirely by the global CSS tokens in `index.css`, so the goal-plan
+   view no longer needs its own background overrides — `var(--bg-app)`,
+   `var(--bg-surface-2)`, and `var(--bg-elev*)` already resolve to the
+   correct colours in light mode. The only goal-plan-specific safety net we
+   still want here is the inline-style flip that turns user-stored
+   `#ffffff` swatches into solid black, mirroring what the global rule does
+   but kept locally for clarity when future tweaks touch this surface. */
+[data-theme="light"] .goal-plan [style*="background:#ffffff"],
+[data-theme="light"] .goal-plan [style*="background: #ffffff"],
+[data-theme="light"] .goal-plan [style*="background-color:#ffffff"],
+[data-theme="light"] .goal-plan [style*="background-color: #ffffff"],
+[data-theme="light"] .goal-plan [style*="background: rgb(255, 255, 255)"],
+[data-theme="light"] .goal-plan [style*="background:rgb(255, 255, 255)"],
+[data-theme="light"] .goal-plan [style*="background-color: rgb(255, 255, 255)"],
+[data-theme="light"] .goal-plan [style*="background-color:rgb(255, 255, 255)"] {
+  background-color: #000000 !important;
+  box-shadow: none;
 }

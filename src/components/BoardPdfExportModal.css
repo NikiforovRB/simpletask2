@@ -31,13 +31,13 @@
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .board-pdf-modal__segmented {
   display: inline-flex;
-  background: #1c1c1c;
-  border: 1px solid #2a2a2a;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 3px;
   gap: 2px;
@@ -47,7 +47,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: #aaa;
+  color: var(--text-secondary);
   font-family: inherit;
   font-size: 0.875rem;
   font-weight: 500;
@@ -59,14 +59,14 @@
 }
 
 .board-pdf-modal__segmented-btn:hover:not(:disabled):not(.board-pdf-modal__segmented-btn--active) {
-  color: #ddd;
-  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-strong);
+  background: var(--bg-hover);
 }
 
 .board-pdf-modal__segmented-btn--active {
-  background: #5A86EE;
-  color: #ffffff;
-  box-shadow: 0 1px 6px rgba(90, 134, 238, 0.35);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  box-shadow: 0 1px 6px var(--accent-glow);
 }
 
 .board-pdf-modal__segmented-btn:disabled {
@@ -96,14 +96,14 @@
   margin: 0.5rem 0 0;
   font-size: 0.8125rem;
   line-height: 1.45;
-  color: #9a9a9a;
+  color: var(--text-secondary);
 }
 
 .board-pdf-modal__section-label {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #888;
+  color: var(--text-muted);
   margin-bottom: 0.35rem;
 }
 
@@ -111,10 +111,10 @@
   position: relative;
   width: 100%;
   max-height: min(58vh, 600px);
-  background: #0d0d0d;
+  background: var(--bg-surface-2);
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #333;
+  border: 1px solid var(--border-strong);
   touch-action: none;
 }
 
@@ -133,7 +133,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.875rem;
 }
 
@@ -166,7 +166,7 @@
 .board-pdf-modal__crop-window {
   position: absolute;
   box-sizing: border-box;
-  border: 1.5px solid #5A86EE;
+  border: 1.5px solid var(--accent);
   cursor: move;
   touch-action: none;
   z-index: 2;
@@ -181,8 +181,8 @@
   height: 16px;
   padding: 0;
   margin: 0;
-  border: 2px solid #ffffff;
-  background: #5A86EE;
+  border: 2px solid var(--text-strong);
+  background: var(--accent);
   border-radius: 50%;
   cursor: nwse-resize;
   touch-action: none;
@@ -190,15 +190,16 @@
 }
 
 .board-pdf-modal__corner-handle:hover {
-  background: #6f97f3;
+  background: var(--accent);
+  filter: brightness(1.1);
 }
 
 .board-pdf-modal__sheet {
   width: 100%;
   max-height: min(58vh, 600px);
-  background: #1a1a1a;
+  background: var(--bg-surface-4);
   border-radius: 8px;
-  border: 1px solid #333;
+  border: 1px solid var(--border-strong);
   padding: 14px;
   box-sizing: border-box;
   display: flex;

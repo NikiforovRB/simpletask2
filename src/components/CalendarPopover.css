@@ -1,5 +1,6 @@
 .calendar-popover {
-  background: #111;
+  background: var(--bg-surface);
+  color: var(--text-primary);
   padding: 0.75rem;
   min-width: 220px;
 }
@@ -14,19 +15,19 @@
 .calendar-popover__nav-btn {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   padding: 0.25rem;
   cursor: pointer;
   font-size: 0.875rem;
 }
 
 .calendar-popover__nav-btn:hover {
-  color: #fff;
+  color: var(--text-strong);
 }
 
 .calendar-popover__title {
   font-size: 0.8125rem;
-  color: #aaa;
+  color: var(--text-secondary);
 }
 
 .calendar-popover__weekdays {
@@ -38,7 +39,7 @@
 
 .calendar-popover__wd {
   font-size: 0.6875rem;
-  color: #666;
+  color: var(--text-dim);
   text-align: center;
 }
 
@@ -51,7 +52,7 @@
 .calendar-popover__cell {
   background: none;
   border: none;
-  color: #ccc;
+  color: var(--text-secondary);
   font-size: 0.8125rem;
   padding: 0.35rem;
   cursor: pointer;
@@ -60,23 +61,24 @@
 }
 
 .calendar-popover__cell:hover {
-  background: #222;
-  color: #fff;
+  background: var(--bg-hover-strong);
+  color: var(--text-strong);
 }
 
 .calendar-popover__cell--today {
-  background: #5a86ee;
-  color: #fff;
+  background: var(--accent);
+  color: var(--text-on-accent);
 }
 
 .calendar-popover__cell--today:hover {
-  background: #6a96ff;
+  background: var(--accent);
+  filter: brightness(1.1);
 }
 
 .calendar-popover__cell--selected {
-  border: 1px solid #5a86ee;
+  border: 1px solid var(--accent);
 }
 
 .calendar-popover__cell--selected:hover {
-  border-color: #6a96ff;
+  border-color: var(--accent);
 }

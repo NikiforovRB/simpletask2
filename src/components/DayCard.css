@@ -1,5 +1,5 @@
 .day-card {
-  background: #000000;
+  background: var(--bg-app);
   min-width: 0;
 }
 
@@ -15,7 +15,7 @@
   flex: 1;
   font-size: 0.9375rem;
   font-weight: normal;
-  color: #666666;
+  color: var(--text-dim);
   margin: 0;
   padding: 0;
   border: none;
@@ -27,7 +27,7 @@
 }
 
 .day-card__title-btn:hover {
-  color: #ffffff;
+  color: var(--text-strong);
 }
 
 .day-card__title-inner {
@@ -48,7 +48,7 @@
   flex: 1;
   font-size: 0.9375rem;
   font-weight: normal;
-  color: #666666;
+  color: var(--text-dim);
   margin: 0;
   padding: 0;
   text-align: left;
@@ -60,7 +60,7 @@
   margin-top: 15px;
   margin-bottom: 0.75rem;
   width: 100%;
-  border-bottom: 1px solid #2f2f2f;
+  border-bottom: 1px solid var(--divider);
 }
 
 .day-card__header-actions {
@@ -111,17 +111,17 @@
   text-align: left;
   background: none;
   border: none;
-  color: #666666;
+  color: var(--text-dim);
   font-size: 0.9375rem;
   cursor: pointer;
   padding: 0.25rem 0 0.35rem;
   margin-bottom: 0.35rem;
-  border-bottom: 1px solid #2f2f2f;
+  border-bottom: 1px solid var(--divider);
   font-family: inherit;
 }
 
 .day-card__completed-toggle:hover {
-  color: #ffffff;
+  color: var(--text-strong);
 }
 
 .day-card__list {
@@ -140,5 +140,5 @@
 }
 
 .day-card__list--completed .task-item__title {
-  color: #666;
+  color: var(--text-dim);
 }

@@ -21,6 +21,10 @@ function clampBoardZoom(n) {
   return 100;
 }
 
+function normalizeTheme(v) {
+  return v === 'light' ? 'light' : 'dark';
+}
+
 export function useSettings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState({
@@ -34,6 +38,7 @@ export function useSettings() {
     task_font_scale: 1,
     board_zoom: 100,
     board_dots: false,
+    theme: 'dark',
   });
   const [loading, setLoading] = useState(true);
 
@@ -46,7 +51,7 @@ export function useSettings() {
       const { data, error } = await supabase
         .from('user_settings')
         .select(
-          'days_count, new_tasks_position, no_date_list_visible, completed_visible, sidebar_width_px, habits_sidebar_width_px, task_font_weight, task_font_scale, board_zoom, board_dots'
+          'days_count, new_tasks_position, no_date_list_visible, completed_visible, sidebar_width_px, habits_sidebar_width_px, task_font_weight, task_font_scale, board_zoom, board_dots, theme'
         )
         .eq('user_id', user.id)
         .maybeSingle();
@@ -62,6 +67,7 @@ export function useSettings() {
           task_font_scale: normalizeTaskFontScale(data.task_font_scale),
           board_zoom: clampBoardZoom(data.board_zoom),
           board_dots: data.board_dots === true,
+          theme: normalizeTheme(data.theme),
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -76,6 +82,7 @@ export function useSettings() {
           task_font_scale: 1,
           board_zoom: 100,
           board_dots: false,
+          theme: 'dark',
         });
         setSettings({
           days_count: 3,
@@ -88,6 +95,7 @@ export function useSettings() {
           task_font_scale: 1,
           board_zoom: 100,
           board_dots: false,
+          theme: 'dark',
         });
       }
       setLoading(false);
@@ -163,6 +171,13 @@ export function useSettings() {
     setSettings((s) => ({ ...s, board_dots: v }));
   };
 
+  const setTheme = async (theme) => {
+    if (!user) return;
+    const v = normalizeTheme(theme);
+    setSettings((s) => ({ ...s, theme: v }));
+    await supabase.from('user_settings').update({ theme: v }).eq('user_id', user.id);
+  };
+
   return {
     settings,
     setDaysCount,
@@ -175,6 +190,7 @@ export function useSettings() {
     setTaskFontScale,
     setBoardZoom,
     setBoardDots,
+    setTheme,
     loading,
   };
 }

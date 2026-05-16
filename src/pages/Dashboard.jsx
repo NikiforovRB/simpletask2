@@ -100,6 +100,10 @@ import zavtraIcon from '../assets/zavtra.svg';
 import poslezavtraIcon from '../assets/poslezavtra.svg';
 import privIcon from '../assets/priv.svg';
 import privNavIcon from '../assets/priv-nav.svg';
+import sunIcon from '../assets/sun.svg';
+import sunNavIcon from '../assets/sun-nav.svg';
+import moonIcon from '../assets/moon.svg';
+import moonNavIcon from '../assets/moon-nav.svg';
 import doskaIcon from '../assets/doska.svg';
 import doskaNavIcon from '../assets/doska-nav.svg';
 import pdfIcon from '../assets/pdf.svg';
@@ -155,7 +159,49 @@ function getTasksInContainer(tasks, containerId) {
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 }
 
-function SortableMenuOrderRow({ project }) {
+// Configuration for the built-in menu rows inside «Порядок пунктов меню».
+// Order here is fixed; only visibility can be toggled.
+const BUILTIN_MENU_ITEMS = [
+  { key: 'today', label: 'Сегодня' },
+  { key: 'plans', label: 'Планы' },
+  { key: 'goal_plan', label: 'Планы с целями' },
+  { key: 'no_date', label: 'Задачи без даты' },
+  { key: 'someday', label: 'Когда-нибудь' },
+  { key: 'habits', label: 'Привычки' },
+];
+
+const menuHiddenKey = (kind, id) =>
+  kind === 'builtin' ? `menu_hidden::${id}` : `menu_hidden::project::${id}`;
+
+function MenuOrderVisibilityToggle({ hidden, onToggle }) {
+  return (
+    <button
+      type="button"
+      className={`dashboard-menu__order-vis ${hidden ? 'dashboard-menu__order-vis--off' : ''}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle?.();
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+      aria-label={hidden ? 'Показать в меню' : 'Скрыть из меню'}
+      title={hidden ? 'Показать в меню' : 'Скрыть из меню'}
+    >
+      <img src={hidden ? eyeoffIcon : eyeIcon} alt="" />
+    </button>
+  );
+}
+
+function BuiltinMenuOrderRow({ item, hidden, onToggleHidden, icon }) {
+  return (
+    <div className="dashboard-menu__order-row dashboard-menu__order-row--builtin">
+      <img src={icon} alt="" className="dashboard-menu__order-icon" />
+      <span className="dashboard-menu__order-title">{item.label}</span>
+      <MenuOrderVisibilityToggle hidden={hidden} onToggle={onToggleHidden} />
+    </div>
+  );
+}
+
+function SortableMenuOrderRow({ project, hidden, onToggleHidden }) {
   const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: project.id });
   const isBoard = (project.kind || 'project') === 'board';
   const icon = isBoard ? doskaIcon : folderIcon;
@@ -169,12 +215,17 @@ function SortableMenuOrderRow({ project }) {
       ref={setNodeRef}
       style={style}
       className={`dashboard-menu__order-row ${isDragging ? 'dashboard-menu__order-row--dragging' : ''}`}
-      {...attributes}
-      {...listeners}
     >
       <img src={icon} alt="" className="dashboard-menu__order-icon" />
       <span className="dashboard-menu__order-title">{project.title}</span>
-      <span className="dashboard-menu__order-handle" aria-hidden>
+      <MenuOrderVisibilityToggle hidden={hidden} onToggle={onToggleHidden} />
+      <span
+        className="dashboard-menu__order-handle"
+        aria-label="Перетащить"
+        title="Перетащить"
+        {...attributes}
+        {...listeners}
+      >
         <img src={dragIcon} alt="" />
       </span>
     </div>
@@ -224,6 +275,7 @@ export default function Dashboard() {
     setTaskFontScale,
     setBoardZoom,
     setBoardDots,
+    setTheme,
   } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
@@ -383,12 +435,25 @@ export default function Dashboard() {
   const [fontScaleDraft, setFontScaleDraft] = useState(1);
   const [textFontBtnHover, setTextFontBtnHover] = useState(false);
   const [menuOrderBtnHover, setMenuOrderBtnHover] = useState(false);
+  const [themeBtnHover, setThemeBtnHover] = useState(false);
   const [menuOrderModalOpen, setMenuOrderModalOpen] = useState(false);
   const [menuOrderDraft, setMenuOrderDraft] = useState([]);
   const [menuOrderActiveId, setMenuOrderActiveId] = useState(null);
+  // Draft visibility map keyed by `menu_hidden::*` list-key (true = hidden).
+  // Filled when the modal opens and committed on Save.
+  const [menuVisDraft, setMenuVisDraft] = useState({});
   const contextMenuRef = useRef(null);
   const hasHover = useMediaQuery('(hover: hover)');
   const isWideMenu = useMediaQuery('(min-width: 600px)');
+
+  // Theme: reflect the user's saved theme on <html data-theme> so all CSS
+  // light-overrides can fire immediately. We also stash it on <body> so any
+  // legacy selectors that key on `body[data-theme]` keep working.
+  useEffect(() => {
+    const theme = settings.theme === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.setAttribute('data-theme', theme);
+  }, [settings.theme]);
   const sidebarWidthPx = useMemo(() => clampSidebarWidthPx(settings.sidebar_width_px), [settings.sidebar_width_px]);
   const liveMenuWidth = useMemo(
     () => (menuWidthModalOpen ? clampSidebarWidthPx(menuWidthDraft) : sidebarWidthPx),
@@ -969,8 +1034,33 @@ export default function Dashboard() {
 
   const openMenuOrderModal = useCallback(() => {
     setMenuOrderDraft(projects.map((p) => p.id));
+    // Seed the visibility draft from currently persisted state.
+    const draft = {};
+    BUILTIN_MENU_ITEMS.forEach((item) => {
+      const key = menuHiddenKey('builtin', item.key);
+      draft[key] = !!getListCollapsed?.(key);
+    });
+    projects.forEach((p) => {
+      const key = menuHiddenKey('project', p.id);
+      draft[key] = !!getListCollapsed?.(key);
+    });
+    setMenuVisDraft(draft);
     setMenuOrderModalOpen(true);
-  }, [projects]);
+  }, [projects, getListCollapsed]);
+
+  const toggleMenuVisDraft = useCallback((key) => {
+    setMenuVisDraft((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  // Live read of menu visibility (true means the row is hidden).
+  const isBuiltinHidden = useCallback(
+    (key) => !!getListCollapsed?.(menuHiddenKey('builtin', key)),
+    [getListCollapsed]
+  );
+  const isProjectHidden = useCallback(
+    (id) => !!getListCollapsed?.(menuHiddenKey('project', id)),
+    [getListCollapsed]
+  );
 
   const handleMenuOrderDragStart = useCallback((event) => {
     setMenuOrderActiveId(event.active?.id ?? null);
@@ -989,9 +1079,20 @@ export default function Dashboard() {
   }, []);
 
   const saveMenuOrder = useCallback(async () => {
-    await reorderProjects(menuOrderDraft);
+    if (projects.length > 1) {
+      await reorderProjects(menuOrderDraft);
+    }
+    // Persist only the visibility flags that actually changed compared to
+    // the live state, so we don't generate noise on the user_list_collapsed
+    // table for unchanged rows.
+    const writes = [];
+    Object.entries(menuVisDraft).forEach(([key, hidden]) => {
+      const current = !!getListCollapsed?.(key);
+      if (current !== !!hidden) writes.push(setListCollapsed?.(key, !!hidden));
+    });
+    if (writes.length) await Promise.all(writes);
     setMenuOrderModalOpen(false);
-  }, [menuOrderDraft, reorderProjects]);
+  }, [menuOrderDraft, menuVisDraft, projects.length, reorderProjects, getListCollapsed, setListCollapsed]);
 
   const activeMenuOrderProject = menuOrderActiveId
     ? projects.find((p) => p.id === menuOrderActiveId)
@@ -1013,7 +1114,7 @@ export default function Dashboard() {
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
     <div
-      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''} ${viewMode === 'board' ? 'dashboard--board' : ''} ${viewMode === 'board' && !activeBoardId ? 'dashboard--board-pdf-only' : ''}`}
+      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''} ${viewMode === 'board' ? 'dashboard--board' : ''} ${viewMode === 'board' && !activeBoardId ? 'dashboard--board-pdf-only' : ''} ${viewMode === 'goal_plan' ? 'dashboard--goal-plan' : ''}`}
       style={{
         '--sidebar-width': `${liveMenuWidth}px`,
         '--task-font-weight': String(taskFontWeightToCssNumber(normalizeTaskFontWeight(liveTaskFontWeight))),
@@ -1101,68 +1202,80 @@ export default function Dashboard() {
             style={{ width: `${liveMenuWidth}px` }}
           >
             <div className="dashboard-menu__body">
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setTodayHover(true)}
-                onMouseLeave={() => hasHover && setTodayHover(false)}
-                onClick={() => handleMenuSelect('today')}
-              >
-                <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
-                <span>Сегодня</span>
-              </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'plans' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setPlansHover(true)}
-                onMouseLeave={() => hasHover && setPlansHover(false)}
-                onClick={() => handleMenuSelect('plans')}
-              >
-                <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
-                <span>Планы</span>
-              </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'goal_plan' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setGoalPlanHover(true)}
-                onMouseLeave={() => hasHover && setGoalPlanHover(false)}
-                onClick={() => handleMenuSelect('goal_plan')}
-              >
-                <img src={viewMode === 'goal_plan' || (hasHover && goalPlanHover) ? goalNavIcon : goalIcon} alt="" />
-                <span>Планы с целями</span>
-              </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'no_date' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setNoDateHover(true)}
-                onMouseLeave={() => hasHover && setNoDateHover(false)}
-                onClick={() => handleMenuSelect('no_date')}
-              >
-                <img src={viewMode === 'no_date' || (hasHover && noDateHover) ? layersNavIcon : layersIcon} alt="" />
-                <span>Задачи без даты</span>
-              </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'someday' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setSomedayHover(true)}
-                onMouseLeave={() => hasHover && setSomedayHover(false)}
-                onClick={() => handleMenuSelect('someday')}
-              >
-                <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
-                <span>Когда-нибудь</span>
-              </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'habits' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setHabitsHover(true)}
-                onMouseLeave={() => hasHover && setHabitsHover(false)}
-                onClick={() => handleMenuSelect('habits')}
-              >
-                <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
-                <span>Привычки</span>
-              </button>
+              {!isBuiltinHidden('today') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setTodayHover(true)}
+                  onMouseLeave={() => hasHover && setTodayHover(false)}
+                  onClick={() => handleMenuSelect('today')}
+                >
+                  <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
+                  <span>Сегодня</span>
+                </button>
+              )}
+              {!isBuiltinHidden('plans') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'plans' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setPlansHover(true)}
+                  onMouseLeave={() => hasHover && setPlansHover(false)}
+                  onClick={() => handleMenuSelect('plans')}
+                >
+                  <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
+                  <span>Планы</span>
+                </button>
+              )}
+              {!isBuiltinHidden('goal_plan') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'goal_plan' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setGoalPlanHover(true)}
+                  onMouseLeave={() => hasHover && setGoalPlanHover(false)}
+                  onClick={() => handleMenuSelect('goal_plan')}
+                >
+                  <img src={viewMode === 'goal_plan' || (hasHover && goalPlanHover) ? goalNavIcon : goalIcon} alt="" />
+                  <span>Планы с целями</span>
+                </button>
+              )}
+              {!isBuiltinHidden('no_date') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'no_date' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setNoDateHover(true)}
+                  onMouseLeave={() => hasHover && setNoDateHover(false)}
+                  onClick={() => handleMenuSelect('no_date')}
+                >
+                  <img src={viewMode === 'no_date' || (hasHover && noDateHover) ? layersNavIcon : layersIcon} alt="" />
+                  <span>Задачи без даты</span>
+                </button>
+              )}
+              {!isBuiltinHidden('someday') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'someday' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setSomedayHover(true)}
+                  onMouseLeave={() => hasHover && setSomedayHover(false)}
+                  onClick={() => handleMenuSelect('someday')}
+                >
+                  <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
+                  <span>Когда-нибудь</span>
+                </button>
+              )}
+              {!isBuiltinHidden('habits') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'habits' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setHabitsHover(true)}
+                  onMouseLeave={() => hasHover && setHabitsHover(false)}
+                  onClick={() => handleMenuSelect('habits')}
+                >
+                  <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
+                  <span>Привычки</span>
+                </button>
+              )}
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-                {projects.map((p) => {
+                {projects.filter((p) => !isProjectHidden(p.id)).map((p) => {
                   const isBoard = p.kind === 'board';
                   const isActive = isBoard
                     ? viewMode === 'board' && activeBoardId === p.id
@@ -1204,18 +1317,34 @@ export default function Dashboard() {
                 <img src={hasHover && spacingBtnHover ? spacingNavIcon : spacingIcon} alt="" />
               </button>
               {renderFontMenuButton()}
-              {projects.length > 1 && (
-                <button
-                  type="button"
-                  className="dashboard-menu__order-btn"
-                  onMouseEnter={() => hasHover && setMenuOrderBtnHover(true)}
-                  onMouseLeave={() => hasHover && setMenuOrderBtnHover(false)}
-                  onClick={openMenuOrderModal}
-                  aria-label="Изменить порядок пунктов в меню"
-                >
-                  <img src={hasHover && menuOrderBtnHover ? dragNavIcon : dragIcon} alt="" />
-                </button>
-              )}
+              <button
+                type="button"
+                className="dashboard-menu__order-btn"
+                onMouseEnter={() => hasHover && setMenuOrderBtnHover(true)}
+                onMouseLeave={() => hasHover && setMenuOrderBtnHover(false)}
+                onClick={openMenuOrderModal}
+                aria-label="Порядок и видимость пунктов меню"
+              >
+                <img src={hasHover && menuOrderBtnHover ? dragNavIcon : dragIcon} alt="" />
+              </button>
+              <button
+                type="button"
+                className="dashboard-menu__order-btn dashboard-menu__theme-btn"
+                onMouseEnter={() => hasHover && setThemeBtnHover(true)}
+                onMouseLeave={() => hasHover && setThemeBtnHover(false)}
+                onClick={() => setTheme(settings.theme === 'light' ? 'dark' : 'light')}
+                aria-label={settings.theme === 'light' ? 'Включить тёмную тему' : 'Включить светлую тему'}
+                title={settings.theme === 'light' ? 'Тёмная тема' : 'Светлая тема'}
+              >
+                <img
+                  src={
+                    settings.theme === 'light'
+                      ? (hasHover && themeBtnHover ? moonNavIcon : moonIcon)
+                      : (hasHover && themeBtnHover ? sunNavIcon : sunIcon)
+                  }
+                  alt=""
+                />
+              </button>
             </div>
           </nav>
         ) : (
@@ -1226,16 +1355,18 @@ export default function Dashboard() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="dashboard-menu__mobile-top">
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setTodayHover(true)}
-                  onMouseLeave={() => hasHover && setTodayHover(false)}
-                  onClick={() => handleMenuSelect('today')}
-                >
-                  <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
-                  <span>Сегодня</span>
-                </button>
+                {!isBuiltinHidden('today') ? (
+                  <button
+                    type="button"
+                    className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
+                    onMouseEnter={() => hasHover && setTodayHover(true)}
+                    onMouseLeave={() => hasHover && setTodayHover(false)}
+                    onClick={() => handleMenuSelect('today')}
+                  >
+                    <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
+                    <span>Сегодня</span>
+                  </button>
+                ) : <span />}
                 <button
                   type="button"
                   className="dashboard-menu__close"
@@ -1245,58 +1376,68 @@ export default function Dashboard() {
                   ×
                 </button>
               </div>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'plans' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setPlansHover(true)}
-                onMouseLeave={() => hasHover && setPlansHover(false)}
-                onClick={() => handleMenuSelect('plans')}
-              >
-                <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
-                <span>Планы</span>
-              </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'goal_plan' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setGoalPlanHover(true)}
-                onMouseLeave={() => hasHover && setGoalPlanHover(false)}
-                onClick={() => handleMenuSelect('goal_plan')}
-              >
-                <img src={viewMode === 'goal_plan' || (hasHover && goalPlanHover) ? goalNavIcon : goalIcon} alt="" />
-                <span>Планы с целями</span>
-              </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'no_date' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setNoDateHover(true)}
-                onMouseLeave={() => hasHover && setNoDateHover(false)}
-                onClick={() => handleMenuSelect('no_date')}
-              >
-                <img src={viewMode === 'no_date' || (hasHover && noDateHover) ? layersNavIcon : layersIcon} alt="" />
-                <span>Задачи без даты</span>
-              </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'someday' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setSomedayHover(true)}
-                onMouseLeave={() => hasHover && setSomedayHover(false)}
-                onClick={() => handleMenuSelect('someday')}
-              >
-                <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
-                <span>Когда-нибудь</span>
-              </button>
-              <button
-                type="button"
-                className={`dashboard-menu__item ${viewMode === 'habits' ? 'dashboard-menu__item--active' : ''}`}
-                onMouseEnter={() => hasHover && setHabitsHover(true)}
-                onMouseLeave={() => hasHover && setHabitsHover(false)}
-                onClick={() => handleMenuSelect('habits')}
-              >
-                <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
-                <span>Привычки</span>
-              </button>
+              {!isBuiltinHidden('plans') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'plans' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setPlansHover(true)}
+                  onMouseLeave={() => hasHover && setPlansHover(false)}
+                  onClick={() => handleMenuSelect('plans')}
+                >
+                  <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
+                  <span>Планы</span>
+                </button>
+              )}
+              {!isBuiltinHidden('goal_plan') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'goal_plan' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setGoalPlanHover(true)}
+                  onMouseLeave={() => hasHover && setGoalPlanHover(false)}
+                  onClick={() => handleMenuSelect('goal_plan')}
+                >
+                  <img src={viewMode === 'goal_plan' || (hasHover && goalPlanHover) ? goalNavIcon : goalIcon} alt="" />
+                  <span>Планы с целями</span>
+                </button>
+              )}
+              {!isBuiltinHidden('no_date') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'no_date' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setNoDateHover(true)}
+                  onMouseLeave={() => hasHover && setNoDateHover(false)}
+                  onClick={() => handleMenuSelect('no_date')}
+                >
+                  <img src={viewMode === 'no_date' || (hasHover && noDateHover) ? layersNavIcon : layersIcon} alt="" />
+                  <span>Задачи без даты</span>
+                </button>
+              )}
+              {!isBuiltinHidden('someday') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'someday' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setSomedayHover(true)}
+                  onMouseLeave={() => hasHover && setSomedayHover(false)}
+                  onClick={() => handleMenuSelect('someday')}
+                >
+                  <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
+                  <span>Когда-нибудь</span>
+                </button>
+              )}
+              {!isBuiltinHidden('habits') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'habits' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setHabitsHover(true)}
+                  onMouseLeave={() => hasHover && setHabitsHover(false)}
+                  onClick={() => handleMenuSelect('habits')}
+                >
+                  <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
+                  <span>Привычки</span>
+                </button>
+              )}
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-                {projects.map((p) => {
+                {projects.filter((p) => !isProjectHidden(p.id)).map((p) => {
                   const isBoard = p.kind === 'board';
                   const isActive = isBoard
                     ? viewMode === 'board' && activeBoardId === p.id
@@ -1328,18 +1469,34 @@ export default function Dashboard() {
               </button>
               <div className="dashboard-menu__mobile-font-row">
                 {renderFontMenuButton()}
-                {projects.length > 1 && (
-                  <button
-                    type="button"
-                    className="dashboard-menu__order-btn"
-                    onMouseEnter={() => hasHover && setMenuOrderBtnHover(true)}
-                    onMouseLeave={() => hasHover && setMenuOrderBtnHover(false)}
-                    onClick={openMenuOrderModal}
-                    aria-label="Изменить порядок пунктов в меню"
-                  >
-                    <img src={hasHover && menuOrderBtnHover ? dragNavIcon : dragIcon} alt="" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="dashboard-menu__order-btn"
+                  onMouseEnter={() => hasHover && setMenuOrderBtnHover(true)}
+                  onMouseLeave={() => hasHover && setMenuOrderBtnHover(false)}
+                  onClick={openMenuOrderModal}
+                  aria-label="Порядок и видимость пунктов меню"
+                >
+                  <img src={hasHover && menuOrderBtnHover ? dragNavIcon : dragIcon} alt="" />
+                </button>
+                <button
+                  type="button"
+                  className="dashboard-menu__order-btn dashboard-menu__theme-btn"
+                  onMouseEnter={() => hasHover && setThemeBtnHover(true)}
+                  onMouseLeave={() => hasHover && setThemeBtnHover(false)}
+                  onClick={() => setTheme(settings.theme === 'light' ? 'dark' : 'light')}
+                  aria-label={settings.theme === 'light' ? 'Включить тёмную тему' : 'Включить светлую тему'}
+                  title={settings.theme === 'light' ? 'Тёмная тема' : 'Светлая тема'}
+                >
+                  <img
+                    src={
+                      settings.theme === 'light'
+                        ? (hasHover && themeBtnHover ? moonNavIcon : moonIcon)
+                        : (hasHover && themeBtnHover ? sunNavIcon : sunIcon)
+                    }
+                    alt=""
+                  />
+                </button>
               </div>
             </nav>
           </div>
@@ -1523,37 +1680,73 @@ export default function Dashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="dashboard__settings-title">Порядок пунктов меню</div>
-            <DndContext
-              sensors={menuOrderSensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleMenuOrderDragStart}
-              onDragEnd={handleMenuOrderDragEnd}
-            >
-              <SortableContext items={menuOrderDraft} strategy={verticalListSortingStrategy}>
-                <div className="dashboard-menu__order-list">
+            <div className="dashboard-menu__order-list">
+              {BUILTIN_MENU_ITEMS.map((item) => {
+                const visKey = menuHiddenKey('builtin', item.key);
+                const hidden = !!menuVisDraft[visKey];
+                const icon = (() => {
+                  switch (item.key) {
+                    case 'today': return starIcon;
+                    case 'plans': return calendarIcon;
+                    case 'goal_plan': return goalIcon;
+                    case 'no_date': return layersIcon;
+                    case 'someday': return archiveIcon;
+                    case 'habits': return privIcon;
+                    default: return folderIcon;
+                  }
+                })();
+                return (
+                  <BuiltinMenuOrderRow
+                    key={item.key}
+                    item={item}
+                    icon={icon}
+                    hidden={hidden}
+                    onToggleHidden={() => toggleMenuVisDraft(visKey)}
+                  />
+                );
+              })}
+              {projects.length > 0 && (
+                <div className="dashboard-menu__order-divider" aria-hidden />
+              )}
+              <DndContext
+                sensors={menuOrderSensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleMenuOrderDragStart}
+                onDragEnd={handleMenuOrderDragEnd}
+              >
+                <SortableContext items={menuOrderDraft} strategy={verticalListSortingStrategy}>
                   {menuOrderDraft.map((id) => {
                     const p = projects.find((proj) => proj.id === id);
                     if (!p) return null;
-                    return <SortableMenuOrderRow key={id} project={p} />;
+                    const visKey = menuHiddenKey('project', p.id);
+                    const hidden = !!menuVisDraft[visKey];
+                    return (
+                      <SortableMenuOrderRow
+                        key={id}
+                        project={p}
+                        hidden={hidden}
+                        onToggleHidden={() => toggleMenuVisDraft(visKey)}
+                      />
+                    );
                   })}
-                </div>
-              </SortableContext>
-              <DragOverlay>
-                {activeMenuOrderProject ? (
-                  <div className="dashboard-menu__order-row dashboard-menu__order-row--overlay">
-                    <img
-                      src={(activeMenuOrderProject.kind || 'project') === 'board' ? doskaIcon : folderIcon}
-                      alt=""
-                      className="dashboard-menu__order-icon"
-                    />
-                    <span className="dashboard-menu__order-title">{activeMenuOrderProject.title}</span>
-                    <span className="dashboard-menu__order-handle" aria-hidden>
-                      <img src={dragIcon} alt="" />
-                    </span>
-                  </div>
-                ) : null}
-              </DragOverlay>
-            </DndContext>
+                </SortableContext>
+                <DragOverlay>
+                  {activeMenuOrderProject ? (
+                    <div className="dashboard-menu__order-row dashboard-menu__order-row--overlay">
+                      <img
+                        src={(activeMenuOrderProject.kind || 'project') === 'board' ? doskaIcon : folderIcon}
+                        alt=""
+                        className="dashboard-menu__order-icon"
+                      />
+                      <span className="dashboard-menu__order-title">{activeMenuOrderProject.title}</span>
+                      <span className="dashboard-menu__order-handle" aria-hidden>
+                        <img src={dragIcon} alt="" />
+                      </span>
+                    </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            </div>
             <div className="dashboard__settings-edit-actions">
               <button type="button" className="dashboard__settings-submit" onClick={() => setMenuOrderModalOpen(false)}>
                 Отмена
