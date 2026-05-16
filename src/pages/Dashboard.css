@@ -666,10 +666,25 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.35rem;
+  /* Per spec the three "settings" buttons (font / order / theme) sit flush
+     against each other, with the «+» add-project button held 30px away
+     by the `+ font-btn { margin-left }` rule below. Setting `gap: 0` here
+     keeps the cluster tight without needing per-button negative margins. */
+  gap: 0;
   padding: 0.5rem 0.75rem 0.25rem;
   flex-shrink: 0;
   border-top: 1px solid var(--bg-hover);
+}
+
+/* «+» (Новый проект) is the only "create" action in the row, so it sits
+   apart from the settings cluster. Container gap is 0, so the full 30px
+   separator lives entirely on the margin of the first button after «+».
+   The duplicate rule for `.dashboard-menu__order-btn` is a fallback for
+   the case where the font button is hidden by user preferences and
+   another settings button slides into the first-after-«+» slot. */
+.dashboard-menu__bottom-tools .dashboard-menu__add-project + .dashboard-menu__font-btn,
+.dashboard-menu__bottom-tools .dashboard-menu__add-project + .dashboard-menu__order-btn {
+  margin-left: 20px;
 }
 
 .dashboard-menu__add-project--in-bottom {
@@ -684,7 +699,18 @@
   align-items: center;
   justify-content: center;
   border-radius: 6px;
+  /* Drop the original 1.5rem text styling — the desktop button now
+     renders an <img> like the other three so its visible glyph width
+     matches them and the gap-driven row stays optically uniform. */
+  font-size: 0;
+  line-height: 1;
   transition: color 0.15s ease, background 0.15s ease;
+}
+
+.dashboard-menu__bottom-tools .dashboard-menu__add-project img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
 }
 
 .dashboard-menu__bottom-tools .dashboard-menu__add-project:hover {
@@ -692,37 +718,43 @@
   background: var(--bg-hover);
 }
 
-.dashboard-menu__width-btn {
-  width: 2rem;
-  height: 2rem;
-  margin-left: 25px;
-  border: none;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  color: var(--text-dim);
-  transition: color 0.15s ease, background 0.15s ease;
+/* Hover-grabbable column at the right edge of the desktop side menu.
+   Mirrors the .goal-plan__resize-handle pattern: an invisible 12px
+   strip that surfaces a 2px accent rail on hover/active. */
+.dashboard-menu__resize-handle {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  width: 12px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 95;
+  touch-action: none;
 }
 
-.dashboard-menu__width-btn:hover {
-  color: var(--accent);
-  background: var(--bg-hover);
+.dashboard-menu__resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: transparent;
+  border-radius: 2px;
+  transition: background 0.15s ease;
 }
 
-.dashboard-menu__width-btn img {
-  width: 1.1rem;
-  height: 1.1rem;
-  object-fit: contain;
+@media (hover: hover) {
+  .dashboard-menu__resize-handle:hover::after,
+  .dashboard-menu__resize-handle:active::after {
+    background: var(--accent);
+  }
 }
 
 .dashboard-menu__font-btn {
   width: 2rem;
   height: 2rem;
-  margin-left: 5px;
   border: none;
   background: none;
   padding: 0;
@@ -750,7 +782,6 @@
 .dashboard-menu__order-btn {
   width: 2rem;
   height: 2rem;
-  margin-left: 5px;
   border: none;
   background: none;
   padding: 0;
@@ -845,6 +876,10 @@
   line-height: 1.25;
 }
 
+/* Modal styles below are still consumed by HabitsView's own sidebar-width
+   popup (it reuses these `dashboard__menu-width-*` classes), so they stay
+   in this stylesheet even though the left-side menu no longer opens a
+   modal — its width is adjusted by direct drag on .dashboard-menu__resize-handle. */
 .dashboard__menu-width-popup {
   max-width: 320px;
 }
@@ -1259,8 +1294,4 @@
     padding: 0;
   }
 
-  .dashboard-menu--mobile .dashboard-menu__mobile-font-row .dashboard-menu__font-btn,
-  .dashboard-menu--mobile .dashboard-menu__mobile-font-row .dashboard-menu__order-btn {
-    margin-left: 0;
-  }
 }

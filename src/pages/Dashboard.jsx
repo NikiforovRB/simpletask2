@@ -79,8 +79,8 @@ import folderIcon from '../assets/folder.svg';
 import folderNavIcon from '../assets/folder-nav.svg';
 import dragIcon from '../assets/drag.svg';
 import dragNavIcon from '../assets/drag-nav.svg';
-import spacingIcon from '../assets/spacing.svg';
-import spacingNavIcon from '../assets/spacing-nav.svg';
+import plusIcon from '../assets/plus.svg';
+import plusNavIcon from '../assets/plus-nav.svg';
 import textIcon from '../assets/text.svg';
 import textNavIcon from '../assets/text-nav.svg';
 import exitIcon from '../assets/exit.svg';
@@ -427,15 +427,20 @@ export default function Dashboard() {
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [activeProjectDragId, setActiveProjectDragId] = useState(null);
   const [activeHabitDragId, setActiveHabitDragId] = useState(null);
-  const [menuWidthModalOpen, setMenuWidthModalOpen] = useState(false);
-  const [menuWidthDraft, setMenuWidthDraft] = useState(220);
-  const [spacingBtnHover, setSpacingBtnHover] = useState(false);
+  // Live width while the user is dragging the right-edge resize handle of
+  // the side menu. `null` means no active drag → fall back to the saved
+  // width. The value is committed to settings on pointer-up.
+  const [resizingMenuWidth, setResizingMenuWidth] = useState(null);
   const [fontModalOpen, setFontModalOpen] = useState(false);
   const [fontWeightDraft, setFontWeightDraft] = useState('medium');
   const [fontScaleDraft, setFontScaleDraft] = useState(1);
   const [textFontBtnHover, setTextFontBtnHover] = useState(false);
   const [menuOrderBtnHover, setMenuOrderBtnHover] = useState(false);
   const [themeBtnHover, setThemeBtnHover] = useState(false);
+  // Hover state for the desktop bottom-tools «+» (add-project) button.
+  // Used to swap plus-nav.svg in on hover, mirroring the other three
+  // buttons in the row so all four behave identically.
+  const [addProjectBtnHover, setAddProjectBtnHover] = useState(false);
   const [menuOrderModalOpen, setMenuOrderModalOpen] = useState(false);
   const [menuOrderDraft, setMenuOrderDraft] = useState([]);
   const [menuOrderActiveId, setMenuOrderActiveId] = useState(null);
@@ -456,8 +461,8 @@ export default function Dashboard() {
   }, [settings.theme]);
   const sidebarWidthPx = useMemo(() => clampSidebarWidthPx(settings.sidebar_width_px), [settings.sidebar_width_px]);
   const liveMenuWidth = useMemo(
-    () => (menuWidthModalOpen ? clampSidebarWidthPx(menuWidthDraft) : sidebarWidthPx),
-    [menuWidthModalOpen, menuWidthDraft, sidebarWidthPx]
+    () => (resizingMenuWidth != null ? clampSidebarWidthPx(resizingMenuWidth) : sidebarWidthPx),
+    [resizingMenuWidth, sidebarWidthPx]
   );
   const activeProjectDrag = useMemo(
     () => (activeProjectDragId ? projects.find((p) => p.id === activeProjectDragId) : null),
@@ -994,19 +999,43 @@ export default function Dashboard() {
 
   const activeTask = activeDragId ? tasks.find((t) => t.id === activeDragId) : null;
 
-  const openMenuWidthModal = useCallback(() => {
-    setMenuWidthDraft(sidebarWidthPx);
-    setMenuWidthModalOpen(true);
-  }, [sidebarWidthPx]);
-
-  const applyMenuWidthStep = useCallback((delta) => {
-    setMenuWidthDraft((w) => clampSidebarWidthPx(w + delta));
-  }, []);
-
-  const saveMenuWidth = useCallback(async () => {
-    await setSidebarWidthPx(menuWidthDraft);
-    setMenuWidthModalOpen(false);
-  }, [menuWidthDraft, setSidebarWidthPx]);
+  // Pointer-down on the right-edge resize handle of the side menu. Tracks
+  // pointer movement against `window` so the drag survives the cursor
+  // leaving the handle, and only persists the new width if it actually
+  // changed (a stray click on the divider should be a no-op).
+  const handleMenuResizePointerDown = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startW = sidebarWidthPx;
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+      let lastWidth = startW;
+      const onMove = (ev) => {
+        const dx = ev.clientX - startX;
+        const next = clampSidebarWidthPx(startW + dx);
+        lastWidth = next;
+        setResizingMenuWidth(next);
+      };
+      const onUp = () => {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+        if (lastWidth !== startW) {
+          Promise.resolve(setSidebarWidthPx(lastWidth)).finally(() => setResizingMenuWidth(null));
+        } else {
+          setResizingMenuWidth(null);
+        }
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    },
+    [sidebarWidthPx, setSidebarWidthPx]
+  );
 
   const liveTaskFontWeight = fontModalOpen ? fontWeightDraft : settings.task_font_weight;
   const liveTaskFontScale = fontModalOpen ? fontScaleDraft : settings.task_font_scale;
@@ -1201,6 +1230,14 @@ export default function Dashboard() {
             className={`dashboard-menu dashboard-menu--side ${!menuOpen && mobileMenuClosing ? 'dashboard-menu--closing' : ''}`}
             style={{ width: `${liveMenuWidth}px` }}
           >
+            <div
+              className="dashboard-menu__resize-handle"
+              onPointerDown={handleMenuResizePointerDown}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Изменить ширину меню"
+              title="Перетащите, чтобы изменить ширину"
+            />
             <div className="dashboard-menu__body">
               {!isBuiltinHidden('today') && (
                 <button
@@ -1301,20 +1338,12 @@ export default function Dashboard() {
               <button
                 type="button"
                 className="dashboard-menu__add-project dashboard-menu__add-project--in-bottom"
+                onMouseEnter={() => hasHover && setAddProjectBtnHover(true)}
+                onMouseLeave={() => hasHover && setAddProjectBtnHover(false)}
                 onClick={() => setAddProjectModalOpen(true)}
                 aria-label="Добавить проект"
               >
-                +
-              </button>
-              <button
-                type="button"
-                className="dashboard-menu__width-btn"
-                onMouseEnter={() => hasHover && setSpacingBtnHover(true)}
-                onMouseLeave={() => hasHover && setSpacingBtnHover(false)}
-                onClick={openMenuWidthModal}
-                aria-label="Изменить ширину меню для ПК"
-              >
-                <img src={hasHover && spacingBtnHover ? spacingNavIcon : spacingIcon} alt="" />
+                <img src={hasHover && addProjectBtnHover ? plusNavIcon : plusIcon} alt="" />
               </button>
               {renderFontMenuButton()}
               <button
@@ -1752,31 +1781,6 @@ export default function Dashboard() {
                 Отмена
               </button>
               <button type="button" className="dashboard__settings-submit" onClick={saveMenuOrder}>
-                Сохранить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {menuWidthModalOpen && (
-        <div className="dashboard__settings-overlay" onClick={() => setMenuWidthModalOpen(false)}>
-          <div className="dashboard__settings-popup dashboard__menu-width-popup" onClick={(e) => e.stopPropagation()}>
-            <div className="dashboard__settings-title">Ширина меню</div>
-            <div className="dashboard__menu-width-controls">
-              <button type="button" className="dashboard__menu-width-step" onClick={() => applyMenuWidthStep(-10)} aria-label="Уменьшить на 10 пикселей">
-                <span className="dashboard__menu-width-step-inner">−</span>
-              </button>
-              <span className="dashboard__menu-width-value">{liveMenuWidth}px</span>
-              <button type="button" className="dashboard__menu-width-step" onClick={() => applyMenuWidthStep(10)} aria-label="Увеличить на 10 пикселей">
-                <span className="dashboard__menu-width-step-inner">+</span>
-              </button>
-            </div>
-            <div className="dashboard__settings-edit-actions">
-              <button type="button" className="dashboard__settings-submit" onClick={() => setMenuWidthModalOpen(false)}>
-                Отмена
-              </button>
-              <button type="button" className="dashboard__settings-submit" onClick={saveMenuWidth}>
                 Сохранить
               </button>
             </div>

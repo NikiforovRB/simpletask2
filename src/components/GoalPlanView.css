@@ -1,7 +1,10 @@
 .goal-plan {
   width: 100%;
-  font-family: 'Gilroy', sans-serif;
-  font-weight: 500;
+  /* Use the same multi-weight font family as TaskItem so the global
+     --task-font-weight token from the font-settings modal can actually
+     load the matching .ttf face (Gilroy plain only ships at weight 500). */
+  font-family: 'Gilroy Task', 'Gilroy', sans-serif;
+  font-weight: var(--task-font-weight, 500);
   color: var(--text-primary);
   /* Suppress iOS Safari's 300ms double-tap-zoom so our explicit double-tap
      gesture (to enter edit mode) registers as two clean clicks instead of
@@ -9,9 +12,12 @@
   touch-action: manipulation;
 }
 
-.goal-plan,
+/* Inherit the live task font weight everywhere inside the goal-plan tree.
+   Using `inherit` (rather than a hard 500) lets the font-settings modal
+   thin or thicken every piece of body copy in this view in lock-step with
+   the rest of the app's task lists. */
 .goal-plan * {
-  font-weight: 500 !important;
+  font-weight: inherit;
 }
 
 .goal-plan__layout {
@@ -122,7 +128,7 @@
 }
 
 .goal-plan__section-title {
-  font-size: 14px;
+  font-size: calc(14px * var(--task-font-scale, 1));
   color: var(--text-dim);
   letter-spacing: 0.01em;
   flex: 1;
@@ -383,7 +389,7 @@
   padding: 2px 2px 2px 0;
   cursor: text;
   font: inherit;
-  font-size: 14px;
+  font-size: calc(14px * var(--task-font-scale, 1));
   line-height: 1.35;
   white-space: pre-wrap;
   word-break: break-word;
@@ -406,7 +412,7 @@
   color: var(--text-strong);
   padding: 2px 2px 2px 0;
   font: inherit;
-  font-size: 14px;
+  font-size: calc(14px * var(--task-font-scale, 1));
   line-height: 1.35;
   outline: none;
   resize: none;
@@ -482,7 +488,7 @@
 }
 
 .goal-plan__empty {
-  font-size: 13px;
+  font-size: calc(13px * var(--task-font-scale, 1));
   color: var(--text-faint);
   padding: 6px 0;
   cursor: pointer;
@@ -678,7 +684,7 @@
 
 .goal-plan__day-title {
   margin: 0;
-  font-size: 14px;
+  font-size: calc(14px * var(--task-font-scale, 1));
   color: var(--text-dim);
   flex: 1;
   min-width: 0;
@@ -714,7 +720,7 @@
   color: var(--text-strong);
   padding: 4px 0;
   font: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--task-font-scale, 1));
   line-height: 1.4;
   resize: none;
   outline: none;
@@ -800,8 +806,8 @@
   padding: 0.25rem 0;
   min-width: 180px;
   box-shadow: var(--shadow-elev);
-  font-family: 'Gilroy', sans-serif;
-  font-weight: 500;
+  font-family: 'Gilroy Task', 'Gilroy', sans-serif;
+  font-weight: var(--task-font-weight, 500);
 }
 
 .goal-plan__ctxmenu-colors {
@@ -855,10 +861,10 @@
   border: none;
   color: var(--text-primary);
   padding: 0.5rem 0.75rem;
-  font-size: 0.9375rem;
+  font-size: calc(0.9375rem * var(--task-font-scale, 1));
   cursor: pointer;
   font-family: inherit;
-  font-weight: 500;
+  font-weight: inherit;
 }
 
 .goal-plan__ctxmenu-item--danger {
@@ -882,7 +888,7 @@
   color: var(--text-strong);
   padding: 6px 10px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: calc(14px * var(--task-font-scale, 1));
   box-shadow: var(--shadow-elev);
   max-width: 320px;
   white-space: nowrap;
