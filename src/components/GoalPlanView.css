@@ -265,7 +265,6 @@
   background: var(--bg-elev-2);
   border-radius: 6px;
   z-index: 5;
-  box-shadow: var(--shadow-sm);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease;
