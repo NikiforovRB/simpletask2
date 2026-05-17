@@ -1536,20 +1536,31 @@ export default function Dashboard() {
         <div className="dashboard__settings-overlay" onClick={() => { setAddProjectModalOpen(false); setAddProjectKind('project'); }}>
           <div className="dashboard__settings-popup dashboard__settings-popup--new-project" onClick={(e) => e.stopPropagation()}>
             <div className="dashboard__settings-title">{addProjectKind === 'board' ? 'Новая доска' : 'Новый проект'}</div>
-            <div className="dashboard__kind-toggle">
+            <div
+              className={`dashboard__kind-toggle dashboard__kind-toggle--${addProjectKind === 'board' ? 'board' : 'project'}`}
+              role="tablist"
+              aria-label="Тип нового элемента"
+            >
+              <span className="dashboard__kind-toggle-indicator" aria-hidden="true" />
               <button
                 type="button"
+                role="tab"
+                aria-selected={addProjectKind === 'project'}
                 className={`dashboard__kind-toggle-option ${addProjectKind === 'project' ? 'dashboard__kind-toggle-option--active' : ''}`}
                 onClick={() => setAddProjectKind('project')}
               >
-                Список задач
+                <img src={folderIcon} alt="" className="dashboard__kind-toggle-icon" />
+                <span>Список задач</span>
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={addProjectKind === 'board'}
                 className={`dashboard__kind-toggle-option ${addProjectKind === 'board' ? 'dashboard__kind-toggle-option--active' : ''}`}
                 onClick={() => setAddProjectKind('board')}
               >
-                Доска
+                <img src={doskaIcon} alt="" className="dashboard__kind-toggle-icon" />
+                <span>Доска</span>
               </button>
             </div>
             <input
