@@ -77,6 +77,48 @@ function ChevronIcon({ collapsed, size = 14 }) {
   );
 }
 
+function GapIcon() {
+  // "Vertical-spacing" glyph — two horizontal bars with a double-headed
+  // arrow between them. Uses `currentColor`, so the button's `color`
+  // controls fill/stroke (no theme filter hassle from light-mode <img>
+  // recolouring rules).
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path d="M3 3h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M3 13h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M8 4.5v7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path
+        d="M5.8 6.5L8 4.5L10.2 6.5M5.8 9.5L8 11.5L10.2 9.5"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+function TopGapButton({ active, onClick }) {
+  return (
+    <button
+      type="button"
+      className={classNames(
+        'goal-plan__row-icon-btn',
+        'goal-plan__row-gap-btn',
+        active && 'goal-plan__row-gap-btn--active'
+      )}
+      onClick={onClick}
+      onMouseDown={(e) => e.stopPropagation()}
+      aria-label={active ? 'Убрать отступ сверху' : 'Добавить отступ сверху'}
+      title={active ? 'Убрать отступ сверху' : 'Добавить отступ сверху'}
+      aria-pressed={!!active}
+    >
+      <GapIcon />
+    </button>
+  );
+}
+
 function DeleteButton({ onClick }) {
   const [hover, setHover] = useState(false);
   return (
@@ -478,11 +520,13 @@ function SortableItemRow({
   onKeyboardCreateSubtask,
   onChangeColor,
   onChangeDate,
+  onToggleTopGap,
   onContextMenu,
   placeholder,
   allowColor,
   allowSubtasks,
   allowDate,
+  allowTopGap,
   dateClearable = true,
   dateShowLabel = true,
 }) {
@@ -578,6 +622,9 @@ function SortableItemRow({
               />
             )}
           </div>
+        )}
+        {allowTopGap && onToggleTopGap && (
+          <TopGapButton active={!!item.top_gap} onClick={onToggleTopGap} />
         )}
         {allowSubtasks && onAddSubtask && (
           <button
@@ -946,7 +993,13 @@ function DayItemTree({
   // adding visual gaps below the row.
   const showSubtasks = !subCollapsed && (subtasks.length > 0 || isDragging);
   return (
-    <div className="goal-plan__tree goal-plan__tree--day">
+    <div
+      className={classNames(
+        'goal-plan__tree',
+        'goal-plan__tree--day',
+        item.top_gap && 'goal-plan__tree--top-gap'
+      )}
+    >
       <DropSlot id={containerId} index={index} />
       <SortableItemRow
         item={item}
@@ -955,6 +1008,7 @@ function DayItemTree({
         draggable
         allowColor
         allowDate
+        allowTopGap
         dateClearable={false}
         dateShowLabel={false}
         allowSubtasks
@@ -967,6 +1021,7 @@ function DayItemTree({
         onToggle={() => onToggle(item.id)}
         onChangeColor={(c) => onChangeColor(item.id, c)}
         onChangeDate={(d) => onChangeDate(item.id, d)}
+        onToggleTopGap={() => onUpdate?.(item.id, { top_gap: !item.top_gap })}
         onKeyboardCreateBelow={() => onCreateAfter?.(item)}
         onKeyboardCreateSubtask={() => {
           setSubCollapsed(false);

@@ -210,6 +210,13 @@
   position: relative;
 }
 
+/* User-toggleable breathing room above a day task. Toggled from the row
+   toolbar (the gap icon to the right of the colour swatch); the flag is
+   persisted to `goal_plan_items.top_gap` so it survives reloads. */
+.goal-plan__tree--day.goal-plan__tree--top-gap {
+  margin-top: 40px;
+}
+
 .goal-plan__subtasks {
   margin-left: 22px;
   display: flex;
@@ -457,6 +464,24 @@
   width: 14px;
   height: 14px;
   object-fit: contain;
+}
+
+/* Inline-SVG "vertical spacing" toggle that sits right after the colour
+   swatch and adds/removes 40px of breathing room above the row. Uses
+   `currentColor`, so the button's CSS `color` drives both stroke colours
+   in the icon; active state means the gap is currently applied. */
+.goal-plan__row-gap-btn {
+  color: var(--text-secondary);
+}
+
+.goal-plan__row-gap-btn:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.goal-plan__row-gap-btn--active,
+.goal-plan__row-gap-btn--active:hover {
+  color: var(--accent);
 }
 
 .goal-plan__handle {
