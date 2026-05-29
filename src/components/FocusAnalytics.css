@@ -198,13 +198,54 @@
   text-align: center;
 }
 
-/* ---- individual sessions (edit/delete) ---- */
-.focus-analytics__sessions-title {
+/* ---- individual sessions (add/edit/delete) ---- */
+.focus-analytics__sessions-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin: 1.8rem 0 0.8rem;
+}
+
+.focus-analytics__sessions-title {
   font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-dim);
+}
+
+.focus-analytics__add-btn {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: var(--bg-surface-2);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.focus-analytics__add-btn:hover {
+  background: var(--bg-surface-3);
+}
+
+.focus-analytics__add-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+.focus-analytics__add-icon--hover {
+  display: none;
+}
+
+.focus-analytics__add-btn:hover .focus-analytics__add-icon--default {
+  display: none;
+}
+
+.focus-analytics__add-btn:hover .focus-analytics__add-icon--hover {
+  display: inline-block;
 }
 
 .focus-analytics__sessions {
@@ -264,21 +305,21 @@
   border-radius: 50%;
   background: transparent;
   border: none;
-  color: var(--text-dim);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 .focus-analytics__session-icon:hover {
   background: var(--bg-hover);
-  color: var(--text-strong);
 }
 
-.focus-analytics__session-icon--danger:hover {
-  color: #ea6868;
+.focus-analytics__session-icon img {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
 }
 
 .focus-analytics__session-edit {
@@ -309,10 +350,20 @@
   min-width: 6rem;
 }
 
-.focus-analytics__session-input--mins {
-  width: 3.6rem;
+.focus-analytics__session-input--num {
+  width: 3rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+.focus-analytics__session-input--time {
+  width: 5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-analytics__session--adding {
+  border-bottom: none;
 }
 
 .focus-analytics__session-unit {

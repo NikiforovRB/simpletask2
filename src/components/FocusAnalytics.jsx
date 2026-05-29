@@ -1,7 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useFocus } from '../contexts/FocusContext';
 import { toLocalDateString, formatDayLabel } from '../constants';
+import editIcon from '../assets/edit.svg';
+import editNavIcon from '../assets/edit-nav.svg';
+import deleteIcon from '../assets/delete.svg';
+import deleteNav2Icon from '../assets/delete-nav2.svg';
+import plusIcon from '../assets/plus.svg';
+import plusNavIcon from '../assets/plus-nav.svg';
 import './FocusAnalytics.css';
+
+function SessionIconButton({ icon, hoverIcon, onClick, label }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      className="focus-analytics__session-icon"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+    >
+      <img src={hover ? hoverIcon : icon} alt="" />
+    </button>
+  );
+}
 
 function fmtDuration(totalSeconds) {
   const s = Math.max(0, Math.round(totalSeconds));
@@ -28,12 +51,18 @@ const PALETTE = ['#5a86ee', '#15c466', '#f4ba04', '#613aaf', '#00b5cc', '#f33737
 const LIVE_ID = '__live__';
 
 export function FocusAnalytics() {
-  const { sessions, sessionsLoading, deleteSession, updateSession, active, workSeconds, target } = useFocus();
+  const { sessions, sessionsLoading, logSession, deleteSession, updateSession, active, workSeconds, target } = useFocus();
   const [mounted, setMounted] = useState(false);
   const [selectedDay, setSelectedDay] = useState(toLocalDateString(new Date()));
   const [editingId, setEditingId] = useState(null);
+  const [editHours, setEditHours] = useState('');
   const [editMinutes, setEditMinutes] = useState('');
   const [editTitle, setEditTitle] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [addTitle, setAddTitle] = useState('');
+  const [addTime, setAddTime] = useState('12:00');
+  const [addHours, setAddHours] = useState('0');
+  const [addMinutes, setAddMinutes] = useState('25');
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
@@ -125,23 +154,57 @@ export function FocusAnalytics() {
 
   const startEdit = (s) => {
     setEditingId(s.id);
-    setEditMinutes(String(Math.max(1, Math.round((s.duration_seconds || 0) / 60))));
+    const secs = s.duration_seconds || 0;
+    setEditHours(String(Math.floor(secs / 3600)));
+    setEditMinutes(String(Math.round((secs % 3600) / 60)));
     setEditTitle(s.task_title || '');
   };
 
   const saveEdit = (id) => {
-    const mins = parseInt(editMinutes, 10);
-    updateSession(id, {
-      duration_seconds: Number.isFinite(mins) ? Math.max(0, mins) * 60 : undefined,
-      task_title: editTitle,
-    });
+    const h = parseInt(editHours, 10);
+    const m = parseInt(editMinutes, 10);
+    const totalSec = (Number.isFinite(h) ? Math.max(0, h) : 0) * 3600 + (Number.isFinite(m) ? Math.max(0, m) : 0) * 60;
+    updateSession(id, { duration_seconds: totalSec, task_title: editTitle });
     setEditingId(null);
+  };
+
+  const openAdd = () => {
+    const now = new Date();
+    setAddTitle('');
+    setAddTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+    setAddHours('0');
+    setAddMinutes('25');
+    setEditingId(null);
+    setAdding(true);
+  };
+
+  const saveAdd = () => {
+    const h = parseInt(addHours, 10);
+    const m = parseInt(addMinutes, 10);
+    const totalSec = (Number.isFinite(h) ? Math.max(0, h) : 0) * 3600 + (Number.isFinite(m) ? Math.max(0, m) : 0) * 60;
+    if (totalSec < 1) {
+      setAdding(false);
+      return;
+    }
+    const [hh, mm] = (addTime || '12:00').split(':').map((x) => parseInt(x, 10));
+    const start = new Date(`${selectedDay}T00:00:00`);
+    start.setHours(Number.isFinite(hh) ? hh : 12, Number.isFinite(mm) ? mm : 0, 0, 0);
+    const end = new Date(start.getTime() + totalSec * 1000);
+    logSession({
+      taskTitle: addTitle.trim() || 'Фокус',
+      source: 'custom',
+      mode: 'stopwatch',
+      durationSeconds: totalSec,
+      startedAt: start.toISOString(),
+      endedAt: end.toISOString(),
+    });
+    setAdding(false);
   };
 
   return (
     <div className="focus-analytics">
       <div className="focus-analytics__inner">
-        <h1 className="focus-analytics__title">Аналитика фокуса</h1>
+        <h1 className="focus-analytics__title">Аналитика фокус-сессий</h1>
 
         <div className="focus-analytics__cards">
           {[
@@ -193,34 +256,96 @@ export function FocusAnalytics() {
 
         {sessionsLoading ? (
           <div className="focus-analytics__empty">Загрузка…</div>
-        ) : selectedDetail.tasks.length === 0 ? (
-          <div className="focus-analytics__empty">В этот день фокус-сессий не было.</div>
         ) : (
           <>
-            <div className="focus-analytics__tasks">
-              {selectedDetail.tasks.map((t, i) => {
-                const pct = selectedDetail.total ? (t.secs / selectedDetail.total) * 100 : 0;
-                const color = PALETTE[i % PALETTE.length];
-                return (
-                  <div className="focus-analytics__task-row" key={t.title + i}>
-                    <div className="focus-analytics__task-head">
-                      <span className="focus-analytics__task-dot" style={{ background: color }} />
-                      <span className="focus-analytics__task-title">{t.title}</span>
-                      <span className="focus-analytics__task-time">{fmtDuration(t.secs)}</span>
+            {selectedDetail.tasks.length > 0 && (
+              <div className="focus-analytics__tasks">
+                {selectedDetail.tasks.map((t, i) => {
+                  const pct = selectedDetail.total ? (t.secs / selectedDetail.total) * 100 : 0;
+                  const color = PALETTE[i % PALETTE.length];
+                  return (
+                    <div className="focus-analytics__task-row" key={t.title + i}>
+                      <div className="focus-analytics__task-head">
+                        <span className="focus-analytics__task-dot" style={{ background: color }} />
+                        <span className="focus-analytics__task-title">{t.title}</span>
+                        <span className="focus-analytics__task-time">{fmtDuration(t.secs)}</span>
+                      </div>
+                      <div className="focus-analytics__task-track">
+                        <div
+                          className="focus-analytics__task-fill"
+                          style={{ width: mounted ? `${pct}%` : '0%', background: color, transitionDelay: `${i * 50}ms` }}
+                        />
+                      </div>
                     </div>
-                    <div className="focus-analytics__task-track">
-                      <div
-                        className="focus-analytics__task-fill"
-                        style={{ width: mounted ? `${pct}%` : '0%', background: color, transitionDelay: `${i * 50}ms` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="focus-analytics__sessions-title-row">
+              <span className="focus-analytics__sessions-title">Сессии</span>
+              <button
+                type="button"
+                className="focus-analytics__add-btn"
+                onClick={openAdd}
+                aria-label="Добавить фокус-сессию"
+                title="Добавить фокус-сессию"
+              >
+                <img src={plusIcon} alt="" className="focus-analytics__add-icon focus-analytics__add-icon--default" />
+                <img src={plusNavIcon} alt="" className="focus-analytics__add-icon focus-analytics__add-icon--hover" />
+              </button>
             </div>
 
-            <div className="focus-analytics__sessions-title">Сессии</div>
+            {adding && (
+              <div className="focus-analytics__session focus-analytics__session--adding">
+                <div className="focus-analytics__session-edit">
+                  <input
+                    className="focus-analytics__session-input focus-analytics__session-input--time"
+                    type="time"
+                    step="300"
+                    value={addTime}
+                    onChange={(e) => setAddTime(e.target.value)}
+                    aria-label="Время начала"
+                  />
+                  <input
+                    className="focus-analytics__session-input focus-analytics__session-input--title"
+                    value={addTitle}
+                    onChange={(e) => setAddTitle(e.target.value)}
+                    placeholder="Название"
+                  />
+                  <input
+                    className="focus-analytics__session-input focus-analytics__session-input--num"
+                    type="number"
+                    min="0"
+                    value={addHours}
+                    onChange={(e) => setAddHours(e.target.value)}
+                    aria-label="Часы"
+                  />
+                  <span className="focus-analytics__session-unit">ч</span>
+                  <input
+                    className="focus-analytics__session-input focus-analytics__session-input--num"
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={addMinutes}
+                    onChange={(e) => setAddMinutes(e.target.value)}
+                    aria-label="Минуты"
+                  />
+                  <span className="focus-analytics__session-unit">мин</span>
+                  <button type="button" className="focus-analytics__session-btn focus-analytics__session-btn--save" onClick={saveAdd}>
+                    Добавить
+                  </button>
+                  <button type="button" className="focus-analytics__session-btn" onClick={() => setAdding(false)}>
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="focus-analytics__sessions">
+              {selectedDetail.sessions.length === 0 && !adding && (
+                <div className="focus-analytics__empty">В этот день фокус-сессий не было.</div>
+              )}
               {selectedDetail.sessions.map((s) => (
                 <div className="focus-analytics__session" key={s.id}>
                   {editingId === s.id ? (
@@ -232,9 +357,19 @@ export function FocusAnalytics() {
                         placeholder="Название"
                       />
                       <input
-                        className="focus-analytics__session-input focus-analytics__session-input--mins"
+                        className="focus-analytics__session-input focus-analytics__session-input--num"
                         type="number"
                         min="0"
+                        value={editHours}
+                        onChange={(e) => setEditHours(e.target.value)}
+                        aria-label="Часы"
+                      />
+                      <span className="focus-analytics__session-unit">ч</span>
+                      <input
+                        className="focus-analytics__session-input focus-analytics__session-input--num"
+                        type="number"
+                        min="0"
+                        max="59"
                         value={editMinutes}
                         onChange={(e) => setEditMinutes(e.target.value)}
                         aria-label="Минуты"
@@ -256,28 +391,8 @@ export function FocusAnalytics() {
                       ) : (
                         <>
                           <span className="focus-analytics__session-dur">{fmtDuration(s.duration_seconds)}</span>
-                          <button
-                            type="button"
-                            className="focus-analytics__session-icon"
-                            onClick={() => startEdit(s)}
-                            aria-label="Редактировать"
-                            title="Редактировать"
-                          >
-                            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden>
-                              <path d="M11 2.5l2.5 2.5L6 12.5l-3 .5.5-3L11 2.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            className="focus-analytics__session-icon focus-analytics__session-icon--danger"
-                            onClick={() => deleteSession(s.id)}
-                            aria-label="Удалить"
-                            title="Удалить"
-                          >
-                            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden>
-                              <path d="M3.5 4.5h9M6.5 4V3h3v1M5 4.5l.5 8h5l.5-8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          </button>
+                          <SessionIconButton icon={editIcon} hoverIcon={editNavIcon} onClick={() => startEdit(s)} label="Редактировать" />
+                          <SessionIconButton icon={deleteIcon} hoverIcon={deleteNav2Icon} onClick={() => deleteSession(s.id)} label="Удалить" />
                         </>
                       )}
                     </>

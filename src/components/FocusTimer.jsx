@@ -70,7 +70,7 @@ export function FocusTimer() {
   const isPomo = mode === 'pomodoro';
   const ringProgress = isPomo
     ? Math.min(1, phaseTarget ? phaseElapsed / phaseTarget : 0)
-    : (phaseElapsed % 60) / 60; // stopwatch: smooth per-minute sweep
+    : (phaseElapsed % 3600) / 3600; // stopwatch: sweep fills over one hour
   const dashOffset = CIRC * (1 - ringProgress);
   const centerTime = isPomo ? fmt(phaseRemaining ?? 0) : fmt(phaseElapsed);
 

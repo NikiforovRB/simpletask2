@@ -222,6 +222,7 @@ export function FocusProvider({ children }) {
     // Session data + mutations (single source of truth for the analytics page).
     sessions,
     sessionsLoading,
+    logSession,
     deleteSession,
     updateSession,
   };

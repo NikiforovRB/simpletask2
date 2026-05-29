@@ -154,13 +154,13 @@
 .focus-card__ring-track {
   fill: none;
   stroke: var(--bg-elev);
-  stroke-width: 14;
+  stroke-width: 7;
 }
 
 .focus-card__ring-progress {
   fill: none;
   stroke: var(--focus-accent);
-  stroke-width: 14;
+  stroke-width: 7;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.4s linear, stroke 0.4s ease;
   filter: drop-shadow(0 0 6px var(--accent-glow));

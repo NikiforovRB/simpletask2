@@ -269,14 +269,32 @@ export function TaskItem({
           ) : null}
         </button>
         {!editing && task.scheduled_time && (
-          <button
-            type="button"
-            className="task-item__time-chip"
-            onClick={() => isParentTask && setTimeOpen((v) => !v)}
-            title={`Напоминание: ${reminderLabel(task.reminder_minutes)}`}
-          >
-            {formatTimeHHMM(task.scheduled_time)}
-          </button>
+          <span className="task-item__time-wrap">
+            <button
+              type="button"
+              className="task-item__time-chip"
+              onClick={() => isParentTask && setTimeOpen((v) => !v)}
+              title={`Напоминание: ${reminderLabel(task.reminder_minutes)}`}
+            >
+              {formatTimeHHMM(task.scheduled_time)}
+            </button>
+            {timeOpen && isParentTask && (
+              <>
+                <div className="task-item__calendar-backdrop" onClick={() => setTimeOpen(false)} />
+                <div className="task-item__calendar-popover task-item__calendar-popover--left">
+                  <TimePickerPopover
+                    value={task.scheduled_time}
+                    reminder={task.reminder_minutes}
+                    onChange={({ time, reminder }) => {
+                      onUpdate(task.id, { scheduled_time: time || null, reminder_minutes: reminder });
+                    }}
+                    onClear={() => onUpdate(task.id, { scheduled_time: null, reminder_minutes: null })}
+                    onClose={() => setTimeOpen(false)}
+                  />
+                </div>
+              </>
+            )}
+          </span>
         )}
         {showLightning && (
           <button
@@ -424,7 +442,7 @@ export function TaskItem({
             )}
           </div>
           )}
-          {isParentTask && !isCompleted && (
+          {isParentTask && !isCompleted && !task.scheduled_time && (
           <div className="task-item__calendar-wrap">
             <button
               type="button"
@@ -434,7 +452,7 @@ export function TaskItem({
               onClick={() => setTimeOpen((v) => !v)}
               aria-label="Время и напоминание"
             >
-              <img src={(hasHover && timeHover) || task.scheduled_time ? notificationNavIcon : notificationIcon} alt="" />
+              <img src={hasHover && timeHover ? notificationNavIcon : notificationIcon} alt="" />
             </button>
             {timeOpen && (
               <>

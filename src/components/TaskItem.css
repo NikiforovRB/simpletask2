@@ -230,6 +230,19 @@
   z-index: 51;
 }
 
+/* Time popover opened from the time label (left side of the row). */
+.task-item__time-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.task-item__calendar-popover--left {
+  right: auto;
+  left: 0;
+}
+
 .task-item__title {
   flex: 1;
   min-width: 0;
