@@ -112,6 +112,22 @@
   background: rgba(0, 0, 0, 0.3);
 }
 
+/* Time label shown right after the checkbox when a task has a time. Plain
+   text (no icon, no background), always visible. Clicking it opens the time
+   editor (where the time can be cleared). */
+.task-item__time-chip {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  color: #5A86EE;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+
 .task-item__lightning-btn {
   flex-shrink: 0;
   width: 1rem;

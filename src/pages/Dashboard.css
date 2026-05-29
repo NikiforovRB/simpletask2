@@ -248,7 +248,7 @@
 }
 
 .dashboard__context-menu-item--danger {
-  color: var(--danger);
+  color: #ea6868;
 }
 
 .dashboard__context-menu-item-icon {
@@ -455,7 +455,7 @@
 .dashboard__edit-project-fab {
   position: fixed;
   bottom: 1.5rem;
-  right: calc(1.5rem + 2.5rem + 30px);
+  right: calc(1.5rem + 2.5rem + 10px);
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 50%;

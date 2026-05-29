@@ -24,6 +24,10 @@ import molniacompleteIcon from '../assets/molniacomplete.svg';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useMobileTaskEditViewportScroll } from '../hooks/useMobileTaskEditViewportScroll';
 import { CalendarPopover } from './CalendarPopover';
+import { TimePickerPopover } from './TimePickerPopover';
+import { formatTimeHHMM, reminderLabel } from '../lib/reminders';
+import notificationIcon from '../assets/notification.svg';
+import notificationNavIcon from '../assets/notification-nav.svg';
 import './TaskItem.css';
 
 const RED_COLOR = '#f33737';
@@ -192,6 +196,8 @@ export function TaskItem({
   const [lineHover, setLineHover] = useState(false);
   const [collapseSubHover, setCollapseSubHover] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [timeOpen, setTimeOpen] = useState(false);
+  const [timeHover, setTimeHover] = useState(false);
   const [lightningHover, setLightningHover] = useState(false);
 
   const [ctxHover, setCtxHover] = useState(false);
@@ -262,6 +268,16 @@ export function TaskItem({
             </span>
           ) : null}
         </button>
+        {!editing && task.scheduled_time && (
+          <button
+            type="button"
+            className="task-item__time-chip"
+            onClick={() => isParentTask && setTimeOpen((v) => !v)}
+            title={`Напоминание: ${reminderLabel(task.reminder_minutes)}`}
+          >
+            {formatTimeHHMM(task.scheduled_time)}
+          </button>
+        )}
         {showLightning && (
           <button
             type="button"
@@ -402,6 +418,36 @@ export function TaskItem({
                       setCalendarOpen(false);
                     }}
                     onClose={() => setCalendarOpen(false)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          )}
+          {isParentTask && !isCompleted && (
+          <div className="task-item__calendar-wrap">
+            <button
+              type="button"
+              className="task-item__action-btn"
+              onMouseEnter={() => hasHover && setTimeHover(true)}
+              onMouseLeave={() => hasHover && setTimeHover(false)}
+              onClick={() => setTimeOpen((v) => !v)}
+              aria-label="Время и напоминание"
+            >
+              <img src={(hasHover && timeHover) || task.scheduled_time ? notificationNavIcon : notificationIcon} alt="" />
+            </button>
+            {timeOpen && (
+              <>
+                <div className="task-item__calendar-backdrop" onClick={() => setTimeOpen(false)} />
+                <div className="task-item__calendar-popover">
+                  <TimePickerPopover
+                    value={task.scheduled_time}
+                    reminder={task.reminder_minutes}
+                    onChange={({ time, reminder }) => {
+                      onUpdate(task.id, { scheduled_time: time || null, reminder_minutes: reminder });
+                    }}
+                    onClear={() => onUpdate(task.id, { scheduled_time: null, reminder_minutes: null })}
+                    onClose={() => setTimeOpen(false)}
                   />
                 </div>
               </>

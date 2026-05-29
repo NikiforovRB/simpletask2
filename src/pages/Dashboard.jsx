@@ -48,6 +48,11 @@ import { GoalPlanView } from '../components/GoalPlanView';
 import { NoDateList } from '../components/NoDateList';
 import { SomedayList } from '../components/SomedayList';
 import { ProjectList } from '../components/ProjectList';
+import { FocusTimer } from '../components/FocusTimer';
+import { FocusAnalytics } from '../components/FocusAnalytics';
+import { useFocus } from '../contexts/FocusContext';
+import { useReminderScheduler } from '../hooks/useReminderScheduler';
+import { registerReminderServiceWorker } from '../lib/reminders';
 import { getContainerId, getContainerIdForBucket, getContainerIdFromTask, parseContainerId } from '../lib/dnd';
 import { toLocalDateString } from '../constants';
 import { parseSlotId } from '../components/DropSlot';
@@ -100,6 +105,8 @@ import zavtraIcon from '../assets/zavtra.svg';
 import poslezavtraIcon from '../assets/poslezavtra.svg';
 import privIcon from '../assets/priv.svg';
 import privNavIcon from '../assets/priv-nav.svg';
+import focusIcon from '../assets/focus.svg';
+import focusNavIcon from '../assets/focus-nav.svg';
 import sunIcon from '../assets/sun.svg';
 import sunNavIcon from '../assets/sun-nav.svg';
 import moonIcon from '../assets/moon.svg';
@@ -168,6 +175,7 @@ const BUILTIN_MENU_ITEMS = [
   { key: 'no_date', label: 'Задачи без даты' },
   { key: 'someday', label: 'Когда-нибудь' },
   { key: 'habits', label: 'Привычки' },
+  { key: 'focus_analytics', label: 'Фокус' },
 ];
 
 const menuHiddenKey = (kind, id) =>
@@ -264,6 +272,7 @@ function SortableProjectItem({ project, isActive, isHover, iconDefault, iconHove
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const { tasks, addTask, updateTask, deleteTask, toggleComplete, moveTask } = useTasks();
+  const focus = useFocus();
   const {
     settings,
     setDaysCount,
@@ -305,6 +314,7 @@ export default function Dashboard() {
     deleteItem: deleteGoalPlanItem,
     reorderItems: reorderGoalPlanItems,
     moveDayItem: moveGoalPlanDayItem,
+    bulkMoveToDate: bulkMoveGoalPlanToDate,
     setDayNote: setGoalPlanDayNote,
   } = useGoalPlan();
   const [dateOffset, setDateOffset] = useState(() => {
@@ -329,7 +339,7 @@ export default function Dashboard() {
       if (!raw) return 'plans';
       const parsed = JSON.parse(raw);
       const v = parsed?.viewMode;
-      return ['today', 'plans', 'goal_plan', 'no_date', 'someday', 'habits', 'board', 'project'].includes(v) ? v : 'plans';
+      return ['today', 'plans', 'goal_plan', 'no_date', 'someday', 'habits', 'focus_analytics', 'board', 'project'].includes(v) ? v : 'plans';
     } catch {
       return 'plans';
     }
@@ -400,6 +410,7 @@ export default function Dashboard() {
   const [noDateHover, setNoDateHover] = useState(false);
   const [somedayHover, setSomedayHover] = useState(false);
   const [habitsHover, setHabitsHover] = useState(false);
+  const [focusHover, setFocusHover] = useState(false);
   const [projectHoverId, setProjectHoverId] = useState(null);
   const [eyeHover, setEyeHover] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
@@ -459,6 +470,35 @@ export default function Dashboard() {
     document.documentElement.setAttribute('data-theme', theme);
     document.body.setAttribute('data-theme', theme);
   }, [settings.theme]);
+
+  // Register the (local-only) reminder service worker once.
+  useEffect(() => {
+    registerReminderServiceWorker();
+  }, []);
+
+  // Combined reminder list: tasks (all lists/projects) + goal-plan day items.
+  const reminderItems = useMemo(() => {
+    const list = (tasks || []).map((t) => ({
+      id: t.id,
+      title: t.title,
+      scheduled_date: t.scheduled_date,
+      scheduled_time: t.scheduled_time,
+      reminder_minutes: t.reminder_minutes,
+      completed_at: t.completed_at,
+    }));
+    for (const it of goalPlanItemsByKind?.day || []) {
+      list.push({
+        id: `gp-${it.id}`,
+        title: it.text,
+        scheduled_date: it.entry_date,
+        scheduled_time: it.scheduled_time,
+        reminder_minutes: it.reminder_minutes,
+        completed_at: it.completed_at,
+      });
+    }
+    return list;
+  }, [tasks, goalPlanItemsByKind]);
+  useReminderScheduler(reminderItems);
   const sidebarWidthPx = useMemo(() => clampSidebarWidthPx(settings.sidebar_width_px), [settings.sidebar_width_px]);
   const liveMenuWidth = useMemo(
     () => (resizingMenuWidth != null ? clampSidebarWidthPx(resizingMenuWidth) : sidebarWidthPx),
@@ -543,7 +583,7 @@ export default function Dashboard() {
   }, [viewMode, activeProjectId, activeBoardId, projects, projectsLoading, boardItems, boardItemsLoading]);
 
   const handleMenuSelect = useCallback((target) => {
-    const isBuiltinView = ['today', 'plans', 'goal_plan', 'no_date', 'someday', 'habits'].includes(target);
+    const isBuiltinView = ['today', 'plans', 'goal_plan', 'no_date', 'someday', 'habits', 'focus_analytics'].includes(target);
     if (isBuiltinView) {
       setViewMode(target);
       setActiveProjectId(null);
@@ -729,6 +769,12 @@ export default function Dashboard() {
     updateTask(contextMenu.task.id, { text_color: textColor });
     setContextMenu(null);
   }, [contextMenu, updateTask]);
+
+  const handleContextMenuFocus = useCallback(() => {
+    if (!contextMenu?.task) return;
+    focus.openFocus({ ref: contextMenu.task.id, title: contextMenu.task.title, source: 'task' }, 'stopwatch');
+    setContextMenu(null);
+  }, [contextMenu, focus]);
 
 
   const today = new Date();
@@ -1207,7 +1253,7 @@ export default function Dashboard() {
                 className="dashboard__board-header-slot dashboard__board-header-slot--right"
               />
             )}
-            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'goal_plan' && (
+            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
@@ -1309,6 +1355,18 @@ export default function Dashboard() {
                 >
                   <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
                   <span>Привычки</span>
+                </button>
+              )}
+              {!isBuiltinHidden('focus_analytics') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'focus_analytics' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setFocusHover(true)}
+                  onMouseLeave={() => hasHover && setFocusHover(false)}
+                  onClick={() => handleMenuSelect('focus_analytics')}
+                >
+                  <img src={viewMode === 'focus_analytics' || (hasHover && focusHover) ? focusNavIcon : focusIcon} alt="" />
+                  <span>Фокус</span>
                 </button>
               )}
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
@@ -1463,6 +1521,18 @@ export default function Dashboard() {
                 >
                   <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
                   <span>Привычки</span>
+                </button>
+              )}
+              {!isBuiltinHidden('focus_analytics') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'focus_analytics' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setFocusHover(true)}
+                  onMouseLeave={() => hasHover && setFocusHover(false)}
+                  onClick={() => handleMenuSelect('focus_analytics')}
+                >
+                  <img src={viewMode === 'focus_analytics' || (hasHover && focusHover) ? focusNavIcon : focusIcon} alt="" />
+                  <span>Фокус</span>
                 </button>
               )}
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
@@ -1657,6 +1727,11 @@ export default function Dashboard() {
                 );
               })}
             </div>
+            <button type="button" className="dashboard__context-menu-item" onClick={handleContextMenuFocus}>
+              <img src={focusIcon} alt="" className="dashboard__context-menu-item-icon" />
+              <span>Сфокусироваться</span>
+            </button>
+            <div className="dashboard__context-menu-separator" aria-hidden />
             <button type="button" className="dashboard__context-menu-item" onClick={() => handleMoveTaskToDestination({ type: 'today' })}>
               <img src={starIcon} alt="" className="dashboard__context-menu-item-icon" />
               <span>Сегодня</span>
@@ -1732,6 +1807,7 @@ export default function Dashboard() {
                     case 'no_date': return layersIcon;
                     case 'someday': return archiveIcon;
                     case 'habits': return privIcon;
+                    case 'focus_analytics': return focusIcon;
                     default: return folderIcon;
                   }
                 })();
@@ -1898,6 +1974,7 @@ export default function Dashboard() {
           deleteItem={deleteGoalPlanItem}
           reorderItems={reorderGoalPlanItems}
           moveDayItem={moveGoalPlanDayItem}
+          bulkMoveToDate={bulkMoveGoalPlanToDate}
           setDayNote={setGoalPlanDayNote}
           getListCollapsed={getListCollapsed}
           setListCollapsed={setListCollapsed}
@@ -1959,6 +2036,8 @@ export default function Dashboard() {
           setHabitsSidebarWidthPx={setHabitsSidebarWidthPx}
         />
       )}
+
+      {viewMode === 'focus_analytics' && <FocusAnalytics />}
 
       {viewMode === 'board' && (
         <BoardView
@@ -2060,6 +2139,8 @@ export default function Dashboard() {
           setListCollapsed={setListCollapsed}
         />
       )}
+
+      <FocusTimer />
 
       <DragOverlay
         dropAnimation={{

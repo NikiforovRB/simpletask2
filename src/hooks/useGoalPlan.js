@@ -389,6 +389,67 @@ export function useGoalPlan() {
     [user?.id]
   );
 
+  /**
+   * Move every given top-level day item to `targetDate` (appended to that
+   * day's end, preserving the given order). Re-indexes affected source days.
+   * Done in a single state+DB pass so it's safe for many items at once
+   * (sequential `moveDayItem` calls would race on the lagging `stateRef`).
+   * Subtasks follow their parent automatically (they're grouped by parent_id).
+   */
+  const bulkMoveToDate = useCallback(
+    async (ids, targetDate) => {
+      if (!user?.id || !ids?.length || !targetDate) return;
+      const all = stateRef.current?.items || [];
+      const moveSet = new Set(ids);
+      const stateById = new Map();
+      const updates = [];
+
+      const topLevelDay = (date) =>
+        all
+          .filter((it) => it.kind === 'day' && !it.parent_id && it.entry_date === date)
+          .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+      // Append moved items to the end of the target day, in the requested order.
+      let pos = topLevelDay(targetDate).filter((it) => !moveSet.has(it.id)).length;
+      for (const id of ids) {
+        const item = all.find((it) => it.id === id);
+        if (!item || item.kind !== 'day' || item.parent_id) continue;
+        stateById.set(id, { entry_date: targetDate, position: pos });
+        updates.push({ id, entry_date: targetDate, position: pos });
+        pos += 1;
+      }
+
+      // Re-index each affected source day (excluding the moved items).
+      const srcDates = new Set(
+        all.filter((it) => moveSet.has(it.id)).map((it) => it.entry_date)
+      );
+      for (const sd of srcDates) {
+        if (sd === targetDate) continue;
+        const remaining = topLevelDay(sd).filter((it) => !moveSet.has(it.id));
+        remaining.forEach((it, idx) => {
+          stateById.set(it.id, { entry_date: sd, position: idx });
+          updates.push({ id: it.id, entry_date: sd, position: idx });
+        });
+      }
+
+      if (!updates.length) return;
+      setState((prev) => ({
+        ...prev,
+        items: prev.items.map((it) => (stateById.has(it.id) ? { ...it, ...stateById.get(it.id) } : it)),
+      }));
+      await Promise.all(
+        updates.map((u) =>
+          supabase
+            .from('goal_plan_items')
+            .update({ entry_date: u.entry_date, position: u.position })
+            .eq('id', u.id)
+            .eq('user_id', user.id)
+        )
+      );
+    },
+    [user?.id]
+  );
+
   const setDayNote = useCallback(
     async (entry_date, patch) => {
       if (!user?.id || !entry_date) return;
@@ -438,6 +499,7 @@ export function useGoalPlan() {
     deleteItem,
     reorderItems,
     moveDayItem,
+    bulkMoveToDate,
     setDayNote,
     refetch: fetchAll,
   };

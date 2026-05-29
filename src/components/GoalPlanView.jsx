@@ -16,6 +16,7 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { formatDayLabel, toLocalDateString, TASK_COLORS } from '../constants';
+import { useFocus } from '../contexts/FocusContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DropSlot, parseSlotId } from './DropSlot';
 import { CalendarPopover } from './CalendarPopover';
@@ -28,6 +29,7 @@ import trashHoverIcon from '../assets/delete-nav.svg';
 import calIcon from '../assets/cal.svg';
 import calNavIcon from '../assets/cal-nav.svg';
 import starIcon from '../assets/star.svg';
+import focusIcon from '../assets/focus.svg';
 import zavtraIcon from '../assets/zavtra.svg';
 import poslezavtraIcon from '../assets/poslezavtra.svg';
 import ctxDeleteIcon from '../assets/delete-nav2.svg';
@@ -892,6 +894,7 @@ function DayColumn({
   onToggle,
   onChangeColor,
   onChangeDate,
+  onMoveUnfinished,
   onUpdate,
   onContextMenu,
   isDragging,
@@ -903,6 +906,10 @@ function DayColumn({
   const total = dayItems.length;
   const done = dayItems.filter((it) => it.completed_at).length;
   const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+  const todayDs = toLocalDateString(new Date());
+  const isPast = ds < todayDs;
+  const unfinishedCount = dayItems.filter((it) => !it.completed_at).length;
+  const canMoveUnfinished = isPast && unfinishedCount > 0;
   return (
     <section className="goal-plan__day">
       <header className="goal-plan__day-head">
@@ -913,6 +920,19 @@ function DayColumn({
         <div className="goal-plan__day-progress" title={`${done} из ${total}`}>
           <div className="goal-plan__day-progress-bar" style={{ width: `${progress}%` }} />
         </div>
+        {canMoveUnfinished && (
+          <button
+            type="button"
+            className="goal-plan__move-unfinished"
+            onClick={() => onMoveUnfinished?.(ds)}
+            title="Перенести все незавершённые задачи этого дня на сегодня"
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M3 8h8.5M8 4.5L12 8l-4 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>Перенести незавершённое на сегодня ({unfinishedCount})</span>
+          </button>
+        )}
       </header>
       {showStartNote && (
         <DayNoteField
@@ -1085,10 +1105,12 @@ export function GoalPlanView({
   deleteItem,
   reorderItems,
   moveDayItem,
+  bulkMoveToDate,
   setDayNote,
   getListCollapsed,
   setListCollapsed,
 }) {
+  const focus = useFocus();
   const [activeDragId, setActiveDragId] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -1359,6 +1381,19 @@ export function GoalPlanView({
     [updateItem]
   );
 
+  /** Move all unfinished top-level tasks of `ds` to today (appended). */
+  const handleMoveUnfinishedToToday = useCallback(
+    (ds) => {
+      const todayDs = toLocalDateString(new Date());
+      if (ds === todayDs) return;
+      const ids = (dayItemsByDate.get(ds) || [])
+        .filter((it) => !it.completed_at)
+        .map((it) => it.id);
+      if (ids.length) bulkMoveToDate?.(ids, todayDs);
+    },
+    [dayItemsByDate, bulkMoveToDate]
+  );
+
   /** Day-item date change moves the item to the new day's plan (top position),
    * re-indexing positions in both source and target days. */
   const handleChangeDateDay = useCallback(
@@ -1503,6 +1538,7 @@ export function GoalPlanView({
                   onToggle={(id) => toggleComplete(id)}
                   onChangeColor={handleChangeColor}
                   onChangeDate={handleChangeDateDay}
+                  onMoveUnfinished={handleMoveUnfinishedToToday}
                   onUpdate={updateItem}
                   onContextMenu={handleRowContextMenu}
                   isDragging={!!activeDragId}
@@ -1563,6 +1599,21 @@ export function GoalPlanView({
                 );
               })}
             </div>
+            <button
+              type="button"
+              className="goal-plan__ctxmenu-item"
+              onClick={() => {
+                focus.openFocus(
+                  { ref: `gp-${ctxMenu.item.id}`, title: ctxMenu.item.text || 'Задача дня', source: 'goal_plan' },
+                  'stopwatch'
+                );
+                setCtxMenu(null);
+              }}
+            >
+              <img src={focusIcon} alt="" className="goal-plan__ctxmenu-icon" />
+              <span>Сфокусироваться</span>
+            </button>
+            <div className="goal-plan__ctxmenu-separator" aria-hidden />
             <button
               type="button"
               className="goal-plan__ctxmenu-item"

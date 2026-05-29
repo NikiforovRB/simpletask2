@@ -798,8 +798,9 @@ body.board-styling-side-open .dashboard.dashboard--board-pdf-only .dashboard__bo
   color: var(--accent);
 }
 
+.board-view__context-item--danger,
 .board-view__context-item--danger:hover {
-  color: var(--danger);
+  color: #ea6868;
 }
 
 .board-view__context-icon {

@@ -714,6 +714,43 @@
   min-width: 0;
 }
 
+.goal-plan__move-unfinished {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 3px 10px 3px 8px;
+  font-size: calc(11.5px * var(--task-font-scale, 1));
+  font-family: inherit;
+  cursor: pointer;
+  line-height: 1.2;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  animation: gp-move-unfinished-in 0.25s ease;
+}
+
+.goal-plan__move-unfinished:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.goal-plan__move-unfinished:active {
+  transform: scale(0.97);
+}
+
+.goal-plan__move-unfinished svg {
+  flex-shrink: 0;
+}
+
+@keyframes gp-move-unfinished-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .goal-plan__day-progress {
   width: 100%;
   height: 4px;
@@ -892,7 +929,7 @@
 }
 
 .goal-plan__ctxmenu-item--danger {
-  color: var(--danger);
+  color: #ea6868;
 }
 
 .goal-plan__ctxmenu-icon {
