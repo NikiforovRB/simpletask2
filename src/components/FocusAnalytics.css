@@ -41,7 +41,7 @@
 
 .focus-analytics__card-value {
   font-size: 1.4rem;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--text-strong);
   font-variant-numeric: tabular-nums;
 }
