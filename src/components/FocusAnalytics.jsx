@@ -47,7 +47,7 @@ function localTimeOf(iso) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-const PALETTE = ['#5a86ee', '#15c466', '#f4ba04', '#613aaf', '#00b5cc', '#f33737', '#c4d636', '#f29300'];
+const TASK_BAR_COLOR = '#15c466';
 const LIVE_ID = '__live__';
 
 export function FocusAnalytics() {
@@ -262,7 +262,7 @@ export function FocusAnalytics() {
               <div className="focus-analytics__tasks">
                 {selectedDetail.tasks.map((t, i) => {
                   const pct = selectedDetail.total ? (t.secs / selectedDetail.total) * 100 : 0;
-                  const color = PALETTE[i % PALETTE.length];
+                  const color = TASK_BAR_COLOR;
                   return (
                     <div className="focus-analytics__task-row" key={t.title + i}>
                       <div className="focus-analytics__task-head">

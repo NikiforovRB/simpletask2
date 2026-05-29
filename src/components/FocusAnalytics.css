@@ -11,7 +11,7 @@
 
 .focus-analytics__title {
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--text-strong);
   margin: 0 0 1.3rem;
 }
@@ -105,14 +105,10 @@
 
 .focus-analytics__bar-fill {
   width: 100%;
-  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-soft) 140%);
+  background: linear-gradient(180deg, #15c466 0%, rgba(21, 196, 102, 0.3) 140%);
   border-radius: 8px 8px 0 0;
   transition: height 0.6s cubic-bezier(0.2, 0.8, 0.3, 1);
   min-height: 0;
-}
-
-.focus-analytics__bar-col.is-selected .focus-analytics__bar-fill {
-  background: linear-gradient(180deg, #15c466 0%, rgba(21, 196, 102, 0.25) 140%);
 }
 
 .focus-analytics__bar-col:hover .focus-analytics__bar-track {
@@ -125,9 +121,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-.focus-analytics__bar-col.is-selected .focus-analytics__bar-label {
-  color: var(--text-strong);
-  font-weight: 600;
+.focus-analytics__bar-col.is-selected .focus-analytics__bar-label,
+.focus-analytics__bar-col.is-selected .focus-analytics__bar-wd {
+  color: #5A86EE;
 }
 
 .focus-analytics__bar-wd {
@@ -332,17 +328,16 @@
 
 .focus-analytics__session-input {
   background: var(--bg-elev);
-  border: 1px solid var(--border-strong);
+  border: none;
   color: var(--text-strong);
   border-radius: 6px;
-  padding: 0.35rem 0.5rem;
+  padding: 0.4rem 0.55rem;
   font-size: 0.875rem;
   font-family: inherit;
 }
 
 .focus-analytics__session-input:focus {
   outline: none;
-  border-color: var(--accent);
 }
 
 .focus-analytics__session-input--title {
@@ -354,12 +349,29 @@
   width: 3rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Hide the number spinner arrows inside the hours/minutes fields. */
+.focus-analytics__session-input--num::-webkit-outer-spin-button,
+.focus-analytics__session-input--num::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .focus-analytics__session-input--time {
-  width: 5rem;
+  width: 6.5rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+/* Hide the native time-picker (clock) button in the add-session time field. */
+.focus-analytics__session-input--time::-webkit-calendar-picker-indicator {
+  display: none;
+}
+.focus-analytics__session-input--time::-webkit-inner-spin-button {
+  display: none;
 }
 
 .focus-analytics__session--adding {
