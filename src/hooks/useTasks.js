@@ -19,16 +19,53 @@ export function useTasks() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [accessibleProjectIds, setAccessibleProjectIds] = useState([]);
 
   const fetchTasks = useCallback(async () => {
     if (!user) return;
-    const { data, error } = await supabase
+
+    // Projects the user can access: ones they own + ones shared with them.
+    const [{ data: owned }, { data: memberships }] = await Promise.all([
+      supabase.from('task_projects').select('id').eq('user_id', user.id),
+      supabase.from('project_members').select('project_id').eq('user_id', user.id),
+    ]);
+    const projectIds = Array.from(
+      new Set([
+        ...(owned || []).map((p) => p.id),
+        ...(memberships || []).map((m) => m.project_id),
+      ]),
+    );
+    setAccessibleProjectIds(projectIds);
+
+    // Personal tasks (inbox/someday + own project tasks).
+    const ownPromise = supabase
       .from('tasks')
       .select('*')
       .eq('user_id', user.id)
       .order('position', { ascending: true });
-    if (!error) setTasks(data || []);
-    else console.error('Tasks fetch error:', error);
+    // All tasks belonging to accessible projects (includes collaborators' tasks).
+    const projectPromise = projectIds.length
+      ? supabase
+          .from('tasks')
+          .select('*')
+          .in('project_id', projectIds)
+          .order('position', { ascending: true })
+      : Promise.resolve({ data: [], error: null });
+
+    const [{ data: own, error: ownErr }, { data: projectTasks }] = await Promise.all([
+      ownPromise,
+      projectPromise,
+    ]);
+    if (ownErr) {
+      console.error('Tasks fetch error:', ownErr);
+      setLoading(false);
+      return;
+    }
+    const byId = new Map();
+    for (const t of own || []) byId.set(t.id, t);
+    for (const t of projectTasks || []) byId.set(t.id, t);
+    const merged = Array.from(byId.values()).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    setTasks(merged);
     setLoading(false);
   }, [user?.id]);
 
@@ -45,6 +82,21 @@ export function useTasks() {
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [user?.id, fetchTasks]);
+
+  // Best-effort realtime for tasks in shared/owned projects created by others.
+  useEffect(() => {
+    if (!user || accessibleProjectIds.length === 0) return;
+    const channel = supabase.channel(`tasks_projects_${user.id}`);
+    for (const pid of accessibleProjectIds) {
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks', filter: `project_id=eq.${pid}` },
+        fetchTasks,
+      );
+    }
+    channel.subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [user?.id, accessibleProjectIds, fetchTasks]);
 
   const addTask = async (payload) => {
     if (!user) return;

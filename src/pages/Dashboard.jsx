@@ -33,6 +33,7 @@ import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestC
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { useTasks } from '../hooks/useTasks';
 import { useSettings } from '../hooks/useSettings';
 import { useListCollapsed } from '../hooks/useListCollapsed';
@@ -433,6 +434,11 @@ export default function Dashboard() {
   const [editProjectId, setEditProjectId] = useState(null);
   const [editProjectTitle, setEditProjectTitle] = useState('');
   const [editProjectKind, setEditProjectKind] = useState('project');
+  const [editProjectIsOwner, setEditProjectIsOwner] = useState(true);
+  const [shareMembers, setShareMembers] = useState([]);
+  const [shareEmail, setShareEmail] = useState('');
+  const [shareMessage, setShareMessage] = useState(null); // { type: 'ok'|'error', text }
+  const [shareBusy, setShareBusy] = useState(false);
   const [activeDragId, setActiveDragId] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [editingTaskId, setEditingTaskId] = useState(null);
@@ -620,12 +626,66 @@ export default function Dashboard() {
     }
   }, [addProjectTitle, addProjectKind, addProject]);
 
+  const loadShareMembers = useCallback(async (projectId) => {
+    if (!projectId) return;
+    const { data, error } = await supabase.rpc('list_project_members', { p_project_id: projectId });
+    if (!error) setShareMembers(data || []);
+  }, []);
+
   const handleOpenEditProject = useCallback((id, title, kind = 'project') => {
+    const entry = projects.find((p) => p.id === id);
+    const isOwner = !entry || entry.user_id === user?.id;
     setEditProjectId(id);
     setEditProjectTitle(title ?? '');
     setEditProjectKind(kind);
+    setEditProjectIsOwner(isOwner);
+    setShareEmail('');
+    setShareMessage(null);
+    setShareMembers([]);
     setEditProjectOpen(true);
-  }, []);
+    if (isOwner) loadShareMembers(id);
+  }, [projects, user?.id, loadShareMembers]);
+
+  const handleShareProject = useCallback(async () => {
+    const email = shareEmail.trim();
+    if (!editProjectId || !email) return;
+    setShareBusy(true);
+    setShareMessage(null);
+    const { data, error } = await supabase.rpc('share_project', {
+      p_project_id: editProjectId,
+      p_email: email,
+    });
+    setShareBusy(false);
+    if (error) {
+      setShareMessage({ type: 'error', text: 'Ошибка. Попробуйте ещё раз.' });
+      return;
+    }
+    if (data?.ok) {
+      setShareEmail('');
+      setShareMessage({ type: 'ok', text: `Доступ открыт: ${data.email}` });
+      loadShareMembers(editProjectId);
+    } else if (data?.error === 'user_not_found') {
+      setShareMessage({ type: 'error', text: 'Пользователь с таким email не найден.' });
+    } else if (data?.error === 'self') {
+      setShareMessage({ type: 'error', text: 'Это ваш собственный аккаунт.' });
+    } else if (data?.error === 'not_owner') {
+      setShareMessage({ type: 'error', text: 'Делиться может только владелец.' });
+    } else {
+      setShareMessage({ type: 'error', text: 'Не удалось предоставить доступ.' });
+    }
+  }, [editProjectId, shareEmail, loadShareMembers]);
+
+  const handleRemoveShareMember = useCallback(async (memberUserId) => {
+    if (!editProjectId || !memberUserId) return;
+    const { error } = await supabase
+      .from('project_members')
+      .delete()
+      .eq('project_id', editProjectId)
+      .eq('user_id', memberUserId);
+    if (!error) {
+      setShareMembers((prev) => prev.filter((m) => m.user_id !== memberUserId));
+    }
+  }, [editProjectId]);
 
   const handleEditProjectSave = useCallback(() => {
     if (editProjectId && editProjectTitle.trim()) {
@@ -1662,13 +1722,59 @@ export default function Dashboard() {
               autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter') handleEditProjectSave(); }}
             />
+            {editProjectIsOwner && (
+              <div className="dashboard__share">
+                <div className="dashboard__share-label">Совместный доступ</div>
+                <div className="dashboard__share-row">
+                  <input
+                    type="email"
+                    className="dashboard__settings-input dashboard__share-input"
+                    value={shareEmail}
+                    onChange={(e) => { setShareEmail(e.target.value); setShareMessage(null); }}
+                    placeholder="email пользователя"
+                    autoComplete="off"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleShareProject(); }}
+                  />
+                  <button
+                    type="button"
+                    className="dashboard__share-btn"
+                    onClick={handleShareProject}
+                    disabled={shareBusy || !shareEmail.trim()}
+                  >
+                    {shareBusy ? '...' : 'Поделиться'}
+                  </button>
+                </div>
+                {shareMessage && (
+                  <p className={`dashboard__share-msg dashboard__share-msg--${shareMessage.type}`}>{shareMessage.text}</p>
+                )}
+                {shareMembers.length > 0 && (
+                  <ul className="dashboard__share-members">
+                    {shareMembers.map((m) => (
+                      <li key={m.user_id} className="dashboard__share-member">
+                        <span className="dashboard__share-member-email">{m.email}</span>
+                        <button
+                          type="button"
+                          className="dashboard__share-member-remove"
+                          onClick={() => handleRemoveShareMember(m.user_id)}
+                          aria-label="Убрать доступ"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             <div className="dashboard__settings-edit-actions">
               <button type="button" className="dashboard__settings-submit" onClick={handleEditProjectSave}>
                 Сохранить
               </button>
-              <button type="button" className="dashboard__settings-delete" onClick={handleEditProjectDeleteClick}>
-                {editProjectKind === 'board' ? 'Удалить доску' : 'Удалить проект'}
-              </button>
+              {editProjectIsOwner && (
+                <button type="button" className="dashboard__settings-delete" onClick={handleEditProjectDeleteClick}>
+                  {editProjectKind === 'board' ? 'Удалить доску' : 'Удалить проект'}
+                </button>
+              )}
             </div>
           </div>
         </div>

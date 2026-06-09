@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import SuperAdmin from './pages/SuperAdmin';
 
 function AppLoader() {
   return (
@@ -29,6 +30,14 @@ function PublicRoute({ children }) {
   return children;
 }
 
+function SuperAdminRoute({ children }) {
+  const { user, loading, isSuperAdmin } = useAuth();
+  if (loading) return <AppLoader />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isSuperAdmin) return <Navigate to="/" replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -38,6 +47,14 @@ export default function App() {
           <PublicRoute>
             <Login />
           </PublicRoute>
+        }
+      />
+      <Route
+        path="/superadmin"
+        element={
+          <SuperAdminRoute>
+            <SuperAdmin />
+          </SuperAdminRoute>
         }
       />
       <Route

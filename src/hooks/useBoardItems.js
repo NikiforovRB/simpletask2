@@ -61,6 +61,7 @@ export function useBoardItems() {
   itemsRef.current = items;
   const pendingInsertsRef = useRef(new Map());
   const [loading, setLoading] = useState(true);
+  const [accessibleBoardIds, setAccessibleBoardIds] = useState([]);
 
   const [offline, setOfflineState] = useState(() => {
     try {
@@ -112,11 +113,41 @@ export function useBoardItems() {
       setLoading(false);
       return;
     }
-    const { data, error } = await supabase
+
+    // Boards the user can access: owned + shared with them.
+    const [{ data: ownedBoards }, { data: memberships }] = await Promise.all([
+      supabase.from('task_projects').select('id').eq('user_id', user.id).eq('kind', 'board'),
+      supabase.from('project_members').select('project_id').eq('user_id', user.id),
+    ]);
+    const boardIds = Array.from(
+      new Set([
+        ...(ownedBoards || []).map((b) => b.id),
+        ...(memberships || []).map((m) => m.project_id),
+      ]),
+    );
+    setAccessibleBoardIds(boardIds);
+
+    const ownPromise = supabase
       .from('board_items')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: true });
+    const sharedPromise = boardIds.length
+      ? supabase
+          .from('board_items')
+          .select('*')
+          .in('board_id', boardIds)
+          .order('created_at', { ascending: true })
+      : Promise.resolve({ data: [], error: null });
+
+    const [{ data: ownItems, error }, { data: sharedItems }] = await Promise.all([
+      ownPromise,
+      sharedPromise,
+    ]);
+    const dedup = new Map();
+    for (const r of ownItems || []) dedup.set(r.id, r);
+    for (const r of sharedItems || []) dedup.set(r.id, r);
+    const data = Array.from(dedup.values());
     if (!error) {
       const p = pendingRef.current;
       // Merge server data with locally pending changes so we don't lose local state
@@ -165,6 +196,23 @@ export function useBoardItems() {
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [user?.id, offline, fetchAll]);
+
+  // Best-effort realtime for items on shared/owned boards created by others.
+  useEffect(() => {
+    if (!user?.id || offline || accessibleBoardIds.length === 0) return;
+    const channel = supabase.channel(`board_items_shared_${user.id}`);
+    for (const bid of accessibleBoardIds) {
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'board_items', filter: `board_id=eq.${bid}` },
+        () => {
+          fetchAll();
+        }
+      );
+    }
+    channel.subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [user?.id, offline, accessibleBoardIds, fetchAll]);
 
   const addItem = useCallback(
     async (patch = {}) => {
@@ -222,7 +270,8 @@ export function useBoardItems() {
         } catch {}
       }
       const updates = { ...patch, updated_at: new Date().toISOString() };
-      await supabase.from('board_items').update(updates).eq('id', id).eq('user_id', user.id);
+      // No user_id filter: RLS lets the owner or a shared member edit.
+      await supabase.from('board_items').update(updates).eq('id', id);
     },
     [user?.id, touchPending]
   );
@@ -356,7 +405,7 @@ export function useBoardItems() {
           await pendingInsert;
         } catch {}
       }
-      await supabase.from('board_items').delete().eq('id', id).eq('user_id', user.id);
+      await supabase.from('board_items').delete().eq('id', id);
     },
     [user?.id, touchPending]
   );
@@ -380,8 +429,7 @@ export function useBoardItems() {
       const { error } = await supabase
         .from('board_items')
         .update(payload)
-        .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('id', id);
       if (error) {
         console.error('Sync: update failed', error);
         return;
@@ -391,8 +439,7 @@ export function useBoardItems() {
       const { error } = await supabase
         .from('board_items')
         .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('id', id);
       if (error) {
         console.error('Sync: delete failed', error);
         return;

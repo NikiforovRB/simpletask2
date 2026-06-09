@@ -9,13 +9,39 @@ export function useProjects() {
 
   const fetchProjects = useCallback(async () => {
     if (!user) return;
-    const { data, error } = await supabase
+
+    const ownedPromise = supabase
       .from('task_projects')
       .select('*')
       .eq('user_id', user.id)
       .order('position', { ascending: true })
       .order('created_at', { ascending: true });
-    if (!error) setProjects(data || []);
+
+    const membershipPromise = supabase
+      .from('project_members')
+      .select('project_id')
+      .eq('user_id', user.id);
+
+    const [{ data: owned, error: ownedErr }, { data: memberships }] = await Promise.all([
+      ownedPromise,
+      membershipPromise,
+    ]);
+
+    const ownedList = ownedErr ? [] : (owned || []).map((p) => ({ ...p, is_shared: false }));
+
+    const sharedIds = (memberships || []).map((m) => m.project_id);
+    let sharedList = [];
+    if (sharedIds.length) {
+      const { data: shared } = await supabase
+        .from('task_projects')
+        .select('*')
+        .in('id', sharedIds)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: true });
+      sharedList = (shared || []).map((p) => ({ ...p, is_shared: true }));
+    }
+
+    setProjects([...ownedList, ...sharedList]);
     setLoading(false);
   }, [user?.id]);
 
@@ -30,19 +56,27 @@ export function useProjects() {
       .channel('task_projects')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'task_projects', filter: `user_id=eq.${user.id}` }, fetchProjects)
       .subscribe();
-    return () => supabase.removeChannel(channel);
+    const memberChannel = supabase
+      .channel(`project_members_${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_members', filter: `user_id=eq.${user.id}` }, fetchProjects)
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(memberChannel);
+    };
   }, [user?.id, fetchProjects]);
 
   const addProject = async (title, kind = 'project') => {
     if (!user) return null;
-    const maxPos = projects.length ? Math.max(...projects.map((p) => p.position ?? 0)) : -1;
+    const ownedPositions = projects.filter((p) => !p.is_shared).map((p) => p.position ?? 0);
+    const maxPos = ownedPositions.length ? Math.max(...ownedPositions) : -1;
     const { data, error } = await supabase
       .from('task_projects')
       .insert({ user_id: user.id, title: title.trim(), position: maxPos + 1, kind })
       .select()
       .single();
     if (!error && data) {
-      setProjects((prev) => [...prev, data].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
+      setProjects((prev) => [...prev, { ...data, is_shared: false }].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
       return data;
     }
     if (!error) fetchProjects();
@@ -62,11 +96,11 @@ export function useProjects() {
 
   const updateProject = async (projectId, { title }) => {
     if (!user) return;
+    // No user_id filter: RLS allows the owner or a shared member to rename.
     const { error } = await supabase
       .from('task_projects')
       .update({ title: title?.trim() ?? '' })
-      .eq('id', projectId)
-      .eq('user_id', user.id);
+      .eq('id', projectId);
     if (!error) {
       setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, title: title?.trim() ?? p.title } : p)));
     } else {
@@ -76,6 +110,7 @@ export function useProjects() {
 
   const deleteProject = async (projectId) => {
     if (!user) return;
+    // Only the owner can delete (enforced here and by RLS).
     const { error } = await supabase
       .from('task_projects')
       .delete()
@@ -88,6 +123,5 @@ export function useProjects() {
     }
   };
 
-  return { projects, loading, addProject, updateProject, deleteProject, reorderProjects };
+  return { projects, loading, addProject, updateProject, deleteProject, reorderProjects, refetch: fetchProjects };
 }
-

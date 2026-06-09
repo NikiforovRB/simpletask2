@@ -1,0 +1,243 @@
+.superadmin {
+  min-height: 100vh;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  padding: 2rem 1.25rem 4rem;
+}
+
+.superadmin__inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.superadmin__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.superadmin__title {
+  font-size: 1.6rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.superadmin__subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.superadmin__header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.superadmin__card {
+  background: var(--bg-elev);
+  border-radius: 16px;
+  padding: 1.25rem 1.25rem 1.5rem;
+}
+
+.superadmin__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.superadmin__card-title {
+  font-size: 1.05rem;
+  font-weight: 500;
+  margin: 0 0 1rem;
+}
+
+.superadmin__card-head .superadmin__card-title {
+  margin: 0;
+}
+
+.superadmin__add-form {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.superadmin__input {
+  flex: 1 1 220px;
+  min-width: 0;
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.95rem;
+  outline: none;
+}
+
+.superadmin__input:focus {
+  border-color: var(--accent);
+}
+
+.superadmin__primary-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.superadmin__primary-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.superadmin__ghost-btn {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.superadmin__ghost-btn:hover {
+  border-color: var(--border-strong);
+}
+
+.superadmin__ghost-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.superadmin__table-wrap {
+  overflow-x: auto;
+}
+
+.superadmin__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.superadmin__table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.superadmin__table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border-muted);
+  vertical-align: middle;
+}
+
+.superadmin__email {
+  font-weight: 500;
+}
+
+.superadmin__password code {
+  font-family: inherit;
+  letter-spacing: 0.04em;
+}
+
+.superadmin__password-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.superadmin__link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+}
+
+.superadmin__badge {
+  display: inline-block;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.superadmin__row-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.superadmin__delete-btn {
+  background: transparent;
+  color: #ea6868;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.superadmin__delete-btn:hover {
+  background: var(--danger-soft);
+}
+
+.superadmin__delete-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: transparent;
+}
+
+.superadmin__muted {
+  color: var(--text-secondary);
+}
+
+.superadmin__error {
+  color: #ea6868;
+  font-size: 0.9rem;
+  margin: 0.8rem 0 0;
+}
+
+.superadmin__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 1rem;
+}
+
+.superadmin__popup {
+  background: var(--bg-elev);
+  border-radius: 16px;
+  padding: 1.5rem;
+  max-width: 420px;
+  width: 100%;
+}
+
+.superadmin__popup-text {
+  margin: 0 0 1.25rem;
+  line-height: 1.5;
+}
+
+.superadmin__popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
