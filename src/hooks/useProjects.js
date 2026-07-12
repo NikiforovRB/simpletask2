@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { subscribeProjects } from '../lib/projectRealtime';
 
 export function useProjects() {
   const { user } = useAuth();
@@ -65,6 +66,16 @@ export function useProjects() {
       supabase.removeChannel(memberChannel);
     };
   }, [user?.id, fetchProjects]);
+
+  // Live updates when a collaborator edits a shared project (e.g. rename),
+  // via per-project broadcast from the database.
+  const projectIdsKey = useMemo(() => projects.map((p) => p.id).sort().join(','), [projects]);
+  useEffect(() => {
+    if (!user) return;
+    const ids = projectIdsKey ? projectIdsKey.split(',') : [];
+    if (ids.length === 0) return;
+    return subscribeProjects(ids, fetchProjects);
+  }, [user?.id, projectIdsKey, fetchProjects]);
 
   const addProject = async (title, kind = 'project') => {
     if (!user) return null;

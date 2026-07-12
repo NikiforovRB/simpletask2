@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { subscribeProjects } from '../lib/projectRealtime';
 
 /** All task ids removed when deleting id (includes nested subtasks; matches ON DELETE CASCADE). */
 function idsRemovedWithCascade(id, list) {
@@ -83,19 +84,11 @@ export function useTasks() {
     return () => supabase.removeChannel(channel);
   }, [user?.id, fetchTasks]);
 
-  // Best-effort realtime for tasks in shared/owned projects created by others.
+  // Reliable realtime for tasks in shared/owned projects (changes by any
+  // collaborator), via per-project broadcast from the database.
   useEffect(() => {
     if (!user || accessibleProjectIds.length === 0) return;
-    const channel = supabase.channel(`tasks_projects_${user.id}`);
-    for (const pid of accessibleProjectIds) {
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks', filter: `project_id=eq.${pid}` },
-        fetchTasks,
-      );
-    }
-    channel.subscribe();
-    return () => supabase.removeChannel(channel);
+    return subscribeProjects(accessibleProjectIds, fetchTasks);
   }, [user?.id, accessibleProjectIds, fetchTasks]);
 
   const addTask = async (payload) => {

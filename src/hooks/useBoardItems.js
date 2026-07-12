@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { subscribeProjects } from '../lib/projectRealtime';
 
 const OFFLINE_KEY = 'board_offline_mode';
 
@@ -197,21 +198,11 @@ export function useBoardItems() {
     return () => supabase.removeChannel(channel);
   }, [user?.id, offline, fetchAll]);
 
-  // Best-effort realtime for items on shared/owned boards created by others.
+  // Reliable realtime for items on shared/owned boards (changes by any
+  // collaborator), via per-project broadcast from the database.
   useEffect(() => {
     if (!user?.id || offline || accessibleBoardIds.length === 0) return;
-    const channel = supabase.channel(`board_items_shared_${user.id}`);
-    for (const bid of accessibleBoardIds) {
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'board_items', filter: `board_id=eq.${bid}` },
-        () => {
-          fetchAll();
-        }
-      );
-    }
-    channel.subscribe();
-    return () => supabase.removeChannel(channel);
+    return subscribeProjects(accessibleBoardIds, fetchAll);
   }, [user?.id, offline, accessibleBoardIds, fetchAll]);
 
   const addItem = useCallback(

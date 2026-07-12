@@ -204,6 +204,48 @@ export function TaskItem({
   const showLightning = (isCompleted && color === RED_COLOR) || (!isCompleted && color === RED_COLOR);
   const isParentTask = !task.parent_id;
 
+  // Mobile (no-hover): tapping a task reveals the action buttons, which then
+  // auto-hide after 5 seconds of no interaction.
+  const [mobileActionsVisible, setMobileActionsVisible] = useState(false);
+  const hideActionsTimerRef = useRef(null);
+
+  const clearHideActionsTimer = () => {
+    if (hideActionsTimerRef.current) {
+      clearTimeout(hideActionsTimerRef.current);
+      hideActionsTimerRef.current = null;
+    }
+  };
+
+  const scheduleHideActions = () => {
+    clearHideActionsTimer();
+    hideActionsTimerRef.current = setTimeout(() => {
+      setMobileActionsVisible(false);
+      hideActionsTimerRef.current = null;
+    }, 5000);
+  };
+
+  const revealMobileActions = () => {
+    if (hasHover) return;
+    setMobileActionsVisible(true);
+    scheduleHideActions();
+  };
+
+  // Keep the buttons visible while a popover (calendar/time/color) is open,
+  // and (re)start the 5s countdown once everything is closed again.
+  useEffect(() => {
+    if (hasHover) return undefined;
+    const anyPopoverOpen = calendarOpen || timeOpen || showColorPicker;
+    if (anyPopoverOpen) {
+      clearHideActionsTimer();
+      setMobileActionsVisible(true);
+    } else if (mobileActionsVisible) {
+      scheduleHideActions();
+    }
+    return undefined;
+  }, [hasHover, calendarOpen, timeOpen, showColorPicker, mobileActionsVisible]);
+
+  useEffect(() => () => clearHideActionsTimer(), []);
+
   const cycleTopStyle = () => {
     const next = (topStyle + 1) % 3;
     onUpdate(task.id, { top_style: next });
@@ -239,11 +281,11 @@ export function TaskItem({
   return (
     <div
       ref={taskRootRef}
-      className={`task-item ${isCompleted ? 'task-item--completed' : ''} ${isRecentlyCompleted ? 'task-item--entering' : ''} task-item--top-${topStyle} ${editing ? 'task-item--editing' : ''}`}
+      className={`task-item ${isCompleted ? 'task-item--completed' : ''} ${isRecentlyCompleted ? 'task-item--entering' : ''} task-item--top-${topStyle} ${editing ? 'task-item--editing' : ''} ${mobileActionsVisible ? 'task-item--actions-visible' : ''}`}
       data-task-id={task.id}
       onContextMenu={handleContextMenu}
     >
-      <div className="task-item__row">
+      <div className="task-item__row" onClick={revealMobileActions}>
         <button
           type="button"
           className={`task-item__checkbox ${isCompleted ? 'task-item__checkbox--done' : ''}`}

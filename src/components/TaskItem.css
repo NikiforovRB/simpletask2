@@ -161,7 +161,15 @@
   transition: opacity 0.15s ease;
 }
 
-.task-item__row:hover .task-item__actions {
+@media (hover: hover) {
+  .task-item__row:hover .task-item__actions {
+    opacity: 1;
+  }
+}
+
+/* Touch devices: buttons are revealed by tapping the task (JS-driven),
+   then auto-hidden after 5s. See TaskItem.jsx. */
+.task-item--actions-visible .task-item__actions {
   opacity: 1;
 }
 
