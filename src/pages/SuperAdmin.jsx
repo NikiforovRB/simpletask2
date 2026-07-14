@@ -35,6 +35,11 @@ export default function SuperAdmin() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [pwEditId, setPwEditId] = useState(null);
+  const [pwValue, setPwValue] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwError, setPwError] = useState('');
+
   const callAdmin = useCallback(async (body) => {
     const { data, error: invokeError } = await supabase.functions.invoke('admin-users', { body });
     if (invokeError) {
@@ -117,6 +122,37 @@ export default function SuperAdmin() {
     });
   };
 
+  const startPwEdit = (u) => {
+    setPwEditId(u.id);
+    setPwValue(u.password || '');
+    setPwError('');
+  };
+
+  const cancelPwEdit = () => {
+    setPwEditId(null);
+    setPwValue('');
+    setPwError('');
+  };
+
+  const savePassword = async (u) => {
+    setPwError('');
+    if (!pwValue || pwValue.length < 6) {
+      setPwError('Минимум 6 символов');
+      return;
+    }
+    setPwSaving(true);
+    try {
+      await callAdmin({ action: 'set_password', id: u.id, password: pwValue });
+      setRevealed((prev) => new Set(prev).add(u.id));
+      cancelPwEdit();
+      await loadUsers();
+    } catch (err) {
+      setPwError(err.message || 'Не удалось сохранить пароль');
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
   return (
     <div className="superadmin">
       <div className="superadmin__inner">
@@ -192,7 +228,35 @@ export default function SuperAdmin() {
                     <tr key={u.id}>
                       <td className="superadmin__email">{u.email}</td>
                       <td className="superadmin__password">
-                        {u.password ? (
+                        {pwEditId === u.id ? (
+                          <span className="superadmin__password-edit">
+                            <input
+                              type="text"
+                              className="superadmin__input superadmin__pw-input"
+                              value={pwValue}
+                              onChange={(e) => setPwValue(e.target.value)}
+                              placeholder="Новый пароль"
+                              autoComplete="off"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') savePassword(u);
+                                if (e.key === 'Escape') cancelPwEdit();
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="superadmin__primary-btn superadmin__pw-save"
+                              onClick={() => savePassword(u)}
+                              disabled={pwSaving}
+                            >
+                              {pwSaving ? '...' : 'Сохранить'}
+                            </button>
+                            <button type="button" className="superadmin__link-btn" onClick={cancelPwEdit}>
+                              Отмена
+                            </button>
+                            {pwError && <span className="superadmin__pw-error">{pwError}</span>}
+                          </span>
+                        ) : u.password ? (
                           <span className="superadmin__password-row">
                             <code>{revealed.has(u.id) ? u.password : '••••••••'}</code>
                             <button
@@ -202,9 +266,22 @@ export default function SuperAdmin() {
                             >
                               {revealed.has(u.id) ? 'Скрыть' : 'Показать'}
                             </button>
+                            <button
+                              type="button"
+                              className="superadmin__link-btn"
+                              onClick={() => startPwEdit(u)}
+                            >
+                              Изменить
+                            </button>
                           </span>
                         ) : (
-                          <span className="superadmin__muted">— (появится после входа)</span>
+                          <button
+                            type="button"
+                            className="superadmin__link-btn"
+                            onClick={() => startPwEdit(u)}
+                          >
+                            Задать пароль
+                          </button>
                         )}
                       </td>
                       <td>

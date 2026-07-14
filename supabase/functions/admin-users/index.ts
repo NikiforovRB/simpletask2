@@ -120,6 +120,21 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, id: newId });
     }
 
+    if (action === 'set_password') {
+      const id = String(body.id ?? '');
+      const password = String(body.password ?? '');
+      if (!id) return json({ error: 'Не указан id' }, 400);
+      if (!password || password.length < 6) {
+        return json({ error: 'Пароль должен быть не короче 6 символов' }, 400);
+      }
+      const { error } = await admin.auth.admin.updateUserById(id, { password });
+      if (error) return json({ error: error.message }, 400);
+      await admin
+        .from('profiles')
+        .upsert({ id, password_plain: password }, { onConflict: 'id' });
+      return json({ ok: true });
+    }
+
     if (action === 'delete') {
       const id = String(body.id ?? '');
       if (!id) return json({ error: 'Не указан id' }, 400);

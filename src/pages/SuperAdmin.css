@@ -159,6 +159,29 @@
   gap: 0.6rem;
 }
 
+.superadmin__password-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.superadmin__pw-input {
+  flex: 0 0 auto;
+  width: 180px;
+  padding: 0.4rem 0.6rem;
+}
+
+.superadmin__pw-save {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.superadmin__pw-error {
+  color: #ea6868;
+  font-size: 0.85rem;
+}
+
 .superadmin__link-btn {
   background: none;
   border: none;
