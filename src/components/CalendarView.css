@@ -74,7 +74,7 @@
 /* No-time task list (shared with Plans via TaskItem) */
 .calendar-day__notime {
   list-style: none;
-  margin: 0 0 15px;
+  margin: 0 0 45px;
   padding: 0;
 }
 
