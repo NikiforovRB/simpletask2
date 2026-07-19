@@ -1,7 +1,26 @@
 import { useMemo, useState } from 'react';
 import { toLocalDateString } from '../constants';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useReputation, isPromiseFulfilled, dayStatus } from '../hooks/useReputation';
+import plusIcon from '../assets/plus.svg';
+import plusNavIcon from '../assets/plus-nav.svg';
+import deleteIcon from '../assets/delete.svg';
+import deleteNavIcon from '../assets/delete-nav.svg';
 import './ReputationView.css';
+
+const CheckIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden>
+    <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const pluralDays = (n) => {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return 'день';
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return 'дня';
+  return 'дней';
+};
 
 const KINDS = [
   { key: 'yesno', label: 'Да / Нет' },
@@ -68,8 +87,10 @@ function dayHeading(dateStr) {
   const d = new Date(`${dateStr}T12:00:00`);
   const today = toLocalDateString(new Date());
   const yest = toLocalDateString(addDays(new Date(), -1));
+  const tomorrow = toLocalDateString(addDays(new Date(), 1));
   const base = `${d.getDate()} ${MONTHS[d.getMonth()]}, ${WEEKDAYS[weekdayIndex(d)].toLowerCase()}`;
   if (dateStr === today) return `Сегодня · ${base}`;
+  if (dateStr === tomorrow) return `Завтра · ${base}`;
   if (dateStr === yest) return `Вчера · ${base}`;
   return base;
 }
@@ -129,15 +150,11 @@ function PromiseRow({ promise, onUpdate, onDelete }) {
           onClick={() => onUpdate(promise.id, { done: !promise.done })}
           aria-label={promise.done ? 'Снять отметку' : 'Выполнено'}
         >
-          {promise.done && (
-            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden>
-              <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
+          {promise.done && <CheckIcon />}
         </button>
       ) : (
         <span className={`rep-row__badge ${fulfilled ? 'rep-row__badge--done' : ''}`} aria-hidden>
-          {fulfilled ? '✓' : ''}
+          {fulfilled && <CheckIcon />}
         </span>
       )}
 
@@ -184,21 +201,18 @@ function PromiseRow({ promise, onUpdate, onDelete }) {
         onClick={() => onDelete(promise.id)}
         aria-label="Удалить"
       >
-        ×
+        <img src={hover ? deleteNavIcon : deleteIcon} alt="" />
       </button>
     </div>
   );
 }
 
-function AddPromiseForm({ onAdd }) {
-  const [open, setOpen] = useState(false);
+function AddPromiseForm({ onAdd, onClose }) {
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState('yesno');
   const [planH, setPlanH] = useState('');
   const [planM, setPlanM] = useState('');
   const [planCount, setPlanCount] = useState('');
-
-  const reset = () => { setTitle(''); setKind('yesno'); setPlanH(''); setPlanM(''); setPlanCount(''); };
 
   const submit = () => {
     if (!title.trim()) return;
@@ -206,17 +220,8 @@ function AddPromiseForm({ onAdd }) {
     if (kind === 'time') plan_value = (Number(planH) || 0) * 60 + (Number(planM) || 0);
     if (kind === 'count') plan_value = Number(planCount) || 0;
     onAdd({ title: title.trim(), kind, plan_value, fact_value: null, done: false });
-    reset();
-    setOpen(false);
+    onClose();
   };
-
-  if (!open) {
-    return (
-      <button type="button" className="rep-add__toggle" onClick={() => setOpen(true)}>
-        + Добавить обещание
-      </button>
-    );
-  }
 
   return (
     <div className="rep-add">
@@ -226,7 +231,7 @@ function AddPromiseForm({ onAdd }) {
         placeholder="Что обещаю себе?"
         autoFocus
         onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { reset(); setOpen(false); } }}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onClose(); }}
       />
       <div className="rep-add__kinds">
         {KINDS.map((k) => (
@@ -255,7 +260,7 @@ function AddPromiseForm({ onAdd }) {
       )}
       <div className="rep-add__actions">
         <button type="button" className="rep-add__submit" onClick={submit}>Добавить</button>
-        <button type="button" className="rep-add__cancel" onClick={() => { reset(); setOpen(false); }}>Отмена</button>
+        <button type="button" className="rep-add__cancel" onClick={onClose}>Отмена</button>
       </div>
     </div>
   );
@@ -263,6 +268,10 @@ function AddPromiseForm({ onAdd }) {
 
 function DayCard({ dateStr, promises, onAdd, onUpdate, onDelete }) {
   const status = dayStatus(promises);
+  const [adding, setAdding] = useState(false);
+  const hasHover = useMediaQuery('(hover: hover)');
+  const [plusHover, setPlusHover] = useState(false);
+
   return (
     <section className="rep-day rep-anim-in">
       <div className="rep-day__header">
@@ -271,13 +280,29 @@ function DayCard({ dateStr, promises, onAdd, onUpdate, onDelete }) {
         {promises.length > 0 && (
           <span className="rep-day__count">{promises.filter(isPromiseFulfilled).length}/{promises.length}</span>
         )}
+        <button
+          type="button"
+          className="rep-day__add"
+          onMouseEnter={() => hasHover && setPlusHover(true)}
+          onMouseLeave={() => hasHover && setPlusHover(false)}
+          onClick={() => setAdding(true)}
+          aria-label="Добавить обещание"
+        >
+          <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
+        </button>
       </div>
+      <div className="rep-day__line" />
       <div className="rep-day__rows">
         {promises.map((p) => (
           <PromiseRow key={p.id} promise={p} onUpdate={onUpdate} onDelete={onDelete} />
         ))}
       </div>
-      <AddPromiseForm onAdd={(payload) => onAdd({ ...payload, promise_date: dateStr })} />
+      {adding && (
+        <AddPromiseForm
+          onAdd={(payload) => onAdd({ ...payload, promise_date: dateStr })}
+          onClose={() => setAdding(false)}
+        />
+      )}
     </section>
   );
 }
@@ -365,13 +390,20 @@ export function ReputationView() {
   const listDays = useMemo(() => {
     const startStr = toLocalDateString(start);
     const endStr = toLocalDateString(end);
+    const tomorrowStr = toLocalDateString(addDays(today, 1));
     const set = new Set();
     for (const p of promises) {
       if (p.promise_date >= startStr && p.promise_date <= endStr) set.add(p.promise_date);
     }
-    if (todayStr >= startStr && todayStr <= endStr) set.add(todayStr);
+    // In the current period, always allow planning today and tomorrow.
+    if (offset === 0) {
+      set.add(todayStr);
+      set.add(tomorrowStr);
+    } else if (todayStr >= startStr && todayStr <= endStr) {
+      set.add(todayStr);
+    }
     return Array.from(set).sort().reverse();
-  }, [promises, start, end, todayStr]);
+  }, [promises, start, end, offset, today, todayStr]);
 
   const detailDay = selectedDay && selectedDay >= toLocalDateString(start) && selectedDay <= toLocalDateString(end)
     ? selectedDay
@@ -385,7 +417,10 @@ export function ReputationView() {
           <span className="rep__streak-num" key={promiseStreak}>{promiseStreak}</span>
           <span className="rep__streak-label">{promiseStreak === 1 ? 'обещание подряд' : 'обещаний подряд'}</span>
         </div>
-        <div className="rep__streak-days">{dayStreak} {dayStreak === 1 ? 'день' : 'дней'} подряд без срывов</div>
+        <div className="rep__streak-days">
+          <span className="rep__streak-days-label">Успешная серия</span>
+          <span className="rep__streak-days-value">{dayStreak} {pluralDays(dayStreak)} подряд</span>
+        </div>
       </div>
 
       <div className="rep__controls">
