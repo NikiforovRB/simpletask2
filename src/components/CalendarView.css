@@ -267,8 +267,8 @@
 
 .calendar-modal__times {
   display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .calendar-modal__time-wrap {
@@ -279,7 +279,7 @@
 
 .calendar-modal__clear {
   align-self: stretch;
-  width: 2.4rem;
+  width: 2.6rem;
   flex-shrink: 0;
   background: var(--bg-elev);
   border: 1px solid var(--border-strong);
