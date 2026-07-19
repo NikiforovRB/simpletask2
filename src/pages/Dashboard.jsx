@@ -435,6 +435,7 @@ export default function Dashboard() {
   const boardWorldRef = useRef(null);
   const [boardHeaderLeftSlot, setBoardHeaderLeftSlot] = useState(null);
   const [boardHeaderRightSlot, setBoardHeaderRightSlot] = useState(null);
+  const [repHeaderSlot, setRepHeaderSlot] = useState(null);
   const [addProjectModalOpen, setAddProjectModalOpen] = useState(false);
   const [addProjectTitle, setAddProjectTitle] = useState('');
   const [addProjectKind, setAddProjectKind] = useState('project'); // 'project' | 'board'
@@ -1349,6 +1350,9 @@ export default function Dashboard() {
                 </select>
               </span>
             )}
+            {viewMode === 'reputation' && (
+              <div ref={setRepHeaderSlot} className="dashboard__rep-header-slot" />
+            )}
           </div>
           <div className="dashboard__header-actions">
             {viewMode === 'board' && (
@@ -2184,7 +2188,9 @@ export default function Dashboard() {
         />
       )}
 
-      {viewMode === 'reputation' && <ReputationView />}
+      {viewMode === 'reputation' && (
+        <ReputationView headerSlot={repHeaderSlot} daysCount={settings.days_count} setDaysCount={setDaysCount} />
+      )}
 
       {viewMode === 'goal_plan' && (
         <GoalPlanView

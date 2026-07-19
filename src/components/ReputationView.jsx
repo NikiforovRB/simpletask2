@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toLocalDateString } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useReputation, isPromiseFulfilled, dayStatus } from '../hooks/useReputation';
@@ -277,9 +278,6 @@ function DayCard({ dateStr, promises, onAdd, onUpdate, onDelete }) {
       <div className="rep-day__header">
         <span className={`rep-day__dot rep-day__dot--${status}`} aria-hidden />
         <span className="rep-day__title">{dayHeading(dateStr)}</span>
-        {promises.length > 0 && (
-          <span className="rep-day__count">{promises.filter(isPromiseFulfilled).length}/{promises.length}</span>
-        )}
         <button
           type="button"
           className="rep-day__add"
@@ -290,6 +288,9 @@ function DayCard({ dateStr, promises, onAdd, onUpdate, onDelete }) {
         >
           <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
         </button>
+        {promises.length > 0 && (
+          <span className="rep-day__count">{promises.filter(isPromiseFulfilled).length}/{promises.length}</span>
+        )}
       </div>
       <div className="rep-day__line" />
       <div className="rep-day__rows">
@@ -343,7 +344,7 @@ function Heatmap({ start, end, byDate, onSelect, selected }) {
   );
 }
 
-export function ReputationView() {
+export function ReputationView({ headerSlot, daysCount = 3, setDaysCount }) {
   const { promises, addPromise, updatePromise, deletePromise } = useReputation();
   const [mode, setMode] = useState('list'); // 'list' | 'heatmap'
   const [periodType, setPeriodType] = useState('7d');
@@ -386,31 +387,45 @@ export function ReputationView() {
     return { promiseStreak: pStreak, dayStreak: dStreak };
   }, [promises, byDate, todayStr]);
 
-  // List mode: days with promises within range + today, descending.
+  // List mode: N consecutive days starting today (today at top, next days below).
   const listDays = useMemo(() => {
-    const startStr = toLocalDateString(start);
-    const endStr = toLocalDateString(end);
-    const tomorrowStr = toLocalDateString(addDays(today, 1));
-    const set = new Set();
-    for (const p of promises) {
-      if (p.promise_date >= startStr && p.promise_date <= endStr) set.add(p.promise_date);
-    }
-    // In the current period, always allow planning today and tomorrow.
-    if (offset === 0) {
-      set.add(todayStr);
-      set.add(tomorrowStr);
-    } else if (todayStr >= startStr && todayStr <= endStr) {
-      set.add(todayStr);
-    }
-    return Array.from(set).sort().reverse();
-  }, [promises, start, end, offset, today, todayStr]);
+    const n = Math.max(1, Math.min(7, daysCount || 1));
+    const arr = [];
+    for (let i = 0; i < n; i++) arr.push(toLocalDateString(addDays(today, i)));
+    return arr;
+  }, [daysCount, today]);
 
   const detailDay = selectedDay && selectedDay >= toLocalDateString(start) && selectedDay <= toLocalDateString(end)
     ? selectedDay
     : null;
 
+  const controls = (
+    <div className="rep-ctl">
+      <select className="dashboard__select" value={mode} onChange={(e) => setMode(e.target.value)} aria-label="Режим статистики">
+        <option value="list">Статистика</option>
+        <option value="heatmap">Тепловая карта</option>
+      </select>
+      {mode === 'list' && (
+        <select className="dashboard__select" value={daysCount} onChange={(e) => setDaysCount?.(Number(e.target.value))} aria-label="Количество дней">
+          {[1, 2, 3, 4, 5, 6, 7].map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      )}
+      {mode === 'heatmap' && (
+        <>
+          <select className="dashboard__select" value={periodType} onChange={(e) => { setPeriodType(e.target.value); setOffset(0); }} aria-label="Период">
+            {PERIODS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+          </select>
+          <button type="button" className="rep-ctl__nav" onClick={() => setOffset((o) => o - 1)} aria-label="Раньше">‹</button>
+          <span className="rep-ctl__label">{rangeLabel(periodType, start, end)}</span>
+          <button type="button" className="rep-ctl__nav" onClick={() => setOffset((o) => Math.min(0, o + 1))} aria-label="Позже" disabled={offset >= 0}>›</button>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="rep">
+      {headerSlot && createPortal(controls, headerSlot)}
       <div className="rep__streak">
         <div className="rep__streak-flame" aria-hidden>🔥</div>
         <div className="rep__streak-main">
@@ -423,46 +438,18 @@ export function ReputationView() {
         </div>
       </div>
 
-      <div className="rep__controls">
-        <div className="rep__modes">
-          <button type="button" className={`rep__mode ${mode === 'list' ? 'rep__mode--active' : ''}`} onClick={() => setMode('list')}>Статистика</button>
-          <button type="button" className={`rep__mode ${mode === 'heatmap' ? 'rep__mode--active' : ''}`} onClick={() => setMode('heatmap')}>Тепловая карта</button>
-        </div>
-        <div className="rep__periods">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              className={`rep__period ${periodType === p.key ? 'rep__period--active' : ''}`}
-              onClick={() => { setPeriodType(p.key); setOffset(0); }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <div className="rep__nav">
-          <button type="button" className="rep__nav-btn" onClick={() => setOffset((o) => o - 1)} aria-label="Раньше">‹</button>
-          <span className="rep__nav-label">{rangeLabel(periodType, start, end)}</span>
-          <button type="button" className="rep__nav-btn" onClick={() => setOffset((o) => Math.min(0, o + 1))} aria-label="Позже" disabled={offset >= 0}>›</button>
-        </div>
-      </div>
-
       {mode === 'list' ? (
         <div className="rep__list">
-          {listDays.length === 0 ? (
-            <p className="rep__empty">Нет обещаний за этот период.</p>
-          ) : (
-            listDays.map((ds) => (
-              <DayCard
-                key={ds}
-                dateStr={ds}
-                promises={(byDate.get(ds) || [])}
-                onAdd={addPromise}
-                onUpdate={updatePromise}
-                onDelete={deletePromise}
-              />
-            ))
-          )}
+          {listDays.map((ds) => (
+            <DayCard
+              key={ds}
+              dateStr={ds}
+              promises={(byDate.get(ds) || [])}
+              onAdd={addPromise}
+              onUpdate={updatePromise}
+              onDelete={deletePromise}
+            />
+          ))}
         </div>
       ) : (
         <div className="rep__heatmap-wrap">
