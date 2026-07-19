@@ -71,87 +71,11 @@
   }
 }
 
-.calendar-day__allday {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: calc(0.75rem + 15px);
-}
-
-.calendar-allday__item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border-radius: 6px;
-  padding: 0.15rem 0.35rem;
-}
-
-.calendar-allday__item:hover {
-  background: var(--bg-hover);
-}
-
-/* Checkbox matches the Plans task checkbox (.task-item__checkbox) */
-.calendar-allday__check {
-  flex: 0 0 16px;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  border: none;
-  background: var(--border);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+/* No-time task list (shared with Plans via TaskItem) */
+.calendar-day__notime {
+  list-style: none;
+  margin: 0 0 15px;
   padding: 0;
-  color: var(--bg-surface-2);
-  transition: background 0.12s;
-}
-
-.calendar-allday__check:hover {
-  background: var(--border-strong);
-}
-
-.calendar-allday__check--done,
-.calendar-allday__check--done:hover {
-  background: var(--success);
-  color: var(--bg-surface-2);
-}
-
-.calendar-allday__input {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text-primary);
-  font-family: 'Gilroy Task', 'Gilroy', system-ui, sans-serif;
-  font-weight: var(--task-font-weight, 500);
-  font-size: calc(0.9375rem * var(--task-font-scale, 1));
-  padding: 0.15rem 0;
-}
-
-.calendar-allday__input--done {
-  text-decoration: line-through;
-  opacity: 0.55;
-}
-
-.calendar-allday__iconbtn {
-  flex-shrink: 0;
-  width: 1.1rem;
-  height: 1.1rem;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.calendar-allday__iconbtn img {
-  width: 1.1rem;
-  height: 1.1rem;
-  object-fit: contain;
 }
 
 .calendar-day__timeline {
@@ -232,11 +156,16 @@
 .calendar-event__label {
   font-family: 'Gilroy Task', 'Gilroy', system-ui, sans-serif;
   font-weight: var(--task-font-weight, 500);
-  font-size: calc(0.8rem * var(--task-font-scale, 1));
+  font-size: calc(0.9375rem * var(--task-font-scale, 1));
   color: var(--text-primary);
   overflow: hidden;
   display: block;
   word-break: break-word;
+}
+
+.calendar-event--done .calendar-event__label {
+  text-decoration: line-through;
+  opacity: 0.55;
 }
 
 .calendar-event__time {

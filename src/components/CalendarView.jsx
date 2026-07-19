@@ -1,19 +1,18 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { toLocalDateString, formatDayLabel, TASK_COLORS } from '../constants';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { toLocalDateString, formatDayLabel, TASK_COLORS, DEFAULT_TASK_COLOR } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { CalendarPopover } from './CalendarPopover';
+import { SortableTask } from './SortableTask';
+import { DropSlot } from './DropSlot';
+import { getContainerId } from '../lib/dnd';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
-import editIcon from '../assets/edit.svg';
-import editNavIcon from '../assets/edit-nav.svg';
-import deleteIcon from '../assets/delete.svg';
-import deleteNavIcon from '../assets/delete-nav.svg';
 import './CalendarView.css';
 
 const BASE_HOUR_HEIGHT = 48; // px per hour at 1x
 const SNAP = 15; // minutes
 const MIN_DURATION = 15;
-const DEFAULT_EVENT_COLOR = '#5a86ee';
 
 const snap15 = (m) => Math.round(m / SNAP) * SNAP;
 const pad = (n) => String(n).padStart(2, '0');
@@ -23,6 +22,15 @@ const hhmmToMinutes = (s) => {
   if (Number.isNaN(h)) return null;
   return h * 60 + (m || 0);
 };
+// Postgres `time` values arrive as "HH:MM:SS".
+const timeStrToMin = (t) => {
+  if (!t) return null;
+  const [h, m] = String(t).split(':').map(Number);
+  if (Number.isNaN(h)) return null;
+  return h * 60 + (m || 0);
+};
+const minToTimeStr = (min) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}:00`;
+
 const formatEventDate = (dateStr) => {
   const d = new Date(`${dateStr}T12:00:00`);
   if (Number.isNaN(d.getTime())) return dateStr;
@@ -31,27 +39,52 @@ const formatEventDate = (dateStr) => {
   return `${dm}, ${wd}`;
 };
 
+// Map a task row into the modal's event shape and back.
+function taskToEvent(task) {
+  const start = task.scheduled_time ? timeStrToMin(task.scheduled_time) : null;
+  const end = task.scheduled_end_time
+    ? timeStrToMin(task.scheduled_end_time)
+    : (start != null ? start + 60 : null);
+  return {
+    id: task.id,
+    title: task.title,
+    event_date: task.scheduled_date,
+    all_day: start == null,
+    start_minute: start,
+    end_minute: end,
+    color: task.text_color || DEFAULT_TASK_COLOR,
+  };
+}
+
+function eventPatchToTask(patch) {
+  return {
+    title: patch.title,
+    scheduled_date: patch.event_date,
+    text_color: patch.color,
+    scheduled_time: patch.all_day ? null : minToTimeStr(patch.start_minute),
+    scheduled_end_time: patch.all_day ? null : minToTimeStr(patch.end_minute),
+  };
+}
+
 function EventModal({ event, onClose, onSave, onDelete }) {
   const isNew = !event.id;
-  const initialHasTime = !event.all_day && event.start_minute != null;
   const [title, setTitle] = useState(event.title || '');
   const [date, setDate] = useState(event.event_date);
-  const [hasTime, setHasTime] = useState(initialHasTime);
+  const [hasTime, setHasTime] = useState(!event.all_day && event.start_minute != null);
   const [start, setStart] = useState(event.start_minute ?? 9 * 60);
   const [end, setEnd] = useState(event.end_minute ?? 10 * 60);
-  const [color, setColor] = useState(event.color || DEFAULT_EVENT_COLOR);
+  const [color, setColor] = useState(event.color || DEFAULT_TASK_COLOR);
   const [dateOpen, setDateOpen] = useState(false);
 
   const save = () => {
-    const patch = {
+    onSave({
       title: title.trim(),
       event_date: date,
       color,
       all_day: !hasTime,
       start_minute: hasTime ? start : null,
       end_minute: hasTime ? Math.max(start + MIN_DURATION, end) : null,
-    };
-    onSave(patch);
+    });
     onClose();
   };
 
@@ -153,81 +186,10 @@ function EventModal({ event, onClose, onSave, onDelete }) {
   );
 }
 
-function AllDayItem({ event, onUpdate, onDelete, onOpenModal }) {
-  const [title, setTitle] = useState(event.title || '');
-  const [hover, setHover] = useState(false);
-  const [editHover, setEditHover] = useState(false);
-  const [delHover, setDelHover] = useState(false);
-  const hasHover = useMediaQuery('(hover: hover)');
-
-  useEffect(() => {
-    setTitle(event.title || '');
-  }, [event.title]);
-
-  const commit = () => {
-    const t = title.trim();
-    if (t !== (event.title || '')) onUpdate(event.id, { title: t });
-  };
-
-  const done = !!event.completed;
-
-  return (
-    <div
-      className="calendar-allday__item"
-      style={{ '--ev-color': event.color || DEFAULT_EVENT_COLOR }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-    >
-      <button
-        type="button"
-        className={`calendar-allday__check${done ? ' calendar-allday__check--done' : ''}`}
-        onClick={() => onUpdate(event.id, { completed: !done })}
-        aria-label={done ? 'Снять отметку' : 'Выполнено'}
-      >
-        {done && (
-          <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
-            <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </button>
-      <input
-        className={`calendar-allday__input${done ? ' calendar-allday__input--done' : ''}`}
-        style={{ color: event.color || DEFAULT_EVENT_COLOR }}
-        value={title}
-        placeholder="Задача без времени"
-        onChange={(e) => setTitle(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
-      />
-      {hover && (
-        <>
-          <button
-            type="button"
-            className="calendar-allday__iconbtn"
-            onMouseEnter={() => hasHover && setEditHover(true)}
-            onMouseLeave={() => hasHover && setEditHover(false)}
-            onClick={() => onOpenModal(event)}
-            aria-label="Редактировать"
-          >
-            <img src={hasHover && editHover ? editNavIcon : editIcon} alt="" />
-          </button>
-          <button
-            type="button"
-            className="calendar-allday__iconbtn"
-            onMouseEnter={() => hasHover && setDelHover(true)}
-            onMouseLeave={() => hasHover && setDelHover(false)}
-            onClick={() => onDelete(event.id)}
-            aria-label="Удалить"
-          >
-            <img src={hasHover && delHover ? deleteNavIcon : deleteIcon} alt="" />
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-
-function CalendarDayColumn({ date, events, startHour, endHour, hourHeight, now, onUpdateEvent, onDeleteEvent, onOpenModal }) {
+function CalendarDayColumn({
+  date, tasks, startHour, endHour, hourHeight, now,
+  onUpdateTiming, onOpenModal, onAddTaskAt, taskHandlers,
+}) {
   const dateStr = toLocalDateString(date);
   const pxPerMin = hourHeight / 60;
   const dayStartMin = startHour * 60;
@@ -241,10 +203,17 @@ function CalendarDayColumn({ date, events, startHour, endHour, hourHeight, now, 
   const hasHover = useMediaQuery('(hover: hover)');
   const [plusHover, setPlusHover] = useState(false);
 
-  const allDayEvents = events.filter((e) => e.event_date === dateStr && e.all_day);
-  const timedEvents = events.filter(
-    (e) => e.event_date === dateStr && !e.all_day && e.start_minute != null && e.end_minute != null,
-  );
+  const noTimeTasks = tasks
+    .filter((t) => !t.parent_id && !t.completed_at && t.scheduled_date === dateStr && (t.list_type || 'inbox') === 'inbox' && !t.scheduled_time)
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+  const timedEvents = tasks
+    .filter((t) => !t.parent_id && t.scheduled_date === dateStr && (t.list_type || 'inbox') === 'inbox' && t.scheduled_time)
+    .map((t) => {
+      const start = timeStrToMin(t.scheduled_time);
+      const end = t.scheduled_end_time ? timeStrToMin(t.scheduled_end_time) : start + 60;
+      return { id: t.id, title: t.title, color: t.text_color || DEFAULT_TASK_COLOR, completed: !!t.completed_at, start_minute: start, end_minute: end, task: t };
+    });
 
   const clientYToMinute = (clientY) => {
     const el = timelineRef.current;
@@ -293,18 +262,18 @@ function CalendarDayColumn({ date, events, startHour, endHour, hourHeight, now, 
         let e2 = Math.max(d.start, d.end);
         if (e2 - s < MIN_DURATION) e2 = Math.min(dayEndMin, s + 60);
         if (e2 - s < MIN_DURATION) s = Math.max(dayStartMin, e2 - 60);
-        onOpenModal({ event_date: dateStr, all_day: false, start_minute: s, end_minute: e2, title: '', color: DEFAULT_EVENT_COLOR });
+        onOpenModal({ event_date: dateStr, all_day: false, start_minute: s, end_minute: e2, title: '', color: DEFAULT_TASK_COLOR });
       } else if (d.type === 'move') {
         if (!d.moved) {
           const ev = timedEvents.find((x) => x.id === d.id);
-          if (ev) onOpenModal(ev);
+          if (ev) onOpenModal(taskToEvent(ev.task));
         } else {
-          onUpdateEvent(d.id, { start_minute: d.start, end_minute: d.end });
+          onUpdateTiming(d.id, d.start, d.end);
         }
       } else if (d.type === 'resize-top') {
-        onUpdateEvent(d.id, { start_minute: d.start });
+        onUpdateTiming(d.id, d.start, d.origEnd);
       } else if (d.type === 'resize-bottom') {
-        onUpdateEvent(d.id, { end_minute: d.end });
+        onUpdateTiming(d.id, d.origStart, d.end);
       }
     };
     window.addEventListener('pointermove', onMove);
@@ -356,9 +325,7 @@ function CalendarDayColumn({ date, events, startHour, endHour, hourHeight, now, 
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const showNow = isToday && nowMin >= dayStartMin && nowMin <= dayEndMin;
 
-  const handleAdd = () => {
-    onOpenModal({ event_date: dateStr, all_day: true, title: '', color: DEFAULT_EVENT_COLOR });
-  };
+  const containerId = getContainerId(dateStr, null, false);
 
   return (
     <section className="calendar-day">
@@ -369,20 +336,39 @@ function CalendarDayColumn({ date, events, startHour, endHour, hourHeight, now, 
           className="calendar-day__add"
           onMouseEnter={() => hasHover && setPlusHover(true)}
           onMouseLeave={() => hasHover && setPlusHover(false)}
-          onClick={handleAdd}
+          onClick={() => onAddTaskAt({ scheduled_date: dateStr, text_color: DEFAULT_TASK_COLOR })}
           aria-label="Добавить задачу"
         >
           <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
         </button>
       </div>
 
-      {allDayEvents.length > 0 && (
-        <div className="calendar-day__allday">
-          {allDayEvents.map((ev) => (
-            <AllDayItem key={ev.id} event={ev} onUpdate={onUpdateEvent} onDelete={onDeleteEvent} onOpenModal={onOpenModal} />
+      <ul className="calendar-day__notime">
+        <SortableContext items={noTimeTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          {noTimeTasks.map((task, i) => (
+            <li key={task.id}>
+              <DropSlot id={containerId} index={i} />
+              <SortableTask
+                task={task}
+                containerId={containerId}
+                subtasks={taskHandlers.getSubtasks(task.id)}
+                getSubtasks={taskHandlers.getSubtasks}
+                onToggle={taskHandlers.onToggle}
+                onUpdate={taskHandlers.onUpdate}
+                onDelete={taskHandlers.onDelete}
+                onAddSubtask={taskHandlers.onAddSubtask}
+                onTaskContextMenu={taskHandlers.onTaskContextMenu}
+                editingTaskId={taskHandlers.editingTaskId}
+                onEditingTaskConsumed={taskHandlers.onEditingTaskConsumed}
+                onCreateSiblingTask={taskHandlers.onCreateSiblingTask}
+                onCreateSiblingSubtask={taskHandlers.onCreateSiblingSubtask}
+                onCreateSubtaskAndEdit={taskHandlers.onCreateSubtaskAndEdit}
+              />
+            </li>
           ))}
-        </div>
-      )}
+          <li><DropSlot id={containerId} index={noTimeTasks.length} /></li>
+        </SortableContext>
+      </ul>
 
       <div className="calendar-day__timeline" ref={timelineRef} style={{ height: timelineHeight }} onPointerDown={beginTimelineCreate}>
         {hourLines.map((h) => (
@@ -405,8 +391,8 @@ function CalendarDayColumn({ date, events, startHour, endHour, hourHeight, now, 
           return (
             <div
               key={ev.id}
-              className="calendar-event"
-              style={{ top, height, '--ev-color': ev.color || DEFAULT_EVENT_COLOR }}
+              className={`calendar-event${ev.completed ? ' calendar-event--done' : ''}`}
+              style={{ top, height, '--ev-color': ev.color }}
               onPointerDown={(e) => beginMove(e, ev)}
             >
               <div className="calendar-event__resize calendar-event__resize--top" onPointerDown={(e) => beginResize(e, ev, 'top')} />
@@ -433,10 +419,19 @@ function CalendarDayColumn({ date, events, startHour, endHour, hourHeight, now, 
   );
 }
 
-export function CalendarView({ days, events, startHour, endHour, scale = 1, addEvent, updateEvent, deleteEvent }) {
+export function CalendarView({
+  days, tasks, startHour, endHour, scale = 1,
+  addTask, updateTask, deleteTask,
+  onToggle, onAddTaskAt, onAddSubtask, onTaskContextMenu,
+  editingTaskId, onEditingTaskConsumed,
+  onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit,
+}) {
   const [editingEvent, setEditingEvent] = useState(null);
   const [now, setNow] = useState(() => new Date());
   const hourHeight = BASE_HOUR_HEIGHT * (scale || 1);
+
+  const getSubtasks = (parentId) =>
+    tasks.filter((t) => t.parent_id === parentId).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
   // Refresh the "now" indicator every 5 minutes while this view is mounted.
   useEffect(() => {
@@ -445,8 +440,27 @@ export function CalendarView({ days, events, startHour, endHour, scale = 1, addE
   }, []);
 
   const handleSave = (patch) => {
-    if (editingEvent?.id) updateEvent(editingEvent.id, patch);
-    else addEvent(patch);
+    const taskPatch = eventPatchToTask(patch);
+    if (editingEvent?.id) updateTask(editingEvent.id, taskPatch);
+    else addTask({ ...taskPatch, list_type: 'inbox' });
+  };
+
+  const taskHandlers = {
+    onToggle,
+    onUpdate: updateTask,
+    onDelete: deleteTask,
+    onAddSubtask,
+    onTaskContextMenu,
+    editingTaskId,
+    onEditingTaskConsumed,
+    onCreateSiblingTask,
+    onCreateSiblingSubtask,
+    onCreateSubtaskAndEdit,
+    getSubtasks,
+  };
+
+  const updateTiming = (id, startMin, endMin) => {
+    updateTask(id, { scheduled_time: minToTimeStr(startMin), scheduled_end_time: minToTimeStr(endMin) });
   };
 
   return (
@@ -456,14 +470,15 @@ export function CalendarView({ days, events, startHour, endHour, scale = 1, addE
           <CalendarDayColumn
             key={toLocalDateString(date)}
             date={date}
-            events={events}
+            tasks={tasks}
             startHour={startHour}
             endHour={endHour}
             hourHeight={hourHeight}
             now={now}
-            onUpdateEvent={updateEvent}
-            onDeleteEvent={deleteEvent}
+            onUpdateTiming={updateTiming}
             onOpenModal={setEditingEvent}
+            onAddTaskAt={onAddTaskAt}
+            taskHandlers={taskHandlers}
           />
         ))}
       </div>
@@ -473,7 +488,7 @@ export function CalendarView({ days, events, startHour, endHour, scale = 1, addE
           event={editingEvent}
           onClose={() => setEditingEvent(null)}
           onSave={handleSave}
-          onDelete={() => { if (editingEvent.id) deleteEvent(editingEvent.id); }}
+          onDelete={() => { if (editingEvent.id) deleteTask(editingEvent.id); }}
         />
       )}
     </div>

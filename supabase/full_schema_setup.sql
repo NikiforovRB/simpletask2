@@ -1,5 +1,5 @@
 -- ============================================================
--- simple-tasks2 — FULL schema setup (migrations 001..034 combined)
+-- simple-tasks2 — FULL schema setup (migrations 001..035 combined)
 -- Run once in the Supabase SQL Editor of the target project.
 -- ============================================================
 
@@ -936,4 +936,13 @@ alter table public.user_settings
 alter table public.user_settings
   add constraint user_settings_calendar_scale_check
   check (calendar_scale >= 1 and calendar_scale <= 3);
+
+
+-- >>>>>>>>>> 035_task_end_time.sql >>>>>>>>>>
+
+-- Calendar/Plans sync: tasks get an optional end time.
+-- A task with scheduled_time (+ scheduled_end_time) renders on the Calendar
+-- timeline and with a "13:00 - 13:30 •" prefix in Plans.
+alter table public.tasks
+  add column if not exists scheduled_end_time time;
 

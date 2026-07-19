@@ -41,7 +41,6 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useProjects } from '../hooks/useProjects';
 import { useHabits } from '../hooks/useHabits';
 import { useBoardItems } from '../hooks/useBoardItems';
-import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useGoalPlan } from '../hooks/useGoalPlan';
 import { DayCard } from '../components/DayCard';
 import { HabitsView } from '../components/HabitsView';
@@ -293,7 +292,6 @@ export default function Dashboard() {
     setCalendarScale,
   } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
-  const { events: calendarEvents, addEvent: addCalendarEvent, updateEvent: updateCalendarEvent, deleteEvent: deleteCalendarEvent } = useCalendarEvents();
   const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
   const {
@@ -2139,13 +2137,22 @@ export default function Dashboard() {
       {viewMode === 'calendar' && (
         <CalendarView
           days={days}
-          events={calendarEvents}
+          tasks={inboxTasks}
           startHour={settings.calendar_start_hour}
           endHour={settings.calendar_end_hour}
           scale={settings.calendar_scale}
-          addEvent={addCalendarEvent}
-          updateEvent={updateCalendarEvent}
-          deleteEvent={deleteCalendarEvent}
+          addTask={addTask}
+          updateTask={updateTask}
+          deleteTask={deleteTask}
+          onToggle={handleToggle}
+          onAddTaskAt={handleAddTaskAt}
+          onAddSubtask={handleAddSubtask}
+          onTaskContextMenu={handleTaskContextMenu}
+          editingTaskId={editingTaskId}
+          onEditingTaskConsumed={() => setEditingTaskId(null)}
+          onCreateSiblingTask={handleCreateSiblingTask}
+          onCreateSiblingSubtask={handleCreateSiblingSubtask}
+          onCreateSubtaskAndEdit={handleCreateSubtaskAndEdit}
         />
       )}
 

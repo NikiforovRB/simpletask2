@@ -318,7 +318,9 @@ export function TaskItem({
               onClick={() => isParentTask && setTimeOpen((v) => !v)}
               title={`Напоминание: ${reminderLabel(task.reminder_minutes)}`}
             >
-              {formatTimeHHMM(task.scheduled_time)}
+              {task.scheduled_end_time
+                ? `${formatTimeHHMM(task.scheduled_time)} – ${formatTimeHHMM(task.scheduled_end_time)} •`
+                : `${formatTimeHHMM(task.scheduled_time)} •`}
             </button>
             {timeOpen && isParentTask && (
               <>
