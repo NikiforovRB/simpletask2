@@ -75,7 +75,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: calc(0.75rem + 15px);
 }
 
 .calendar-allday__item {
@@ -90,12 +90,28 @@
   background: var(--bg-hover);
 }
 
-.calendar-allday__dot {
+.calendar-allday__check {
   flex-shrink: 0;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ev-color, var(--accent));
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-on-accent, #fff);
+}
+
+.calendar-allday__check:hover {
+  border-color: var(--accent);
+}
+
+.calendar-allday__check--done {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .calendar-allday__input {
@@ -108,6 +124,11 @@
   font-size: 0.9rem;
   font-family: inherit;
   padding: 0.15rem 0;
+}
+
+.calendar-allday__input--done {
+  text-decoration: line-through;
+  opacity: 0.55;
 }
 
 .calendar-allday__del {

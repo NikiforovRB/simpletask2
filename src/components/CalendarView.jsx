@@ -162,6 +162,8 @@ function AllDayItem({ event, onUpdate, onDelete, onOpenModal }) {
     if (t !== (event.title || '')) onUpdate(event.id, { title: t });
   };
 
+  const done = !!event.completed;
+
   return (
     <div
       className="calendar-allday__item"
@@ -169,9 +171,21 @@ function AllDayItem({ event, onUpdate, onDelete, onOpenModal }) {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <span className="calendar-allday__dot" aria-hidden />
+      <button
+        type="button"
+        className={`calendar-allday__check${done ? ' calendar-allday__check--done' : ''}`}
+        onClick={() => onUpdate(event.id, { completed: !done })}
+        aria-label={done ? 'Снять отметку' : 'Выполнено'}
+      >
+        {done && (
+          <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
+            <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </button>
       <input
-        className="calendar-allday__input"
+        className={`calendar-allday__input${done ? ' calendar-allday__input--done' : ''}`}
+        style={{ color: event.color || DEFAULT_EVENT_COLOR }}
         value={title}
         placeholder="Задача без времени"
         onChange={(e) => setTitle(e.target.value)}
