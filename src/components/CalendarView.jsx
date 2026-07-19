@@ -386,8 +386,13 @@ function CalendarDayColumn({
           const isDragged = drag && drag.id === ev.id;
           const s = isDragged ? drag.start : ev.start_minute;
           const e2 = isDragged ? drag.end : ev.end_minute;
-          const top = (s - dayStartMin) * pxPerMin;
-          const height = Math.max(MIN_DURATION * pxPerMin, (e2 - s) * pxPerMin);
+          // Skip events entirely outside the configured timeline window.
+          if (e2 <= dayStartMin || s >= dayEndMin) return null;
+          // Clip the block to the visible window, but keep the true times in the label.
+          const visStart = Math.max(s, dayStartMin);
+          const visEnd = Math.min(e2, dayEndMin);
+          const top = (visStart - dayStartMin) * pxPerMin;
+          const height = Math.max(4, (visEnd - visStart) * pxPerMin);
           return (
             <div
               key={ev.id}
