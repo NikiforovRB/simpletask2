@@ -1,0 +1,449 @@
+import { useMemo, useState } from 'react';
+import { toLocalDateString } from '../constants';
+import { useReputation, isPromiseFulfilled, dayStatus } from '../hooks/useReputation';
+import './ReputationView.css';
+
+const KINDS = [
+  { key: 'yesno', label: 'Да / Нет' },
+  { key: 'time', label: 'Время' },
+  { key: 'count', label: 'Количество' },
+];
+
+const PERIODS = [
+  { key: '7d', label: '7 дней' },
+  { key: 'week', label: 'Неделя' },
+  { key: 'month', label: 'Месяц' },
+  { key: '3m', label: '3 месяца' },
+];
+
+const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const addMonths = (d, n) => { const x = new Date(d); x.setMonth(x.getMonth() + n); return x; };
+const weekdayIndex = (d) => (d.getDay() + 6) % 7; // Mon=0..Sun=6
+const startOfWeek = (d) => addDays(startOfDay(d), -weekdayIndex(d));
+
+function computeRange(periodType, offset, today) {
+  if (periodType === '7d') {
+    const end = addDays(today, offset * 7);
+    return { start: addDays(end, -6), end };
+  }
+  if (periodType === 'week') {
+    const start = addDays(startOfWeek(today), offset * 7);
+    return { start, end: addDays(start, 6) };
+  }
+  if (periodType === 'month') {
+    const base = addMonths(today, offset);
+    const start = new Date(base.getFullYear(), base.getMonth(), 1);
+    const end = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+    return { start: startOfDay(start), end: startOfDay(end) };
+  }
+  // 3m: three calendar months ending at anchor month
+  const anchor = addMonths(today, offset * 3);
+  const start = new Date(anchor.getFullYear(), anchor.getMonth() - 2, 1);
+  const end = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
+  return { start: startOfDay(start), end: startOfDay(end) };
+}
+
+function rangeLabel(periodType, start, end) {
+  if (periodType === 'month') return `${MONTHS[start.getMonth()][0].toUpperCase()}${MONTHS[start.getMonth()].slice(1)} ${start.getFullYear()}`;
+  if (periodType === '3m') return `${MONTHS_SHORT[start.getMonth()]} – ${MONTHS_SHORT[end.getMonth()]} ${end.getFullYear()}`;
+  const s = `${start.getDate()} ${MONTHS_SHORT[start.getMonth()]}`;
+  const e = `${end.getDate()} ${MONTHS_SHORT[end.getMonth()]}`;
+  return `${s} – ${e}`;
+}
+
+function eachDay(start, end) {
+  const days = [];
+  let d = startOfDay(start);
+  const last = startOfDay(end);
+  while (d <= last) { days.push(d); d = addDays(d, 1); }
+  return days;
+}
+
+function dayHeading(dateStr) {
+  const d = new Date(`${dateStr}T12:00:00`);
+  const today = toLocalDateString(new Date());
+  const yest = toLocalDateString(addDays(new Date(), -1));
+  const base = `${d.getDate()} ${MONTHS[d.getMonth()]}, ${WEEKDAYS[weekdayIndex(d)].toLowerCase()}`;
+  if (dateStr === today) return `Сегодня · ${base}`;
+  if (dateStr === yest) return `Вчера · ${base}`;
+  return base;
+}
+
+const fmtHM = (min) => {
+  if (min == null) return '—';
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h && m) return `${h} ч ${m} мин`;
+  if (h) return `${h} ч`;
+  return `${m} мин`;
+};
+
+function NumInput({ value, onChange, placeholder, max }) {
+  return (
+    <input
+      type="number"
+      className="rep__num"
+      value={value ?? ''}
+      min={0}
+      max={max}
+      placeholder={placeholder}
+      onChange={(e) => {
+        const v = e.target.value;
+        onChange(v === '' ? null : Math.max(0, Number(v)));
+      }}
+    />
+  );
+}
+
+function PromiseRow({ promise, onUpdate, onDelete }) {
+  const fulfilled = isPromiseFulfilled(promise);
+  const [hover, setHover] = useState(false);
+
+  const planH = promise.plan_value != null ? Math.floor(promise.plan_value / 60) : null;
+  const planM = promise.plan_value != null ? promise.plan_value % 60 : null;
+  const factH = promise.fact_value != null ? Math.floor(promise.fact_value / 60) : null;
+  const factM = promise.fact_value != null ? promise.fact_value % 60 : null;
+
+  const setTime = (field, h, m) => {
+    const hh = h == null ? 0 : h;
+    const mm = m == null ? 0 : m;
+    const total = h == null && m == null ? null : hh * 60 + mm;
+    onUpdate(promise.id, { [field]: total });
+  };
+
+  return (
+    <div
+      className={`rep-row rep-row--${promise.kind} ${fulfilled ? 'rep-row--done' : ''}`}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      {promise.kind === 'yesno' ? (
+        <button
+          type="button"
+          className={`rep-row__check ${promise.done ? 'rep-row__check--done' : ''}`}
+          onClick={() => onUpdate(promise.id, { done: !promise.done })}
+          aria-label={promise.done ? 'Снять отметку' : 'Выполнено'}
+        >
+          {promise.done && (
+            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden>
+              <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </button>
+      ) : (
+        <span className={`rep-row__badge ${fulfilled ? 'rep-row__badge--done' : ''}`} aria-hidden>
+          {fulfilled ? '✓' : ''}
+        </span>
+      )}
+
+      <input
+        className="rep-row__title"
+        value={promise.title}
+        placeholder="Обещание"
+        onChange={(e) => onUpdate(promise.id, { title: e.target.value })}
+      />
+
+      {promise.kind === 'time' && (
+        <span className="rep-row__metrics">
+          <span className="rep-row__metric">
+            <span className="rep-row__metric-label">план</span>
+            <NumInput value={planH} onChange={(v) => setTime('plan_value', v, planM)} placeholder="ч" />
+            <NumInput value={planM} onChange={(v) => setTime('plan_value', planH, v)} placeholder="м" max={59} />
+          </span>
+          <span className="rep-row__arrow">→</span>
+          <span className="rep-row__metric">
+            <span className="rep-row__metric-label">факт</span>
+            <NumInput value={factH} onChange={(v) => setTime('fact_value', v, factM)} placeholder="ч" />
+            <NumInput value={factM} onChange={(v) => setTime('fact_value', factH, v)} placeholder="м" max={59} />
+          </span>
+        </span>
+      )}
+
+      {promise.kind === 'count' && (
+        <span className="rep-row__metrics">
+          <span className="rep-row__metric">
+            <span className="rep-row__metric-label">план</span>
+            <NumInput value={promise.plan_value} onChange={(v) => onUpdate(promise.id, { plan_value: v })} placeholder="0" />
+          </span>
+          <span className="rep-row__arrow">→</span>
+          <span className="rep-row__metric">
+            <span className="rep-row__metric-label">факт</span>
+            <NumInput value={promise.fact_value} onChange={(v) => onUpdate(promise.id, { fact_value: v })} placeholder="0" />
+          </span>
+        </span>
+      )}
+
+      <button
+        type="button"
+        className={`rep-row__del ${hover ? 'rep-row__del--visible' : ''}`}
+        onClick={() => onDelete(promise.id)}
+        aria-label="Удалить"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+function AddPromiseForm({ onAdd }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [kind, setKind] = useState('yesno');
+  const [planH, setPlanH] = useState('');
+  const [planM, setPlanM] = useState('');
+  const [planCount, setPlanCount] = useState('');
+
+  const reset = () => { setTitle(''); setKind('yesno'); setPlanH(''); setPlanM(''); setPlanCount(''); };
+
+  const submit = () => {
+    if (!title.trim()) return;
+    let plan_value = null;
+    if (kind === 'time') plan_value = (Number(planH) || 0) * 60 + (Number(planM) || 0);
+    if (kind === 'count') plan_value = Number(planCount) || 0;
+    onAdd({ title: title.trim(), kind, plan_value, fact_value: null, done: false });
+    reset();
+    setOpen(false);
+  };
+
+  if (!open) {
+    return (
+      <button type="button" className="rep-add__toggle" onClick={() => setOpen(true)}>
+        + Добавить обещание
+      </button>
+    );
+  }
+
+  return (
+    <div className="rep-add">
+      <input
+        className="rep-add__title"
+        value={title}
+        placeholder="Что обещаю себе?"
+        autoFocus
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { reset(); setOpen(false); } }}
+      />
+      <div className="rep-add__kinds">
+        {KINDS.map((k) => (
+          <button
+            key={k.key}
+            type="button"
+            className={`rep-add__kind ${kind === k.key ? 'rep-add__kind--active' : ''}`}
+            onClick={() => setKind(k.key)}
+          >
+            {k.label}
+          </button>
+        ))}
+      </div>
+      {kind === 'time' && (
+        <div className="rep-add__plan">
+          <span className="rep-add__plan-label">План:</span>
+          <input type="number" min="0" className="rep__num" value={planH} placeholder="ч" onChange={(e) => setPlanH(e.target.value)} />
+          <input type="number" min="0" max="59" className="rep__num" value={planM} placeholder="мин" onChange={(e) => setPlanM(e.target.value)} />
+        </div>
+      )}
+      {kind === 'count' && (
+        <div className="rep-add__plan">
+          <span className="rep-add__plan-label">План:</span>
+          <input type="number" min="0" className="rep__num" value={planCount} placeholder="кол-во" onChange={(e) => setPlanCount(e.target.value)} />
+        </div>
+      )}
+      <div className="rep-add__actions">
+        <button type="button" className="rep-add__submit" onClick={submit}>Добавить</button>
+        <button type="button" className="rep-add__cancel" onClick={() => { reset(); setOpen(false); }}>Отмена</button>
+      </div>
+    </div>
+  );
+}
+
+function DayCard({ dateStr, promises, onAdd, onUpdate, onDelete }) {
+  const status = dayStatus(promises);
+  return (
+    <section className="rep-day rep-anim-in">
+      <div className="rep-day__header">
+        <span className={`rep-day__dot rep-day__dot--${status}`} aria-hidden />
+        <span className="rep-day__title">{dayHeading(dateStr)}</span>
+        {promises.length > 0 && (
+          <span className="rep-day__count">{promises.filter(isPromiseFulfilled).length}/{promises.length}</span>
+        )}
+      </div>
+      <div className="rep-day__rows">
+        {promises.map((p) => (
+          <PromiseRow key={p.id} promise={p} onUpdate={onUpdate} onDelete={onDelete} />
+        ))}
+      </div>
+      <AddPromiseForm onAdd={(payload) => onAdd({ ...payload, promise_date: dateStr })} />
+    </section>
+  );
+}
+
+function Heatmap({ start, end, byDate, onSelect, selected }) {
+  const days = eachDay(start, end);
+  const lead = weekdayIndex(days[0]);
+  const todayStr = toLocalDateString(new Date());
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push(<span key={`e${i}`} className="rep-cell rep-cell--pad" aria-hidden />);
+  days.forEach((d) => {
+    const ds = toLocalDateString(d);
+    const status = dayStatus(byDate.get(ds) || []);
+    cells.push(
+      <button
+        key={ds}
+        type="button"
+        className={`rep-cell rep-cell--${status} ${ds === todayStr ? 'rep-cell--today' : ''} ${ds === selected ? 'rep-cell--selected' : ''}`}
+        title={`${d.getDate()} ${MONTHS[d.getMonth()]}`}
+        onClick={() => onSelect(ds)}
+      >
+        <span className="rep-cell__num">{d.getDate()}</span>
+      </button>,
+    );
+  });
+  return (
+    <div className="rep-heatmap rep-anim-in">
+      <div className="rep-heatmap__weekdays">
+        {WEEKDAYS.map((w) => <span key={w} className="rep-heatmap__wd">{w}</span>)}
+      </div>
+      <div className="rep-heatmap__grid">{cells}</div>
+      <div className="rep-heatmap__legend">
+        <span><i className="rep-cell rep-cell--green rep-cell--legend" /> всё выполнено</span>
+        <span><i className="rep-cell rep-cell--yellow rep-cell--legend" /> частично</span>
+        <span><i className="rep-cell rep-cell--red rep-cell--legend" /> не выполнено</span>
+      </div>
+    </div>
+  );
+}
+
+export function ReputationView() {
+  const { promises, addPromise, updatePromise, deletePromise } = useReputation();
+  const [mode, setMode] = useState('list'); // 'list' | 'heatmap'
+  const [periodType, setPeriodType] = useState('7d');
+  const [offset, setOffset] = useState(0);
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const todayStr = toLocalDateString(today);
+
+  const byDate = useMemo(() => {
+    const m = new Map();
+    for (const p of promises) {
+      if (!m.has(p.promise_date)) m.set(p.promise_date, []);
+      m.get(p.promise_date).push(p);
+    }
+    return m;
+  }, [promises]);
+
+  const { start, end } = useMemo(() => computeRange(periodType, offset, today), [periodType, offset, today]);
+
+  // Streaks (computed over the full history, up to today).
+  const { promiseStreak, dayStreak } = useMemo(() => {
+    const past = promises.filter((p) => p.promise_date <= todayStr);
+    // promise streak: trailing consecutive fulfilled promises by (date, position)
+    const ordered = [...past].sort((a, b) =>
+      a.promise_date === b.promise_date ? (a.position ?? 0) - (b.position ?? 0) : (a.promise_date < b.promise_date ? -1 : 1),
+    );
+    let pStreak = 0;
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      if (isPromiseFulfilled(ordered[i])) pStreak++;
+      else break;
+    }
+    // day streak: trailing consecutive green promise-days
+    const dates = Array.from(new Set(past.map((p) => p.promise_date))).sort();
+    let dStreak = 0;
+    for (let i = dates.length - 1; i >= 0; i--) {
+      if (dayStatus(byDate.get(dates[i]) || []) === 'green') dStreak++;
+      else break;
+    }
+    return { promiseStreak: pStreak, dayStreak: dStreak };
+  }, [promises, byDate, todayStr]);
+
+  // List mode: days with promises within range + today, descending.
+  const listDays = useMemo(() => {
+    const startStr = toLocalDateString(start);
+    const endStr = toLocalDateString(end);
+    const set = new Set();
+    for (const p of promises) {
+      if (p.promise_date >= startStr && p.promise_date <= endStr) set.add(p.promise_date);
+    }
+    if (todayStr >= startStr && todayStr <= endStr) set.add(todayStr);
+    return Array.from(set).sort().reverse();
+  }, [promises, start, end, todayStr]);
+
+  const detailDay = selectedDay && selectedDay >= toLocalDateString(start) && selectedDay <= toLocalDateString(end)
+    ? selectedDay
+    : null;
+
+  return (
+    <div className="rep">
+      <div className="rep__streak">
+        <div className="rep__streak-flame" aria-hidden>🔥</div>
+        <div className="rep__streak-main">
+          <span className="rep__streak-num" key={promiseStreak}>{promiseStreak}</span>
+          <span className="rep__streak-label">{promiseStreak === 1 ? 'обещание подряд' : 'обещаний подряд'}</span>
+        </div>
+        <div className="rep__streak-days">{dayStreak} {dayStreak === 1 ? 'день' : 'дней'} подряд без срывов</div>
+      </div>
+
+      <div className="rep__controls">
+        <div className="rep__modes">
+          <button type="button" className={`rep__mode ${mode === 'list' ? 'rep__mode--active' : ''}`} onClick={() => setMode('list')}>Статистика</button>
+          <button type="button" className={`rep__mode ${mode === 'heatmap' ? 'rep__mode--active' : ''}`} onClick={() => setMode('heatmap')}>Тепловая карта</button>
+        </div>
+        <div className="rep__periods">
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              className={`rep__period ${periodType === p.key ? 'rep__period--active' : ''}`}
+              onClick={() => { setPeriodType(p.key); setOffset(0); }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="rep__nav">
+          <button type="button" className="rep__nav-btn" onClick={() => setOffset((o) => o - 1)} aria-label="Раньше">‹</button>
+          <span className="rep__nav-label">{rangeLabel(periodType, start, end)}</span>
+          <button type="button" className="rep__nav-btn" onClick={() => setOffset((o) => Math.min(0, o + 1))} aria-label="Позже" disabled={offset >= 0}>›</button>
+        </div>
+      </div>
+
+      {mode === 'list' ? (
+        <div className="rep__list">
+          {listDays.length === 0 ? (
+            <p className="rep__empty">Нет обещаний за этот период.</p>
+          ) : (
+            listDays.map((ds) => (
+              <DayCard
+                key={ds}
+                dateStr={ds}
+                promises={(byDate.get(ds) || [])}
+                onAdd={addPromise}
+                onUpdate={updatePromise}
+                onDelete={deletePromise}
+              />
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="rep__heatmap-wrap">
+          <Heatmap start={start} end={end} byDate={byDate} onSelect={setSelectedDay} selected={detailDay} />
+          {detailDay && (
+            <DayCard
+              key={detailDay}
+              dateStr={detailDay}
+              promises={(byDate.get(detailDay) || [])}
+              onAdd={addPromise}
+              onUpdate={updatePromise}
+              onDelete={deletePromise}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

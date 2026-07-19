@@ -47,6 +47,7 @@ import { HabitsView } from '../components/HabitsView';
 import { BoardView } from '../components/BoardView';
 import { GoalPlanView } from '../components/GoalPlanView';
 import { CalendarView } from '../components/CalendarView';
+import { ReputationView } from '../components/ReputationView';
 import { NoDateList } from '../components/NoDateList';
 import { SomedayList } from '../components/SomedayList';
 import { ProjectList } from '../components/ProjectList';
@@ -175,6 +176,7 @@ const BUILTIN_MENU_ITEMS = [
   { key: 'plans', label: 'Планы' },
   { key: 'calendar', label: 'Календарь' },
   { key: 'goal_plan', label: 'Планы с целями' },
+  { key: 'reputation', label: 'Репутация перед собой' },
   { key: 'no_date', label: 'Задачи без даты' },
   { key: 'someday', label: 'Когда-нибудь' },
   { key: 'habits', label: 'Привычки' },
@@ -344,7 +346,7 @@ export default function Dashboard() {
       if (!raw) return 'plans';
       const parsed = JSON.parse(raw);
       const v = parsed?.viewMode;
-      return ['today', 'plans', 'calendar', 'goal_plan', 'no_date', 'someday', 'habits', 'focus_analytics', 'board', 'project'].includes(v) ? v : 'plans';
+      return ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'focus_analytics', 'board', 'project'].includes(v) ? v : 'plans';
     } catch {
       return 'plans';
     }
@@ -412,6 +414,7 @@ export default function Dashboard() {
   const [todayHover, setTodayHover] = useState(false);
   const [plansHover, setPlansHover] = useState(false);
   const [calendarMenuHover, setCalendarMenuHover] = useState(false);
+  const [reputationMenuHover, setReputationMenuHover] = useState(false);
   const [goalPlanHover, setGoalPlanHover] = useState(false);
   const [noDateHover, setNoDateHover] = useState(false);
   const [somedayHover, setSomedayHover] = useState(false);
@@ -594,7 +597,7 @@ export default function Dashboard() {
   }, [viewMode, activeProjectId, activeBoardId, projects, projectsLoading, boardItems, boardItemsLoading]);
 
   const handleMenuSelect = useCallback((target) => {
-    const isBuiltinView = ['today', 'plans', 'calendar', 'goal_plan', 'no_date', 'someday', 'habits', 'focus_analytics'].includes(target);
+    const isBuiltinView = ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'focus_analytics'].includes(target);
     if (isBuiltinView) {
       setViewMode(target);
       setActiveProjectId(null);
@@ -1354,7 +1357,7 @@ export default function Dashboard() {
                 className="dashboard__board-header-slot dashboard__board-header-slot--right"
               />
             )}
-            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'calendar' && (
+            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'calendar' && viewMode !== 'reputation' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
@@ -1420,6 +1423,18 @@ export default function Dashboard() {
                 >
                   <img src={viewMode === 'calendar' || (hasHover && calendarMenuHover) ? calendarNavIcon : calendarIcon} alt="" />
                   <span>Календарь</span>
+                </button>
+              )}
+              {!isBuiltinHidden('reputation') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'reputation' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setReputationMenuHover(true)}
+                  onMouseLeave={() => hasHover && setReputationMenuHover(false)}
+                  onClick={() => handleMenuSelect('reputation')}
+                >
+                  <img src={viewMode === 'reputation' || (hasHover && reputationMenuHover) ? goalNavIcon : goalIcon} alt="" />
+                  <span>Репутация перед собой</span>
                 </button>
               )}
               {!isBuiltinHidden('goal_plan') && (
@@ -1598,6 +1613,18 @@ export default function Dashboard() {
                 >
                   <img src={viewMode === 'calendar' || (hasHover && calendarMenuHover) ? calendarNavIcon : calendarIcon} alt="" />
                   <span>Календарь</span>
+                </button>
+              )}
+              {!isBuiltinHidden('reputation') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'reputation' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setReputationMenuHover(true)}
+                  onMouseLeave={() => hasHover && setReputationMenuHover(false)}
+                  onClick={() => handleMenuSelect('reputation')}
+                >
+                  <img src={viewMode === 'reputation' || (hasHover && reputationMenuHover) ? goalNavIcon : goalIcon} alt="" />
+                  <span>Репутация перед собой</span>
                 </button>
               )}
               {!isBuiltinHidden('goal_plan') && (
@@ -1976,6 +2003,7 @@ export default function Dashboard() {
                     case 'plans': return calendarIcon;
                     case 'calendar': return calendarIcon;
                     case 'goal_plan': return goalIcon;
+                    case 'reputation': return goalIcon;
                     case 'no_date': return layersIcon;
                     case 'someday': return archiveIcon;
                     case 'habits': return privIcon;
@@ -2155,6 +2183,8 @@ export default function Dashboard() {
           onCreateSubtaskAndEdit={handleCreateSubtaskAndEdit}
         />
       )}
+
+      {viewMode === 'reputation' && <ReputationView />}
 
       {viewMode === 'goal_plan' && (
         <GoalPlanView
