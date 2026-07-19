@@ -247,6 +247,11 @@
   font-family: inherit;
   font-size: 0.92rem;
   padding: 0.2rem 0;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .rep-row--done .rep-row__title { color: var(--text-secondary); }

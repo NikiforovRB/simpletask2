@@ -294,11 +294,47 @@ function CalendarDayColumn({
     forceTick();
   };
 
-  const beginMove = (e, ev) => {
-    e.stopPropagation();
-    dragRef.current = { type: 'move', id: ev.id, anchor: clientYToMinute(e.clientY), origStart: ev.start_minute, origEnd: ev.end_minute, start: ev.start_minute, end: ev.end_minute, moved: false };
+  const startMove = (clientY, ev) => {
+    dragRef.current = { type: 'move', id: ev.id, anchor: clientYToMinute(clientY), origStart: ev.start_minute, origEnd: ev.end_minute, start: ev.start_minute, end: ev.end_minute, moved: false };
     setDragging(true);
     forceTick();
+  };
+
+  const beginMove = (e, ev) => {
+    e.stopPropagation();
+    // Desktop / mouse: start dragging immediately.
+    if (e.pointerType !== 'touch') {
+      startMove(e.clientY, ev);
+      return;
+    }
+    // Touch: require a long press (hold ~400ms) before moving, so a simple
+    // tap doesn't shift the task. A tap opens the edit modal instead.
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let timer = null;
+    const cleanup = () => {
+      clearTimeout(timer);
+      window.removeEventListener('pointermove', onWaitMove);
+      window.removeEventListener('pointerup', onWaitUp);
+      window.removeEventListener('pointercancel', onWaitCancel);
+    };
+    const onWaitMove = (me) => {
+      if (Math.abs(me.clientX - startX) > 10 || Math.abs(me.clientY - startY) > 10) {
+        cleanup(); // moved before the long press engaged -> treat as scroll, no move
+      }
+    };
+    const onWaitUp = () => {
+      cleanup();
+      onOpenModal(taskToEvent(ev.task)); // short tap -> open editor
+    };
+    const onWaitCancel = () => cleanup();
+    timer = setTimeout(() => {
+      cleanup();
+      startMove(startY, ev);
+    }, 400);
+    window.addEventListener('pointermove', onWaitMove);
+    window.addEventListener('pointerup', onWaitUp);
+    window.addEventListener('pointercancel', onWaitCancel);
   };
 
   const beginResize = (e, ev, edge) => {

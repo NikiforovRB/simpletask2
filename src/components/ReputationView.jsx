@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -133,6 +133,15 @@ function PromiseRow({ promise, onUpdate, onDelete, dragHandleProps }) {
   const fulfilled = state === 'done';
   const [hover, setHover] = useState(false);
 
+  const titleRef = useRef(null);
+  const resizeTitle = () => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  useLayoutEffect(() => { resizeTitle(); }, [promise.title]);
+
   // yesno cycle: neutral -> done -> failed -> neutral
   const cycleYesNo = () => {
     const cur = promise.fact_value;
@@ -176,11 +185,14 @@ function PromiseRow({ promise, onUpdate, onDelete, dragHandleProps }) {
         </span>
       )}
 
-      <input
+      <textarea
+        ref={titleRef}
         className="rep-row__title"
         value={promise.title}
         placeholder="Обещание"
+        rows={1}
         onChange={(e) => onUpdate(promise.id, { title: e.target.value })}
+        onInput={resizeTitle}
       />
 
       {promise.kind === 'time' && (
