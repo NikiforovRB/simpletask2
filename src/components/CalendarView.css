@@ -90,28 +90,31 @@
   background: var(--bg-hover);
 }
 
+/* Checkbox matches the Plans task checkbox (.task-item__checkbox) */
 .calendar-allday__check {
-  flex-shrink: 0;
+  flex: 0 0 16px;
   width: 16px;
   height: 16px;
   border-radius: 4px;
-  border: 1.5px solid var(--border-strong);
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
+  border: none;
+  background: var(--border);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-on-accent, #fff);
+  cursor: pointer;
+  padding: 0;
+  color: var(--bg-surface-2);
+  transition: background 0.12s;
 }
 
 .calendar-allday__check:hover {
-  border-color: var(--accent);
+  background: var(--border-strong);
 }
 
-.calendar-allday__check--done {
-  background: var(--accent);
-  border-color: var(--accent);
+.calendar-allday__check--done,
+.calendar-allday__check--done:hover {
+  background: var(--success);
+  color: var(--bg-surface-2);
 }
 
 .calendar-allday__input {
@@ -121,8 +124,9 @@
   border: none;
   outline: none;
   color: var(--text-primary);
-  font-size: 0.9rem;
-  font-family: inherit;
+  font-family: 'Gilroy Task', 'Gilroy', system-ui, sans-serif;
+  font-weight: var(--task-font-weight, 500);
+  font-size: calc(0.9375rem * var(--task-font-scale, 1));
   padding: 0.15rem 0;
 }
 
@@ -131,34 +135,23 @@
   opacity: 0.55;
 }
 
-.calendar-allday__del {
+.calendar-allday__iconbtn {
   flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
   background: none;
   border: none;
-  color: var(--text-secondary);
-  font-size: 1.1rem;
-  line-height: 1;
+  padding: 0;
   cursor: pointer;
-  padding: 0 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.calendar-allday__del:hover {
-  color: #ea6868;
-}
-
-.calendar-allday__edit {
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 0.2rem;
-}
-
-.calendar-allday__edit:hover {
-  color: var(--accent);
+.calendar-allday__iconbtn img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
 }
 
 .calendar-day__timeline {
@@ -237,7 +230,9 @@
 }
 
 .calendar-event__label {
-  font-size: 0.78rem;
+  font-family: 'Gilroy Task', 'Gilroy', system-ui, sans-serif;
+  font-weight: var(--task-font-weight, 500);
+  font-size: calc(0.8rem * var(--task-font-scale, 1));
   color: var(--text-primary);
   overflow: hidden;
   display: block;

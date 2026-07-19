@@ -4,6 +4,10 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { CalendarPopover } from './CalendarPopover';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
+import editIcon from '../assets/edit.svg';
+import editNavIcon from '../assets/edit-nav.svg';
+import deleteIcon from '../assets/delete.svg';
+import deleteNavIcon from '../assets/delete-nav.svg';
 import './CalendarView.css';
 
 const BASE_HOUR_HEIGHT = 48; // px per hour at 1x
@@ -152,6 +156,9 @@ function EventModal({ event, onClose, onSave, onDelete }) {
 function AllDayItem({ event, onUpdate, onDelete, onOpenModal }) {
   const [title, setTitle] = useState(event.title || '');
   const [hover, setHover] = useState(false);
+  const [editHover, setEditHover] = useState(false);
+  const [delHover, setDelHover] = useState(false);
+  const hasHover = useMediaQuery('(hover: hover)');
 
   useEffect(() => {
     setTitle(event.title || '');
@@ -194,8 +201,26 @@ function AllDayItem({ event, onUpdate, onDelete, onOpenModal }) {
       />
       {hover && (
         <>
-          <button type="button" className="calendar-allday__edit" onClick={() => onOpenModal(event)} aria-label="Настройки">✎</button>
-          <button type="button" className="calendar-allday__del" onClick={() => onDelete(event.id)} aria-label="Удалить">×</button>
+          <button
+            type="button"
+            className="calendar-allday__iconbtn"
+            onMouseEnter={() => hasHover && setEditHover(true)}
+            onMouseLeave={() => hasHover && setEditHover(false)}
+            onClick={() => onOpenModal(event)}
+            aria-label="Редактировать"
+          >
+            <img src={hasHover && editHover ? editNavIcon : editIcon} alt="" />
+          </button>
+          <button
+            type="button"
+            className="calendar-allday__iconbtn"
+            onMouseEnter={() => hasHover && setDelHover(true)}
+            onMouseLeave={() => hasHover && setDelHover(false)}
+            onClick={() => onDelete(event.id)}
+            aria-label="Удалить"
+          >
+            <img src={hasHover && delHover ? deleteNavIcon : deleteIcon} alt="" />
+          </button>
         </>
       )}
     </div>
