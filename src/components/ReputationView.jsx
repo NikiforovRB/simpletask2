@@ -7,23 +7,13 @@ import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav.svg';
+import yesIcon from '../assets/yes.svg';
+import noIcon from '../assets/not.svg';
 import './ReputationView.css';
 
-const CheckIcon = () => (
-  <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden>
-    <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const CrossIcon = () => (
-  <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
-    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
-  </svg>
-);
-
 const StateMark = ({ state }) => {
-  if (state === 'done') return <CheckIcon />;
-  if (state === 'failed') return <CrossIcon />;
+  if (state === 'done') return <img className="rep-row__mark" src={yesIcon} alt="" />;
+  if (state === 'failed') return <img className="rep-row__mark" src={noIcon} alt="" />;
   return null;
 };
 

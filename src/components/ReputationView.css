@@ -220,6 +220,13 @@
   transition: background 0.15s ease, transform 0.12s ease;
 }
 
+.rep-row__mark {
+  width: 11px;
+  height: 11px;
+  object-fit: contain;
+  display: block;
+}
+
 .rep-row__check { cursor: pointer; }
 .rep-row__check--neutral:hover { background: var(--border-strong); }
 .rep-row__check:active { transform: scale(0.9); }
