@@ -110,7 +110,7 @@
   width: 40px;
   font-size: 0.7rem;
   color: var(--text-dim);
-  transform: translateY(-50%);
+  line-height: 1;
 }
 
 .calendar-hour__line {
