@@ -1,11 +1,14 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { toLocalDateString, formatDayLabel, TASK_COLORS } from '../constants';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+import plusIcon from '../assets/plus.svg';
+import plusNavIcon from '../assets/plus-nav.svg';
 import './CalendarView.css';
 
-const HOUR_HEIGHT = 48; // px per hour
+const BASE_HOUR_HEIGHT = 48; // px per hour at 1x
 const SNAP = 15; // minutes
-const PX_PER_MIN = HOUR_HEIGHT / 60;
 const MIN_DURATION = 15;
+const DEFAULT_EVENT_COLOR = '#5a86ee';
 
 const snap15 = (m) => Math.round(m / SNAP) * SNAP;
 const pad = (n) => String(n).padStart(2, '0');
@@ -17,21 +20,23 @@ const hhmmToMinutes = (s) => {
 };
 
 function EventModal({ event, onClose, onSave, onDelete }) {
+  const isNew = !event.id;
+  const initialHasTime = !event.all_day && event.start_minute != null;
   const [title, setTitle] = useState(event.title || '');
   const [date, setDate] = useState(event.event_date);
-  const [allDay, setAllDay] = useState(!!event.all_day);
+  const [hasTime, setHasTime] = useState(initialHasTime);
   const [start, setStart] = useState(event.start_minute ?? 9 * 60);
   const [end, setEnd] = useState(event.end_minute ?? 10 * 60);
-  const [color, setColor] = useState(event.color || '#5a86ee');
+  const [color, setColor] = useState(event.color || DEFAULT_EVENT_COLOR);
 
   const save = () => {
     const patch = {
       title: title.trim(),
       event_date: date,
-      all_day: allDay,
       color,
-      start_minute: allDay ? null : start,
-      end_minute: allDay ? null : Math.max(start + MIN_DURATION, end),
+      all_day: !hasTime,
+      start_minute: hasTime ? start : null,
+      end_minute: hasTime ? Math.max(start + MIN_DURATION, end) : null,
     };
     onSave(patch);
     onClose();
@@ -40,7 +45,7 @@ function EventModal({ event, onClose, onSave, onDelete }) {
   return (
     <div className="dashboard__settings-overlay" onClick={onClose}>
       <div className="dashboard__settings-popup calendar-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="dashboard__settings-title">Задача</div>
+        <div className="dashboard__settings-title">{isNew ? 'Новая задача' : 'Задача'}</div>
         <input
           type="text"
           className="dashboard__settings-input"
@@ -50,11 +55,6 @@ function EventModal({ event, onClose, onSave, onDelete }) {
           autoFocus
           onKeyDown={(e) => { if (e.key === 'Enter') save(); }}
         />
-
-        <label className="calendar-modal__row calendar-modal__toggle">
-          <span>Весь день (без времени)</span>
-          <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
-        </label>
 
         <label className="calendar-modal__row">
           <span className="calendar-modal__label">Дата</span>
@@ -66,35 +66,43 @@ function EventModal({ event, onClose, onSave, onDelete }) {
           />
         </label>
 
-        {!allDay && (
+        {hasTime ? (
           <div className="calendar-modal__times">
             <label className="calendar-modal__row">
               <span className="calendar-modal__label">Начало</span>
-              <input
-                type="time"
-                step="900"
-                className="dashboard__settings-input calendar-modal__field"
-                value={fmtMinutes(start)}
-                onChange={(e) => {
-                  const m = hhmmToMinutes(e.target.value);
-                  if (m != null) setStart(m);
-                }}
-              />
+              <span className="calendar-modal__time-wrap">
+                <input
+                  type="time"
+                  step="900"
+                  className="dashboard__settings-input calendar-modal__field"
+                  value={fmtMinutes(start)}
+                  onChange={(e) => { const m = hhmmToMinutes(e.target.value); if (m != null) setStart(m); }}
+                />
+                <button type="button" className="calendar-modal__clear" onClick={() => setHasTime(false)} aria-label="Убрать время" title="Убрать время">×</button>
+              </span>
             </label>
             <label className="calendar-modal__row">
               <span className="calendar-modal__label">Конец</span>
-              <input
-                type="time"
-                step="900"
-                className="dashboard__settings-input calendar-modal__field"
-                value={fmtMinutes(end)}
-                onChange={(e) => {
-                  const m = hhmmToMinutes(e.target.value);
-                  if (m != null) setEnd(m);
-                }}
-              />
+              <span className="calendar-modal__time-wrap">
+                <input
+                  type="time"
+                  step="900"
+                  className="dashboard__settings-input calendar-modal__field"
+                  value={fmtMinutes(end)}
+                  onChange={(e) => { const m = hhmmToMinutes(e.target.value); if (m != null) setEnd(m); }}
+                />
+                <button type="button" className="calendar-modal__clear" onClick={() => setHasTime(false)} aria-label="Убрать время" title="Убрать время">×</button>
+              </span>
             </label>
           </div>
+        ) : (
+          <button
+            type="button"
+            className="calendar-modal__add-time"
+            onClick={() => { setHasTime(true); setStart((s) => s ?? 9 * 60); setEnd((e) => e ?? 10 * 60); }}
+          >
+            + Добавить время
+          </button>
         )}
 
         <div className="calendar-modal__colors">
@@ -112,14 +120,16 @@ function EventModal({ event, onClose, onSave, onDelete }) {
 
         <div className="dashboard__settings-edit-actions">
           <button type="button" className="dashboard__settings-submit" onClick={save}>Сохранить</button>
-          <button type="button" className="dashboard__settings-delete" onClick={() => { onDelete(); onClose(); }}>Удалить</button>
+          {!isNew && (
+            <button type="button" className="dashboard__settings-delete" onClick={() => { onDelete(); onClose(); }}>Удалить</button>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function AllDayItem({ event, onUpdate, onDelete }) {
+function AllDayItem({ event, onUpdate, onDelete, onOpenModal }) {
   const [title, setTitle] = useState(event.title || '');
   const [hover, setHover] = useState(false);
 
@@ -135,7 +145,7 @@ function AllDayItem({ event, onUpdate, onDelete }) {
   return (
     <div
       className="calendar-allday__item"
-      style={{ '--ev-color': event.color || '#5a86ee' }}
+      style={{ '--ev-color': event.color || DEFAULT_EVENT_COLOR }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
@@ -149,22 +159,28 @@ function AllDayItem({ event, onUpdate, onDelete }) {
         onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
       />
       {hover && (
-        <button type="button" className="calendar-allday__del" onClick={() => onDelete(event.id)} aria-label="Удалить">×</button>
+        <>
+          <button type="button" className="calendar-allday__edit" onClick={() => onOpenModal(event)} aria-label="Настройки">✎</button>
+          <button type="button" className="calendar-allday__del" onClick={() => onDelete(event.id)} aria-label="Удалить">×</button>
+        </>
       )}
     </div>
   );
 }
 
-function CalendarDayColumn({ date, events, startHour, endHour, onAddEvent, onUpdateEvent, onDeleteEvent, onOpenModal }) {
+function CalendarDayColumn({ date, events, startHour, endHour, hourHeight, now, onUpdateEvent, onDeleteEvent, onOpenModal }) {
   const dateStr = toLocalDateString(date);
+  const pxPerMin = hourHeight / 60;
   const dayStartMin = startHour * 60;
   const dayEndMin = endHour * 60;
-  const timelineHeight = (dayEndMin - dayStartMin) * PX_PER_MIN;
+  const timelineHeight = (dayEndMin - dayStartMin) * pxPerMin;
 
   const timelineRef = useRef(null);
   const dragRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [, forceTick] = useReducer((x) => x + 1, 0);
+  const hasHover = useMediaQuery('(hover: hover)');
+  const [plusHover, setPlusHover] = useState(false);
 
   const allDayEvents = events.filter((e) => e.event_date === dateStr && e.all_day);
   const timedEvents = events.filter(
@@ -177,7 +193,7 @@ function CalendarDayColumn({ date, events, startHour, endHour, onAddEvent, onUpd
     const rect = el.getBoundingClientRect();
     let y = clientY - rect.top;
     y = Math.max(0, Math.min(timelineHeight, y));
-    const m = snap15(dayStartMin + y / PX_PER_MIN);
+    const m = snap15(dayStartMin + y / pxPerMin);
     return Math.max(dayStartMin, Math.min(dayEndMin, m));
   };
 
@@ -218,8 +234,7 @@ function CalendarDayColumn({ date, events, startHour, endHour, onAddEvent, onUpd
         let e2 = Math.max(d.start, d.end);
         if (e2 - s < MIN_DURATION) e2 = Math.min(dayEndMin, s + 60);
         if (e2 - s < MIN_DURATION) s = Math.max(dayStartMin, e2 - 60);
-        onAddEvent({ event_date: dateStr, all_day: false, start_minute: s, end_minute: e2 })
-          .then((created) => { if (created) onOpenModal(created); });
+        onOpenModal({ event_date: dateStr, all_day: false, start_minute: s, end_minute: e2, title: '', color: DEFAULT_EVENT_COLOR });
       } else if (d.type === 'move') {
         if (!d.moved) {
           const ev = timedEvents.find((x) => x.id === d.id);
@@ -274,58 +289,65 @@ function CalendarDayColumn({ date, events, startHour, endHour, onAddEvent, onUpd
   };
 
   const hourLines = [];
-  for (let h = startHour; h <= endHour; h++) {
-    hourLines.push(h);
-  }
+  for (let h = startHour; h <= endHour; h++) hourLines.push(h);
 
   const drag = dragRef.current;
 
-  // "now" indicator for today
-  const now = new Date();
   const isToday = toLocalDateString(now) === dateStr;
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const showNow = isToday && nowMin >= dayStartMin && nowMin <= dayEndMin;
 
-  const handleAddAllDay = () => {
-    onAddEvent({ event_date: dateStr, all_day: true, title: '' });
+  const handleAdd = () => {
+    onOpenModal({ event_date: dateStr, all_day: true, title: '', color: DEFAULT_EVENT_COLOR });
   };
 
   return (
     <section className="calendar-day">
-      <div className="calendar-day__header">{formatDayLabel(dateStr)}</div>
-
-      <div className="calendar-day__allday">
-        {allDayEvents.map((ev) => (
-          <AllDayItem key={ev.id} event={ev} onUpdate={onUpdateEvent} onDelete={onDeleteEvent} />
-        ))}
-        <button type="button" className="calendar-day__allday-add" onClick={handleAddAllDay}>
-          + задача без времени
+      <div className="calendar-day__header">
+        <span className="calendar-day__title">{formatDayLabel(dateStr)}</span>
+        <button
+          type="button"
+          className="calendar-day__add"
+          onMouseEnter={() => hasHover && setPlusHover(true)}
+          onMouseLeave={() => hasHover && setPlusHover(false)}
+          onClick={handleAdd}
+          aria-label="Добавить задачу"
+        >
+          <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
         </button>
       </div>
 
+      {allDayEvents.length > 0 && (
+        <div className="calendar-day__allday">
+          {allDayEvents.map((ev) => (
+            <AllDayItem key={ev.id} event={ev} onUpdate={onUpdateEvent} onDelete={onDeleteEvent} onOpenModal={onOpenModal} />
+          ))}
+        </div>
+      )}
+
       <div className="calendar-day__timeline" ref={timelineRef} style={{ height: timelineHeight }} onPointerDown={beginTimelineCreate}>
         {hourLines.map((h) => (
-          <div key={h} className="calendar-hour" style={{ top: (h * 60 - dayStartMin) * PX_PER_MIN }}>
+          <div key={h} className="calendar-hour" style={{ top: (h * 60 - dayStartMin) * pxPerMin }}>
             <span className="calendar-hour__label">{pad(h)}:00</span>
             <span className="calendar-hour__line" aria-hidden />
           </div>
         ))}
 
         {showNow && (
-          <div className="calendar-now" style={{ top: (nowMin - dayStartMin) * PX_PER_MIN }} aria-hidden />
+          <div className="calendar-now" style={{ top: (nowMin - dayStartMin) * pxPerMin }} aria-hidden />
         )}
 
         {timedEvents.map((ev) => {
           const isDragged = drag && drag.id === ev.id;
           const s = isDragged ? drag.start : ev.start_minute;
           const e2 = isDragged ? drag.end : ev.end_minute;
-          const top = (s - dayStartMin) * PX_PER_MIN;
-          const height = Math.max(MIN_DURATION * PX_PER_MIN, (e2 - s) * PX_PER_MIN);
+          const top = (s - dayStartMin) * pxPerMin;
+          const height = Math.max(MIN_DURATION * pxPerMin, (e2 - s) * pxPerMin);
           return (
             <div
               key={ev.id}
               className="calendar-event"
-              style={{ top, height, '--ev-color': ev.color || '#5a86ee' }}
+              style={{ top, height, '--ev-color': ev.color || DEFAULT_EVENT_COLOR }}
               onPointerDown={(e) => beginMove(e, ev)}
             >
               <div className="calendar-event__resize calendar-event__resize--top" onPointerDown={(e) => beginResize(e, ev, 'top')} />
@@ -341,8 +363,8 @@ function CalendarDayColumn({ date, events, startHour, endHour, onAddEvent, onUpd
         {drag && drag.type === 'create' && (() => {
           const s = Math.min(drag.start, drag.end);
           const e2 = Math.max(drag.start, drag.end);
-          const top = (s - dayStartMin) * PX_PER_MIN;
-          const height = Math.max(4, (e2 - s) * PX_PER_MIN);
+          const top = (s - dayStartMin) * pxPerMin;
+          const height = Math.max(4, (e2 - s) * pxPerMin);
           return <div className="calendar-event calendar-event--preview" style={{ top, height }} />;
         })()}
       </div>
@@ -350,8 +372,21 @@ function CalendarDayColumn({ date, events, startHour, endHour, onAddEvent, onUpd
   );
 }
 
-export function CalendarView({ days, events, startHour, endHour, addEvent, updateEvent, deleteEvent }) {
+export function CalendarView({ days, events, startHour, endHour, scale = 1, addEvent, updateEvent, deleteEvent }) {
   const [editingEvent, setEditingEvent] = useState(null);
+  const [now, setNow] = useState(() => new Date());
+  const hourHeight = BASE_HOUR_HEIGHT * (scale || 1);
+
+  // Refresh the "now" indicator every 5 minutes while this view is mounted.
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleSave = (patch) => {
+    if (editingEvent?.id) updateEvent(editingEvent.id, patch);
+    else addEvent(patch);
+  };
 
   return (
     <div className="calendar-view">
@@ -363,7 +398,8 @@ export function CalendarView({ days, events, startHour, endHour, addEvent, updat
             events={events}
             startHour={startHour}
             endHour={endHour}
-            onAddEvent={addEvent}
+            hourHeight={hourHeight}
+            now={now}
             onUpdateEvent={updateEvent}
             onDeleteEvent={deleteEvent}
             onOpenModal={setEditingEvent}
@@ -375,8 +411,8 @@ export function CalendarView({ days, events, startHour, endHour, addEvent, updat
         <EventModal
           event={editingEvent}
           onClose={() => setEditingEvent(null)}
-          onSave={(patch) => updateEvent(editingEvent.id, patch)}
-          onDelete={() => deleteEvent(editingEvent.id)}
+          onSave={handleSave}
+          onDelete={() => { if (editingEvent.id) deleteEvent(editingEvent.id); }}
         />
       )}
     </div>

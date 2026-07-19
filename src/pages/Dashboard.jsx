@@ -290,6 +290,7 @@ export default function Dashboard() {
     setBoardDots,
     setTheme,
     setCalendarHours,
+    setCalendarScale,
   } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const { events: calendarEvents, addEvent: addCalendarEvent, updateEvent: updateCalendarEvent, deleteEvent: deleteCalendarEvent } = useCalendarEvents();
@@ -1334,6 +1335,17 @@ export default function Dashboard() {
                     <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
                   ))}
                 </select>
+                <select
+                  value={settings.calendar_scale}
+                  onChange={(e) => setCalendarScale(Number(e.target.value))}
+                  className="dashboard__select"
+                  aria-label="Масштаб временной шкалы"
+                  title="Масштаб временной шкалы"
+                >
+                  {[1, 2, 3].map((s) => (
+                    <option key={s} value={s}>{s}x</option>
+                  ))}
+                </select>
               </span>
             )}
           </div>
@@ -2130,6 +2142,7 @@ export default function Dashboard() {
           events={calendarEvents}
           startHour={settings.calendar_start_hour}
           endHour={settings.calendar_end_hour}
+          scale={settings.calendar_scale}
           addEvent={addCalendarEvent}
           updateEvent={updateCalendarEvent}
           deleteEvent={deleteCalendarEvent}

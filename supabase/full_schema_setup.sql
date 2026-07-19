@@ -1,5 +1,5 @@
 -- ============================================================
--- simple-tasks2 — FULL schema setup (migrations 001..031 combined)
+-- simple-tasks2 — FULL schema setup (migrations 001..032 combined)
 -- Run once in the Supabase SQL Editor of the target project.
 -- ============================================================
 
@@ -905,4 +905,11 @@ create policy "Users can manage own calendar_events"
   with check (auth.uid() = user_id);
 
 alter table public.calendar_events replica identity full;
+
+
+-- >>>>>>>>>> 032_calendar_scale.sql >>>>>>>>>>
+
+-- Calendar: timeline zoom scale (1x / 2x / 3x).
+alter table public.user_settings
+  add column if not exists calendar_scale int not null default 1 check (calendar_scale >= 1 and calendar_scale <= 3);
 

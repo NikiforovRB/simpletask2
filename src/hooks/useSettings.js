@@ -47,6 +47,7 @@ export function useSettings() {
     theme: 'dark',
     calendar_start_hour: 8,
     calendar_end_hour: 22,
+    calendar_scale: 1,
   });
   const [loading, setLoading] = useState(true);
 
@@ -78,6 +79,7 @@ export function useSettings() {
           theme: normalizeTheme(data.theme),
           calendar_start_hour: clampHour(data.calendar_start_hour, 8, 0, 23),
           calendar_end_hour: clampHour(data.calendar_end_hour, 22, 1, 24),
+          calendar_scale: clampHour(data.calendar_scale, 1, 1, 3),
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -108,6 +110,7 @@ export function useSettings() {
           theme: 'dark',
           calendar_start_hour: 8,
           calendar_end_hour: 22,
+          calendar_scale: 1,
         });
       }
       setLoading(false);
@@ -202,6 +205,13 @@ export function useSettings() {
       .eq('user_id', user.id);
   };
 
+  const setCalendarScale = async (scale) => {
+    if (!user) return;
+    const v = clampHour(scale, 1, 1, 3);
+    setSettings((s) => ({ ...s, calendar_scale: v }));
+    await supabase.from('user_settings').update({ calendar_scale: v }).eq('user_id', user.id);
+  };
+
   return {
     settings,
     setDaysCount,
@@ -216,6 +226,7 @@ export function useSettings() {
     setBoardDots,
     setTheme,
     setCalendarHours,
+    setCalendarScale,
     loading,
   };
 }

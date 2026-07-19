@@ -24,11 +24,51 @@
 }
 
 .calendar-day__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   font-size: 0.95rem;
   color: var(--text-primary);
   padding: 0 0 0.6rem;
   border-bottom: 1px solid var(--border);
   margin-bottom: 0.5rem;
+}
+
+.calendar-day__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-day__add {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.calendar-day__add img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
+@media (min-width: 501px) {
+  .calendar-day__add {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .calendar-day__header:hover .calendar-day__add {
+    opacity: 1;
+  }
 }
 
 .calendar-day__allday {
@@ -85,18 +125,18 @@
   color: #ea6868;
 }
 
-.calendar-day__allday-add {
-  align-self: flex-start;
+.calendar-allday__edit {
+  flex-shrink: 0;
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
+  line-height: 1;
   cursor: pointer;
-  padding: 0.2rem 0.35rem;
-  font-family: inherit;
+  padding: 0 0.2rem;
 }
 
-.calendar-day__allday-add:hover {
+.calendar-allday__edit:hover {
   color: var(--accent);
 }
 
@@ -249,6 +289,42 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.calendar-modal__time-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.calendar-modal__clear {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.15rem;
+}
+
+.calendar-modal__clear:hover {
+  color: #ea6868;
+}
+
+.calendar-modal__add-time {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.35rem 0.7rem;
+  font-family: inherit;
+}
+
+.calendar-modal__add-time:hover {
+  border-color: var(--accent);
 }
 
 .calendar-modal__colors {
