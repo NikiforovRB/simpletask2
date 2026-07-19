@@ -312,6 +312,28 @@
 
 .rep-row__del--visible { opacity: 1; }
 
+.rep-row__drag {
+  flex-shrink: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.rep-row:hover .rep-row__drag { opacity: 1; }
+.rep-row__drag:active { cursor: grabbing; }
+
+.rep-row__drag img {
+  width: 1.05rem;
+  height: 1.05rem;
+  object-fit: contain;
+}
+
 /* Add promise */
 .rep-add__toggle {
   align-self: flex-start;

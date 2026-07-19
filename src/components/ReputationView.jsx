@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { toLocalDateString } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useReputation, isPromiseFulfilled, dayStatus, promiseState } from '../hooks/useReputation';
@@ -7,6 +10,7 @@ import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav.svg';
+import dragIcon from '../assets/drag.svg';
 import yesIcon from '../assets/yes.svg';
 import noIcon from '../assets/not.svg';
 import './ReputationView.css';
@@ -124,7 +128,7 @@ function NumInput({ value, onChange, placeholder, max }) {
   );
 }
 
-function PromiseRow({ promise, onUpdate, onDelete }) {
+function PromiseRow({ promise, onUpdate, onDelete, dragHandleProps }) {
   const state = promiseState(promise); // 'done' | 'failed' | 'neutral'
   const fulfilled = state === 'done';
   const [hover, setHover] = useState(false);
@@ -217,6 +221,30 @@ function PromiseRow({ promise, onUpdate, onDelete }) {
       >
         <img src={hover ? deleteNavIcon : deleteIcon} alt="" />
       </button>
+      {dragHandleProps && (
+        <span className="rep-row__drag" {...dragHandleProps} aria-label="Перетащить">
+          <img src={dragIcon} alt="" />
+        </span>
+      )}
+    </div>
+  );
+}
+
+function SortablePromiseRow({ promise, onUpdate, onDelete }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: promise.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <PromiseRow
+        promise={promise}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
     </div>
   );
 }
@@ -285,6 +313,24 @@ function DayCard({ dateStr, promises, onAdd, onUpdate, onDelete }) {
   const [adding, setAdding] = useState(false);
   const hasHover = useMediaQuery('(hover: hover)');
   const [plusHover, setPlusHover] = useState(false);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const items = useMemo(
+    () => [...promises].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    [promises],
+  );
+
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return;
+    const ids = items.map((p) => p.id);
+    const oldIndex = ids.indexOf(active.id);
+    const newIndex = ids.indexOf(over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const reordered = arrayMove(items, oldIndex, newIndex);
+    reordered.forEach((p, idx) => {
+      if ((p.position ?? 0) !== idx) onUpdate(p.id, { position: idx });
+    });
+  };
 
   return (
     <section className="rep-day rep-anim-in">
@@ -309,9 +355,13 @@ function DayCard({ dateStr, promises, onAdd, onUpdate, onDelete }) {
       </div>
       <div className="rep-day__line" />
       <div className="rep-day__rows">
-        {promises.map((p) => (
-          <PromiseRow key={p.id} promise={p} onUpdate={onUpdate} onDelete={onDelete} />
-        ))}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={items.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+            {items.map((p) => (
+              <SortablePromiseRow key={p.id} promise={p} onUpdate={onUpdate} onDelete={onDelete} />
+            ))}
+          </SortableContext>
+        </DndContext>
       </div>
       {adding && (
         <AddPromiseForm
