@@ -14,7 +14,7 @@
   gap: 1rem;
   padding: 1.25rem 1.5rem;
   border-radius: 18px;
-  background: linear-gradient(135deg, var(--accent-soft), transparent 70%);
+  background: var(--accent-soft);
   position: relative;
   overflow: hidden;
 }
@@ -100,17 +100,18 @@
 .rep-ctl__nav:disabled { opacity: 0.35; cursor: default; }
 
 .rep-ctl__label {
-  min-width: 120px;
+  min-width: 190px;
   text-align: center;
   color: var(--text-primary);
   font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 /* List */
 .rep__list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: calc(1rem + 40px);
 }
 
 .rep-day {

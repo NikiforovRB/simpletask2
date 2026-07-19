@@ -37,7 +37,7 @@ const PERIODS = [
 ];
 
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const MONTHS_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
@@ -69,10 +69,10 @@ function computeRange(periodType, offset, today) {
 }
 
 function rangeLabel(periodType, start, end) {
-  if (periodType === 'month') return `${MONTHS[start.getMonth()][0].toUpperCase()}${MONTHS[start.getMonth()].slice(1)} ${start.getFullYear()}`;
-  if (periodType === '3m') return `${MONTHS_SHORT[start.getMonth()]} – ${MONTHS_SHORT[end.getMonth()]} ${end.getFullYear()}`;
-  const s = `${start.getDate()} ${MONTHS_SHORT[start.getMonth()]}`;
-  const e = `${end.getDate()} ${MONTHS_SHORT[end.getMonth()]}`;
+  if (periodType === 'month') return `${MONTHS_NOM[start.getMonth()]} ${start.getFullYear()}`;
+  if (periodType === '3m') return `${MONTHS_NOM[start.getMonth()]} – ${MONTHS_NOM[end.getMonth()].toLowerCase()} ${end.getFullYear()}`;
+  const s = `${start.getDate()} ${MONTHS[start.getMonth()]}`;
+  const e = `${end.getDate()} ${MONTHS[end.getMonth()]}`;
   return `${s} – ${e}`;
 }
 
@@ -276,7 +276,7 @@ function DayCard({ dateStr, promises, onAdd, onUpdate, onDelete }) {
   return (
     <section className="rep-day rep-anim-in">
       <div className="rep-day__header">
-        <span className={`rep-day__dot rep-day__dot--${status}`} aria-hidden />
+        {promises.length > 0 && <span className={`rep-day__dot rep-day__dot--${status}`} aria-hidden />}
         <span className="rep-day__title">{dayHeading(dateStr)}</span>
         <button
           type="button"
