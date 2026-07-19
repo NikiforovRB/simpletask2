@@ -78,6 +78,15 @@
   padding: 0;
 }
 
+.calendar-day__notime li {
+  margin: 0;
+  padding: 0;
+}
+
+.calendar-day__notime li + li {
+  margin-top: 12px;
+}
+
 .calendar-day__timeline {
   position: relative;
   width: 100%;
