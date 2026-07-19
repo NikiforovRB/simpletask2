@@ -210,25 +210,22 @@
 }
 
 .calendar-event__body {
-  padding: 0.2rem 0.4rem;
+  padding: 0.15rem 0.4rem;
   height: 100%;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+}
+
+.calendar-event__label {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  display: block;
+  word-break: break-word;
 }
 
 .calendar-event__time {
-  font-size: 0.68rem;
   color: var(--text-secondary);
   white-space: nowrap;
-}
-
-.calendar-event__title {
-  font-size: 0.82rem;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .calendar-event__resize {
@@ -259,36 +256,65 @@
 .calendar-modal {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  min-width: 300px;
+  gap: 1.1rem;
+  min-width: 340px;
+  padding: 1.75rem;
 }
 
-.calendar-modal__row {
+.calendar-modal__field-group {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
 }
 
 .calendar-modal__label {
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .calendar-modal__field {
   flex: 0 0 auto;
+  width: auto;
+  min-width: 120px;
 }
 
-.calendar-modal__toggle {
-  cursor: pointer;
-  font-size: 0.9rem;
+.calendar-modal__date {
+  position: relative;
+}
+
+.calendar-modal__date-btn {
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
   color: var(--text-primary);
+  border-radius: 6px;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.calendar-modal__date-btn:hover {
+  border-color: var(--accent);
+}
+
+.calendar-modal__date-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+}
+
+.calendar-modal__date-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
 }
 
 .calendar-modal__times {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  gap: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .calendar-modal__time-wrap {

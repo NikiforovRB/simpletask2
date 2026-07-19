@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { toLocalDateString, formatDayLabel, TASK_COLORS } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { CalendarPopover } from './CalendarPopover';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import './CalendarView.css';
@@ -18,6 +19,13 @@ const hhmmToMinutes = (s) => {
   if (Number.isNaN(h)) return null;
   return h * 60 + (m || 0);
 };
+const formatEventDate = (dateStr) => {
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  const dm = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  const wd = d.toLocaleDateString('ru-RU', { weekday: 'short' });
+  return `${dm}, ${wd}`;
+};
 
 function EventModal({ event, onClose, onSave, onDelete }) {
   const isNew = !event.id;
@@ -28,6 +36,7 @@ function EventModal({ event, onClose, onSave, onDelete }) {
   const [start, setStart] = useState(event.start_minute ?? 9 * 60);
   const [end, setEnd] = useState(event.end_minute ?? 10 * 60);
   const [color, setColor] = useState(event.color || DEFAULT_EVENT_COLOR);
+  const [dateOpen, setDateOpen] = useState(false);
 
   const save = () => {
     const patch = {
@@ -56,19 +65,30 @@ function EventModal({ event, onClose, onSave, onDelete }) {
           onKeyDown={(e) => { if (e.key === 'Enter') save(); }}
         />
 
-        <label className="calendar-modal__row">
+        <div className="calendar-modal__field-group">
           <span className="calendar-modal__label">Дата</span>
-          <input
-            type="date"
-            className="dashboard__settings-input calendar-modal__field"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </label>
+          <div className="calendar-modal__date">
+            <button type="button" className="calendar-modal__date-btn" onClick={() => setDateOpen((v) => !v)}>
+              {formatEventDate(date)}
+            </button>
+            {dateOpen && (
+              <>
+                <div className="calendar-modal__date-backdrop" onClick={() => setDateOpen(false)} />
+                <div className="calendar-modal__date-pop">
+                  <CalendarPopover
+                    value={date}
+                    onChange={(d) => { setDate(d); setDateOpen(false); }}
+                    onClose={() => setDateOpen(false)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
 
         {hasTime ? (
           <div className="calendar-modal__times">
-            <label className="calendar-modal__row">
+            <div className="calendar-modal__field-group">
               <span className="calendar-modal__label">Начало</span>
               <span className="calendar-modal__time-wrap">
                 <input
@@ -80,8 +100,8 @@ function EventModal({ event, onClose, onSave, onDelete }) {
                 />
                 <button type="button" className="calendar-modal__clear" onClick={() => setHasTime(false)} aria-label="Убрать время" title="Убрать время">×</button>
               </span>
-            </label>
-            <label className="calendar-modal__row">
+            </div>
+            <div className="calendar-modal__field-group">
               <span className="calendar-modal__label">Конец</span>
               <span className="calendar-modal__time-wrap">
                 <input
@@ -93,7 +113,7 @@ function EventModal({ event, onClose, onSave, onDelete }) {
                 />
                 <button type="button" className="calendar-modal__clear" onClick={() => setHasTime(false)} aria-label="Убрать время" title="Убрать время">×</button>
               </span>
-            </label>
+            </div>
           </div>
         ) : (
           <button
@@ -352,8 +372,10 @@ function CalendarDayColumn({ date, events, startHour, endHour, hourHeight, now, 
             >
               <div className="calendar-event__resize calendar-event__resize--top" onPointerDown={(e) => beginResize(e, ev, 'top')} />
               <div className="calendar-event__body">
-                <span className="calendar-event__time">{fmtMinutes(s)}–{fmtMinutes(e2)}</span>
-                <span className="calendar-event__title">{ev.title || 'Без названия'}</span>
+                <span className="calendar-event__label">
+                  <span className="calendar-event__time">{fmtMinutes(s)}–{fmtMinutes(e2)}</span>
+                  {ev.title ? <> • {ev.title}</> : null}
+                </span>
               </div>
               <div className="calendar-event__resize calendar-event__resize--bottom" onPointerDown={(e) => beginResize(e, ev, 'bottom')} />
             </div>
