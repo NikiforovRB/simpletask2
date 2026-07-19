@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toLocalDateString } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { useReputation, isPromiseFulfilled, dayStatus } from '../hooks/useReputation';
+import { useReputation, isPromiseFulfilled, dayStatus, promiseState } from '../hooks/useReputation';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
@@ -14,6 +14,18 @@ const CheckIcon = () => (
     <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+
+const CrossIcon = () => (
+  <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
+    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+  </svg>
+);
+
+const StateMark = ({ state }) => {
+  if (state === 'done') return <CheckIcon />;
+  if (state === 'failed') return <CrossIcon />;
+  return null;
+};
 
 const pluralDays = (n) => {
   const m10 = n % 10;
@@ -123,8 +135,19 @@ function NumInput({ value, onChange, placeholder, max }) {
 }
 
 function PromiseRow({ promise, onUpdate, onDelete }) {
-  const fulfilled = isPromiseFulfilled(promise);
+  const state = promiseState(promise); // 'done' | 'failed' | 'neutral'
+  const fulfilled = state === 'done';
   const [hover, setHover] = useState(false);
+
+  // yesno cycle: neutral -> done -> failed -> neutral
+  const cycleYesNo = () => {
+    const cur = promise.fact_value;
+    let next;
+    if (cur == null) next = 1;
+    else if (cur >= 1) next = 0;
+    else next = null;
+    onUpdate(promise.id, { fact_value: next });
+  };
 
   const planH = promise.plan_value != null ? Math.floor(promise.plan_value / 60) : null;
   const planM = promise.plan_value != null ? promise.plan_value % 60 : null;
@@ -147,15 +170,15 @@ function PromiseRow({ promise, onUpdate, onDelete }) {
       {promise.kind === 'yesno' ? (
         <button
           type="button"
-          className={`rep-row__check ${promise.done ? 'rep-row__check--done' : ''}`}
-          onClick={() => onUpdate(promise.id, { done: !promise.done })}
-          aria-label={promise.done ? 'Снять отметку' : 'Выполнено'}
+          className={`rep-row__check rep-row__check--${state}`}
+          onClick={cycleYesNo}
+          aria-label="Изменить статус"
         >
-          {promise.done && <CheckIcon />}
+          <StateMark state={state} />
         </button>
       ) : (
-        <span className={`rep-row__badge ${fulfilled ? 'rep-row__badge--done' : ''}`} aria-hidden>
-          {fulfilled && <CheckIcon />}
+        <span className={`rep-row__badge rep-row__badge--${state}`} aria-hidden>
+          <StateMark state={state} />
         </span>
       )}
 
@@ -276,7 +299,9 @@ function DayCard({ dateStr, promises, onAdd, onUpdate, onDelete }) {
   return (
     <section className="rep-day rep-anim-in">
       <div className="rep-day__header">
-        {promises.length > 0 && <span className={`rep-day__dot rep-day__dot--${status}`} aria-hidden />}
+        {status !== 'empty' && status !== 'neutral' && (
+          <span className={`rep-day__dot rep-day__dot--${status}`} aria-hidden />
+        )}
         <span className="rep-day__title">{dayHeading(dateStr)}</span>
         <button
           type="button"
@@ -374,15 +399,19 @@ export function ReputationView({ headerSlot, daysCount = 3, setDaysCount }) {
     );
     let pStreak = 0;
     for (let i = ordered.length - 1; i >= 0; i--) {
-      if (isPromiseFulfilled(ordered[i])) pStreak++;
-      else break;
+      const s = promiseState(ordered[i]);
+      if (s === 'done') pStreak++;
+      else if (s === 'failed') break;
+      // neutral (pending) does not break or count
     }
-    // day streak: trailing consecutive green promise-days
+    // day streak: trailing consecutive fully-green days (a failed day breaks it)
     const dates = Array.from(new Set(past.map((p) => p.promise_date))).sort();
     let dStreak = 0;
     for (let i = dates.length - 1; i >= 0; i--) {
-      if (dayStatus(byDate.get(dates[i]) || []) === 'green') dStreak++;
-      else break;
+      const st = dayStatus(byDate.get(dates[i]) || []);
+      if (st === 'green') dStreak++;
+      else if (st === 'yellow' || st === 'red') break;
+      // green50 / neutral (pending, no fails) does not break or count
     }
     return { promiseStreak: pStreak, dayStreak: dStreak };
   }, [promises, byDate, todayStr]);

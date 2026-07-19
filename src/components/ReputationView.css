@@ -132,6 +132,7 @@
 }
 
 .rep-day__dot--green { background: var(--success); }
+.rep-day__dot--green50 { background: var(--success); opacity: 0.5; }
 .rep-day__dot--yellow { background: #e0b13b; }
 .rep-day__dot--red { background: var(--danger); }
 .rep-day__dot--empty { background: var(--border-strong); }
@@ -204,7 +205,8 @@
 
 .rep-row:hover { background: var(--bg-hover); }
 
-.rep-row__check {
+.rep-row__check,
+.rep-row__badge {
   flex: 0 0 18px;
   width: 18px;
   height: 18px;
@@ -214,31 +216,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  color: var(--bg-surface-2);
+  color: #fff;
   transition: background 0.15s ease, transform 0.12s ease;
 }
 
-.rep-row__check:hover { background: var(--border-strong); }
+.rep-row__check { cursor: pointer; }
+.rep-row__check--neutral:hover { background: var(--border-strong); }
 .rep-row__check:active { transform: scale(0.9); }
+
 .rep-row__check--done,
-.rep-row__check--done:hover { background: var(--success); }
-
-.rep-row__badge {
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  background: var(--border);
-  color: var(--bg-surface-2);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  transition: background 0.2s ease;
-}
-
 .rep-row__badge--done { background: var(--success); }
+
+.rep-row__check--failed,
+.rep-row__badge--failed { background: var(--danger); }
 
 .rep-row__title {
   flex: 1;
@@ -436,8 +426,10 @@
 
 .rep-cell:hover { transform: translateY(-2px); filter: brightness(1.1); }
 .rep-cell--pad { background: transparent; cursor: default; pointer-events: none; }
-.rep-cell--empty { background: var(--bg-elev); }
+.rep-cell--empty,
+.rep-cell--neutral { background: var(--bg-elev); }
 .rep-cell--green { background: var(--success); }
+.rep-cell--green50 { background: color-mix(in srgb, var(--success) 50%, var(--bg-elev)); }
 .rep-cell--yellow { background: #e0b13b; }
 .rep-cell--red { background: var(--danger); }
 .rep-cell--today { box-shadow: 0 0 0 2px var(--accent); }
