@@ -158,6 +158,16 @@
   object-fit: contain;
 }
 
+.dashboard__calendar-hours {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dashboard__calendar-hours-sep {
+  color: var(--text-secondary);
+}
+
 .dashboard__days {
   display: flex;
   flex-direction: column;

@@ -25,6 +25,12 @@ function normalizeTheme(v) {
   return v === 'light' ? 'light' : 'dark';
 }
 
+function clampHour(n, fallback, min, max) {
+  const v = Number(n);
+  if (Number.isFinite(v)) return Math.max(min, Math.min(max, Math.round(v)));
+  return fallback;
+}
+
 export function useSettings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState({
@@ -39,6 +45,8 @@ export function useSettings() {
     board_zoom: 100,
     board_dots: false,
     theme: 'dark',
+    calendar_start_hour: 8,
+    calendar_end_hour: 22,
   });
   const [loading, setLoading] = useState(true);
 
@@ -48,11 +56,11 @@ export function useSettings() {
       return;
     }
     const fetch = async () => {
+      // Select '*' so that a not-yet-applied migration (missing calendar_*
+      // columns) doesn't error out and wipe persisted settings back to defaults.
       const { data, error } = await supabase
         .from('user_settings')
-        .select(
-          'days_count, new_tasks_position, no_date_list_visible, completed_visible, sidebar_width_px, habits_sidebar_width_px, task_font_weight, task_font_scale, board_zoom, board_dots, theme'
-        )
+        .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
       if (!error && data) {
@@ -68,6 +76,8 @@ export function useSettings() {
           board_zoom: clampBoardZoom(data.board_zoom),
           board_dots: data.board_dots === true,
           theme: normalizeTheme(data.theme),
+          calendar_start_hour: clampHour(data.calendar_start_hour, 8, 0, 23),
+          calendar_end_hour: clampHour(data.calendar_end_hour, 22, 1, 24),
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -96,6 +106,8 @@ export function useSettings() {
           board_zoom: 100,
           board_dots: false,
           theme: 'dark',
+          calendar_start_hour: 8,
+          calendar_end_hour: 22,
         });
       }
       setLoading(false);
@@ -178,6 +190,18 @@ export function useSettings() {
     await supabase.from('user_settings').update({ theme: v }).eq('user_id', user.id);
   };
 
+  const setCalendarHours = async (startHour, endHour) => {
+    if (!user) return;
+    let start = clampHour(startHour, 8, 0, 23);
+    let end = clampHour(endHour, 22, 1, 24);
+    if (end <= start) end = Math.min(24, start + 1);
+    setSettings((s) => ({ ...s, calendar_start_hour: start, calendar_end_hour: end }));
+    await supabase
+      .from('user_settings')
+      .update({ calendar_start_hour: start, calendar_end_hour: end })
+      .eq('user_id', user.id);
+  };
+
   return {
     settings,
     setDaysCount,
@@ -191,6 +215,7 @@ export function useSettings() {
     setBoardZoom,
     setBoardDots,
     setTheme,
+    setCalendarHours,
     loading,
   };
 }

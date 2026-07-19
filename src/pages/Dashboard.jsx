@@ -41,11 +41,13 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useProjects } from '../hooks/useProjects';
 import { useHabits } from '../hooks/useHabits';
 import { useBoardItems } from '../hooks/useBoardItems';
+import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useGoalPlan } from '../hooks/useGoalPlan';
 import { DayCard } from '../components/DayCard';
 import { HabitsView } from '../components/HabitsView';
 import { BoardView } from '../components/BoardView';
 import { GoalPlanView } from '../components/GoalPlanView';
+import { CalendarView } from '../components/CalendarView';
 import { NoDateList } from '../components/NoDateList';
 import { SomedayList } from '../components/SomedayList';
 import { ProjectList } from '../components/ProjectList';
@@ -172,6 +174,7 @@ function getTasksInContainer(tasks, containerId) {
 const BUILTIN_MENU_ITEMS = [
   { key: 'today', label: 'Сегодня' },
   { key: 'plans', label: 'Планы' },
+  { key: 'calendar', label: 'Календарь' },
   { key: 'goal_plan', label: 'Планы с целями' },
   { key: 'no_date', label: 'Задачи без даты' },
   { key: 'someday', label: 'Когда-нибудь' },
@@ -286,8 +289,10 @@ export default function Dashboard() {
     setBoardZoom,
     setBoardDots,
     setTheme,
+    setCalendarHours,
   } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
+  const { events: calendarEvents, addEvent: addCalendarEvent, updateEvent: updateCalendarEvent, deleteEvent: deleteCalendarEvent } = useCalendarEvents();
   const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
   const {
@@ -340,7 +345,7 @@ export default function Dashboard() {
       if (!raw) return 'plans';
       const parsed = JSON.parse(raw);
       const v = parsed?.viewMode;
-      return ['today', 'plans', 'goal_plan', 'no_date', 'someday', 'habits', 'focus_analytics', 'board', 'project'].includes(v) ? v : 'plans';
+      return ['today', 'plans', 'calendar', 'goal_plan', 'no_date', 'someday', 'habits', 'focus_analytics', 'board', 'project'].includes(v) ? v : 'plans';
     } catch {
       return 'plans';
     }
@@ -407,6 +412,7 @@ export default function Dashboard() {
   const [menuHover, setMenuHover] = useState(false);
   const [todayHover, setTodayHover] = useState(false);
   const [plansHover, setPlansHover] = useState(false);
+  const [calendarMenuHover, setCalendarMenuHover] = useState(false);
   const [goalPlanHover, setGoalPlanHover] = useState(false);
   const [noDateHover, setNoDateHover] = useState(false);
   const [somedayHover, setSomedayHover] = useState(false);
@@ -589,7 +595,7 @@ export default function Dashboard() {
   }, [viewMode, activeProjectId, activeBoardId, projects, projectsLoading, boardItems, boardItemsLoading]);
 
   const handleMenuSelect = useCallback((target) => {
-    const isBuiltinView = ['today', 'plans', 'goal_plan', 'no_date', 'someday', 'habits', 'focus_analytics'].includes(target);
+    const isBuiltinView = ['today', 'plans', 'calendar', 'goal_plan', 'no_date', 'someday', 'habits', 'focus_analytics'].includes(target);
     if (isBuiltinView) {
       setViewMode(target);
       setActiveProjectId(null);
@@ -1275,7 +1281,7 @@ export default function Dashboard() {
                 className="dashboard__board-header-slot dashboard__board-header-slot--left"
               />
             )}
-            {(viewMode === 'plans' || viewMode === 'goal_plan') && (
+            {(viewMode === 'plans' || viewMode === 'goal_plan' || viewMode === 'calendar') && (
               <>
                 <select
                   value={settings.days_count}
@@ -1305,6 +1311,31 @@ export default function Dashboard() {
                 </button>
               </>
             )}
+            {viewMode === 'calendar' && (
+              <span className="dashboard__calendar-hours" title="Диапазон времени таймлайна">
+                <select
+                  value={settings.calendar_start_hour}
+                  onChange={(e) => setCalendarHours(Number(e.target.value), settings.calendar_end_hour)}
+                  className="dashboard__select"
+                  aria-label="Начало таймлайна"
+                >
+                  {Array.from({ length: 24 }, (_, h) => h).map((h) => (
+                    <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                  ))}
+                </select>
+                <span className="dashboard__calendar-hours-sep">–</span>
+                <select
+                  value={settings.calendar_end_hour}
+                  onChange={(e) => setCalendarHours(settings.calendar_start_hour, Number(e.target.value))}
+                  className="dashboard__select"
+                  aria-label="Конец таймлайна"
+                >
+                  {Array.from({ length: 24 }, (_, i) => i + 1).map((h) => (
+                    <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                  ))}
+                </select>
+              </span>
+            )}
           </div>
           <div className="dashboard__header-actions">
             {viewMode === 'board' && (
@@ -1313,7 +1344,7 @@ export default function Dashboard() {
                 className="dashboard__board-header-slot dashboard__board-header-slot--right"
               />
             )}
-            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && (
+            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'calendar' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
@@ -1367,6 +1398,18 @@ export default function Dashboard() {
                 >
                   <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
                   <span>Планы</span>
+                </button>
+              )}
+              {!isBuiltinHidden('calendar') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'calendar' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setCalendarMenuHover(true)}
+                  onMouseLeave={() => hasHover && setCalendarMenuHover(false)}
+                  onClick={() => handleMenuSelect('calendar')}
+                >
+                  <img src={viewMode === 'calendar' || (hasHover && calendarMenuHover) ? calendarNavIcon : calendarIcon} alt="" />
+                  <span>Календарь</span>
                 </button>
               )}
               {!isBuiltinHidden('goal_plan') && (
@@ -1533,6 +1576,18 @@ export default function Dashboard() {
                 >
                   <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
                   <span>Планы</span>
+                </button>
+              )}
+              {!isBuiltinHidden('calendar') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'calendar' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setCalendarMenuHover(true)}
+                  onMouseLeave={() => hasHover && setCalendarMenuHover(false)}
+                  onClick={() => handleMenuSelect('calendar')}
+                >
+                  <img src={viewMode === 'calendar' || (hasHover && calendarMenuHover) ? calendarNavIcon : calendarIcon} alt="" />
+                  <span>Календарь</span>
                 </button>
               )}
               {!isBuiltinHidden('goal_plan') && (
@@ -1909,6 +1964,7 @@ export default function Dashboard() {
                   switch (item.key) {
                     case 'today': return starIcon;
                     case 'plans': return calendarIcon;
+                    case 'calendar': return calendarIcon;
                     case 'goal_plan': return goalIcon;
                     case 'no_date': return layersIcon;
                     case 'someday': return archiveIcon;
@@ -2066,6 +2122,18 @@ export default function Dashboard() {
             />
           ))}
         </div>
+      )}
+
+      {viewMode === 'calendar' && (
+        <CalendarView
+          days={days}
+          events={calendarEvents}
+          startHour={settings.calendar_start_hour}
+          endHour={settings.calendar_end_hour}
+          addEvent={addCalendarEvent}
+          updateEvent={updateCalendarEvent}
+          deleteEvent={deleteCalendarEvent}
+        />
       )}
 
       {viewMode === 'goal_plan' && (
