@@ -140,7 +140,16 @@ function PromiseRow({ promise, onUpdate, onDelete, dragHandleProps }) {
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   };
-  useLayoutEffect(() => { resizeTitle(); }, [promise.title]);
+  useLayoutEffect(() => {
+    resizeTitle();
+    const el = titleRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    // Recompute height whenever the textarea's width changes (flex layout,
+    // window resize), so wrapped lines are never clipped.
+    const ro = new ResizeObserver(() => resizeTitle());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [promise.title]);
 
   // yesno cycle: neutral -> done -> failed -> neutral
   const cycleYesNo = () => {

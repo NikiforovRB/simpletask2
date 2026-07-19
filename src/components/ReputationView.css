@@ -251,7 +251,9 @@
   overflow: hidden;
   line-height: 1.35;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
+  field-sizing: content;
 }
 
 .rep-row--done .rep-row__title { color: var(--text-secondary); }
