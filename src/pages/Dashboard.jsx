@@ -1342,8 +1342,8 @@ export default function Dashboard() {
                   aria-label="Масштаб временной шкалы"
                   title="Масштаб временной шкалы"
                 >
-                  {[1, 2, 3].map((s) => (
-                    <option key={s} value={s}>{s}x</option>
+                  {Array.from({ length: 11 }, (_, i) => Math.round((1 + i * 0.2) * 10) / 10).map((s) => (
+                    <option key={s} value={s}>{(Number.isInteger(s) ? String(s) : s.toFixed(1).replace('.', ',')) + 'x'}</option>
                   ))}
                 </select>
               </span>

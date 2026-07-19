@@ -31,6 +31,14 @@ function clampHour(n, fallback, min, max) {
   return fallback;
 }
 
+// Calendar timeline scale: snap to 0.2 steps within [1, 3].
+function clampScale(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return 1;
+  const snapped = Math.round(v / 0.2) * 0.2;
+  return Math.max(1, Math.min(3, Math.round(snapped * 10) / 10));
+}
+
 export function useSettings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState({
@@ -79,7 +87,7 @@ export function useSettings() {
           theme: normalizeTheme(data.theme),
           calendar_start_hour: clampHour(data.calendar_start_hour, 8, 0, 23),
           calendar_end_hour: clampHour(data.calendar_end_hour, 22, 1, 24),
-          calendar_scale: clampHour(data.calendar_scale, 1, 1, 3),
+          calendar_scale: clampScale(data.calendar_scale),
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -207,7 +215,7 @@ export function useSettings() {
 
   const setCalendarScale = async (scale) => {
     if (!user) return;
-    const v = clampHour(scale, 1, 1, 3);
+    const v = clampScale(scale);
     setSettings((s) => ({ ...s, calendar_scale: v }));
     await supabase.from('user_settings').update({ calendar_scale: v }).eq('user_id', user.id);
   };

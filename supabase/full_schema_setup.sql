@@ -1,5 +1,5 @@
 -- ============================================================
--- simple-tasks2 — FULL schema setup (migrations 001..033 combined)
+-- simple-tasks2 — FULL schema setup (migrations 001..034 combined)
 -- Run once in the Supabase SQL Editor of the target project.
 -- ============================================================
 
@@ -919,4 +919,21 @@ alter table public.user_settings
 -- Calendar: allow marking events as completed (checkbox on no-time items).
 alter table public.calendar_events
   add column if not exists completed boolean not null default false;
+
+
+-- >>>>>>>>>> 034_calendar_scale_fractional.sql >>>>>>>>>>
+
+-- Calendar: allow fractional timeline scale (1x, 1.2x, ... 3x).
+alter table public.user_settings
+  drop constraint if exists user_settings_calendar_scale_check;
+
+alter table public.user_settings
+  alter column calendar_scale type numeric(3,1) using round(calendar_scale::numeric, 1);
+
+alter table public.user_settings
+  alter column calendar_scale set default 1;
+
+alter table public.user_settings
+  add constraint user_settings_calendar_scale_check
+  check (calendar_scale >= 1 and calendar_scale <= 3);
 
