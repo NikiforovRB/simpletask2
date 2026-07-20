@@ -73,9 +73,9 @@ function computeRange(periodType, offset, today) {
     const end = new Date(base.getFullYear(), base.getMonth() + 1, 0);
     return { start: startOfDay(start), end: startOfDay(end) };
   }
-  // 3m / 4m: N calendar months ending at the anchor month
+  // 3m / 4m: N calendar months ending at the anchor month; paging is per-month.
   const monthsBack = periodType === '4m' ? 4 : 3;
-  const anchor = addMonths(today, offset * monthsBack);
+  const anchor = addMonths(today, offset);
   const start = new Date(anchor.getFullYear(), anchor.getMonth() - (monthsBack - 1), 1);
   const end = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
   return { start: startOfDay(start), end: startOfDay(end) };
@@ -439,20 +439,9 @@ function DayCard({ dateStr, promises, onAdd, onUpdate, onDelete }) {
   );
 }
 
-function Heatmap({ start, end, byDate, onSelect, selected }) {
-  const days = eachDay(start, end);
-  const leadingPad = weekdayIndex(days[0]); // Mon=0
+// Column-major cells (each week is a top-to-bottom column).
+function buildCells({ days, leadingPad, byDate, onSelect, selected, todayStr }) {
   const columns = Math.ceil((leadingPad + days.length) / 7);
-  const todayStr = toLocalDateString(new Date());
-
-  // Month label above the column that contains the 1st of a month.
-  const monthLabels = new Array(columns).fill('');
-  days.forEach((d, i) => {
-    if (d.getDate() === 1) monthLabels[Math.floor((leadingPad + i) / 7)] = MONTHS_ABBR[d.getMonth()];
-  });
-  if (!monthLabels[0]) monthLabels[0] = MONTHS_ABBR[days[0].getMonth()];
-
-  // Cells in column-major order (each week is a top-to-bottom column).
   const cells = [];
   for (let col = 0; col < columns; col++) {
     for (let row = 0; row < 7; row++) {
@@ -477,8 +466,66 @@ function Heatmap({ start, end, byDate, onSelect, selected }) {
       );
     }
   }
+  return { cells, columns };
+}
 
-  const colsTemplate = `repeat(${columns}, 12px)`;
+function MonthBlock({ year, month, byDate, onSelect, selected, todayStr }) {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const days = [];
+  for (let d = 1; d <= daysInMonth; d++) days.push(new Date(year, month, d));
+  const leadingPad = weekdayIndex(new Date(year, month, 1));
+  const { cells } = buildCells({ days, leadingPad, byDate, onSelect, selected, todayStr });
+  return (
+    <div className="rep-hm__month-block">
+      <div className="rep-hm__month-title">{MONTHS_NOM[month]}</div>
+      <div className="rep-hm__grid">{cells}</div>
+    </div>
+  );
+}
+
+const HeatLegend = () => (
+  <div className="rep-heatmap__legend">
+    <span><i className="rep-hm__legend-sw rep-hm__cell--green" /> всё выполнено</span>
+    <span><i className="rep-hm__legend-sw rep-hm__cell--yellow" /> частично</span>
+    <span><i className="rep-hm__legend-sw rep-hm__cell--red" /> не выполнено</span>
+  </div>
+);
+
+function Heatmap({ start, end, byDate, onSelect, selected, periodType }) {
+  const todayStr = toLocalDateString(new Date());
+  const splitByMonth = periodType === 'month' || periodType === '3m' || periodType === '4m';
+
+  if (splitByMonth) {
+    const monthsList = [];
+    let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    const last = new Date(end.getFullYear(), end.getMonth(), 1);
+    while (cur <= last) {
+      monthsList.push({ y: cur.getFullYear(), m: cur.getMonth() });
+      cur = addMonths(cur, 1);
+    }
+    return (
+      <div className="rep-heatmap rep-anim-in">
+        <div className="rep-hm">
+          <div className="rep-hm__months-row">
+            {monthsList.map(({ y, m }) => (
+              <MonthBlock key={`${y}-${m}`} year={y} month={m} byDate={byDate} onSelect={onSelect} selected={selected} todayStr={todayStr} />
+            ))}
+          </div>
+        </div>
+        <HeatLegend />
+      </div>
+    );
+  }
+
+  const days = eachDay(start, end);
+  const leadingPad = weekdayIndex(days[0]);
+  const { cells, columns } = buildCells({ days, leadingPad, byDate, onSelect, selected, todayStr });
+  const monthLabels = new Array(columns).fill('');
+  days.forEach((d, i) => {
+    if (d.getDate() === 1) monthLabels[Math.floor((leadingPad + i) / 7)] = MONTHS_ABBR[d.getMonth()];
+  });
+  if (!monthLabels[0]) monthLabels[0] = MONTHS_ABBR[days[0].getMonth()];
+  const colsTemplate = `repeat(${columns}, 24px)`;
 
   return (
     <div className="rep-heatmap rep-anim-in">
@@ -490,11 +537,7 @@ function Heatmap({ start, end, byDate, onSelect, selected }) {
           <div className="rep-hm__grid">{cells}</div>
         </div>
       </div>
-      <div className="rep-heatmap__legend">
-        <span><i className="rep-hm__legend-sw rep-hm__cell--green" /> всё выполнено</span>
-        <span><i className="rep-hm__legend-sw rep-hm__cell--yellow" /> частично</span>
-        <span><i className="rep-hm__legend-sw rep-hm__cell--red" /> не выполнено</span>
-      </div>
+      <HeatLegend />
     </div>
   );
 }
@@ -638,7 +681,7 @@ export function ReputationView({ headerSlot, daysCount = 3, setDaysCount }) {
         </div>
       ) : (
         <div className="rep__heatmap-wrap">
-          <Heatmap start={start} end={end} byDate={byDate} onSelect={setSelectedDay} selected={detailDay} />
+          <Heatmap start={start} end={end} byDate={byDate} onSelect={setSelectedDay} selected={detailDay} periodType={periodType} />
           {detailDay && (
             <DayCard
               key={detailDay}

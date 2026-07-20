@@ -462,15 +462,34 @@
 
 .rep-hm {
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding: 3px 0 4px 3px; /* left/top room so selection rings aren't clipped */
 }
 
 .rep-hm__scroll { width: max-content; }
 
+.rep-hm__months-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  width: max-content;
+}
+
+.rep-hm__month-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.rep-hm__month-title {
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
 .rep-hm__months {
   display: grid;
-  gap: 3px;
-  margin-bottom: 5px;
+  gap: 4px;
+  margin-bottom: 6px;
 }
 
 .rep-hm__month {
@@ -484,15 +503,15 @@
 .rep-hm__grid {
   display: grid;
   grid-auto-flow: column;
-  grid-template-rows: repeat(7, 12px);
-  grid-auto-columns: 12px;
-  gap: 3px;
+  grid-template-rows: repeat(7, 24px);
+  grid-auto-columns: 24px;
+  gap: 4px;
 }
 
 .rep-hm__cell {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
   border: none;
   padding: 0;
   background: var(--bg-elev);
@@ -511,11 +530,11 @@
 .rep-hm__cell--green50 { background: color-mix(in srgb, var(--success) 50%, var(--bg-elev)); }
 .rep-hm__cell--yellow { background: #e0b13b; }
 .rep-hm__cell--red { background: var(--danger); }
-.rep-hm__cell--today { box-shadow: 0 0 0 1.5px var(--accent); }
-.rep-hm__cell--selected { box-shadow: 0 0 0 1.5px var(--text-strong); }
+.rep-hm__cell--today { box-shadow: 0 0 0 2px var(--accent); }
+.rep-hm__cell--selected { box-shadow: 0 0 0 2px var(--text-strong); }
 
 .rep-hm__num {
-  font-size: 0.5rem;
+  font-size: 0.72rem;
   line-height: 1;
   color: var(--text-primary);
   opacity: 0.4;
@@ -523,9 +542,9 @@
 }
 
 .rep-hm__legend-sw {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
   display: inline-block;
 }
 
