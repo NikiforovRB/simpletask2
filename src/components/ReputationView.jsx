@@ -11,6 +11,10 @@ import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav.svg';
 import dragIcon from '../assets/drag.svg';
+import leftIcon from '../assets/left.svg';
+import leftNavIcon from '../assets/left-nav.svg';
+import rightIcon from '../assets/right.svg';
+import rightNavIcon from '../assets/right-nav.svg';
 import yesIcon from '../assets/yes.svg';
 import noIcon from '../assets/not.svg';
 import './ReputationView.css';
@@ -40,10 +44,12 @@ const PERIODS = [
   { key: 'week', label: 'Неделя' },
   { key: 'month', label: 'Месяц' },
   { key: '3m', label: '3 месяца' },
+  { key: '4m', label: '4 месяца' },
 ];
 
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const MONTHS_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const MONTHS_ABBR = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
@@ -67,16 +73,17 @@ function computeRange(periodType, offset, today) {
     const end = new Date(base.getFullYear(), base.getMonth() + 1, 0);
     return { start: startOfDay(start), end: startOfDay(end) };
   }
-  // 3m: three calendar months ending at anchor month
-  const anchor = addMonths(today, offset * 3);
-  const start = new Date(anchor.getFullYear(), anchor.getMonth() - 2, 1);
+  // 3m / 4m: N calendar months ending at the anchor month
+  const monthsBack = periodType === '4m' ? 4 : 3;
+  const anchor = addMonths(today, offset * monthsBack);
+  const start = new Date(anchor.getFullYear(), anchor.getMonth() - (monthsBack - 1), 1);
   const end = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
   return { start: startOfDay(start), end: startOfDay(end) };
 }
 
 function rangeLabel(periodType, start, end) {
   if (periodType === 'month') return `${MONTHS_NOM[start.getMonth()]} ${start.getFullYear()}`;
-  if (periodType === '3m') return `${MONTHS_NOM[start.getMonth()]} – ${MONTHS_NOM[end.getMonth()].toLowerCase()} ${end.getFullYear()}`;
+  if (periodType === '3m' || periodType === '4m') return `${MONTHS_NOM[start.getMonth()]} – ${MONTHS_NOM[end.getMonth()].toLowerCase()} ${end.getFullYear()}`;
   const s = `${start.getDate()} ${MONTHS[start.getMonth()]}`;
   const e = `${end.getDate()} ${MONTHS[end.getMonth()]}`;
   return `${s} – ${e}`;
@@ -434,35 +441,59 @@ function DayCard({ dateStr, promises, onAdd, onUpdate, onDelete }) {
 
 function Heatmap({ start, end, byDate, onSelect, selected }) {
   const days = eachDay(start, end);
-  const lead = weekdayIndex(days[0]);
+  const leadingPad = weekdayIndex(days[0]); // Mon=0
+  const columns = Math.ceil((leadingPad + days.length) / 7);
   const todayStr = toLocalDateString(new Date());
-  const cells = [];
-  for (let i = 0; i < lead; i++) cells.push(<span key={`e${i}`} className="rep-cell rep-cell--pad" aria-hidden />);
-  days.forEach((d) => {
-    const ds = toLocalDateString(d);
-    const status = dayStatus(byDate.get(ds) || []);
-    cells.push(
-      <button
-        key={ds}
-        type="button"
-        className={`rep-cell rep-cell--${status} ${ds === todayStr ? 'rep-cell--today' : ''} ${ds === selected ? 'rep-cell--selected' : ''}`}
-        title={`${d.getDate()} ${MONTHS[d.getMonth()]}`}
-        onClick={() => onSelect(ds)}
-      >
-        <span className="rep-cell__num">{d.getDate()}</span>
-      </button>,
-    );
+
+  // Month label above the column that contains the 1st of a month.
+  const monthLabels = new Array(columns).fill('');
+  days.forEach((d, i) => {
+    if (d.getDate() === 1) monthLabels[Math.floor((leadingPad + i) / 7)] = MONTHS_ABBR[d.getMonth()];
   });
+  if (!monthLabels[0]) monthLabels[0] = MONTHS_ABBR[days[0].getMonth()];
+
+  // Cells in column-major order (each week is a top-to-bottom column).
+  const cells = [];
+  for (let col = 0; col < columns; col++) {
+    for (let row = 0; row < 7; row++) {
+      const idx = col * 7 + row - leadingPad;
+      if (idx < 0 || idx >= days.length) {
+        cells.push(<span key={`p${col}-${row}`} className="rep-hm__cell rep-hm__cell--pad" aria-hidden />);
+        continue;
+      }
+      const d = days[idx];
+      const ds = toLocalDateString(d);
+      const status = dayStatus(byDate.get(ds) || []);
+      cells.push(
+        <button
+          key={ds}
+          type="button"
+          className={`rep-hm__cell rep-hm__cell--${status} ${ds === todayStr ? 'rep-hm__cell--today' : ''} ${ds === selected ? 'rep-hm__cell--selected' : ''}`}
+          title={`${d.getDate()} ${MONTHS[d.getMonth()]}`}
+          onClick={() => onSelect(ds)}
+        >
+          <span className="rep-hm__num">{d.getDate()}</span>
+        </button>,
+      );
+    }
+  }
+
+  const colsTemplate = `repeat(${columns}, 12px)`;
+
   return (
     <div className="rep-heatmap rep-anim-in">
-      <div className="rep-heatmap__weekdays">
-        {WEEKDAYS.map((w) => <span key={w} className="rep-heatmap__wd">{w}</span>)}
+      <div className="rep-hm">
+        <div className="rep-hm__scroll">
+          <div className="rep-hm__months" style={{ gridTemplateColumns: colsTemplate }}>
+            {monthLabels.map((m, i) => <span key={i} className="rep-hm__month">{m}</span>)}
+          </div>
+          <div className="rep-hm__grid">{cells}</div>
+        </div>
       </div>
-      <div className="rep-heatmap__grid">{cells}</div>
       <div className="rep-heatmap__legend">
-        <span><i className="rep-cell rep-cell--green rep-cell--legend" /> всё выполнено</span>
-        <span><i className="rep-cell rep-cell--yellow rep-cell--legend" /> частично</span>
-        <span><i className="rep-cell rep-cell--red rep-cell--legend" /> не выполнено</span>
+        <span><i className="rep-hm__legend-sw rep-hm__cell--green" /> всё выполнено</span>
+        <span><i className="rep-hm__legend-sw rep-hm__cell--yellow" /> частично</span>
+        <span><i className="rep-hm__legend-sw rep-hm__cell--red" /> не выполнено</span>
       </div>
     </div>
   );
@@ -473,6 +504,9 @@ export function ReputationView({ headerSlot, daysCount = 3, setDaysCount }) {
   const [mode, setMode] = useState('list'); // 'list' | 'heatmap'
   const [periodType, setPeriodType] = useState('7d');
   const [offset, setOffset] = useState(0);
+  const [listOffset, setListOffset] = useState(0);
+  const [listLeftHover, setListLeftHover] = useState(false);
+  const [listRightHover, setListRightHover] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
 
   const today = useMemo(() => startOfDay(new Date()), []);
@@ -515,13 +549,14 @@ export function ReputationView({ headerSlot, daysCount = 3, setDaysCount }) {
     return { promiseStreak: pStreak, dayStreak: dStreak };
   }, [promises, byDate, todayStr]);
 
-  // List mode: N consecutive days starting today (today at top, next days below).
+  // List mode: N consecutive days from the (offset-shifted) base, top to bottom.
   const listDays = useMemo(() => {
     const n = Math.max(1, Math.min(7, daysCount || 1));
+    const base = addDays(today, listOffset);
     const arr = [];
-    for (let i = 0; i < n; i++) arr.push(toLocalDateString(addDays(today, i)));
+    for (let i = 0; i < n; i++) arr.push(toLocalDateString(addDays(base, i)));
     return arr;
-  }, [daysCount, today]);
+  }, [daysCount, today, listOffset]);
 
   const detailDay = selectedDay && selectedDay >= toLocalDateString(start) && selectedDay <= toLocalDateString(end)
     ? selectedDay
@@ -534,9 +569,31 @@ export function ReputationView({ headerSlot, daysCount = 3, setDaysCount }) {
         <option value="heatmap">Тепловая карта</option>
       </select>
       {mode === 'list' && (
-        <select className="dashboard__select" value={daysCount} onChange={(e) => setDaysCount?.(Number(e.target.value))} aria-label="Количество дней">
-          {[1, 2, 3, 4, 5, 6, 7].map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
+        <>
+          <button
+            type="button"
+            className="dashboard__shift-btn"
+            onMouseEnter={() => setListLeftHover(true)}
+            onMouseLeave={() => setListLeftHover(false)}
+            onClick={() => setListOffset((o) => o - 1)}
+            aria-label="Назад"
+          >
+            <img src={listLeftHover ? leftNavIcon : leftIcon} alt="" />
+          </button>
+          <select className="dashboard__select" value={daysCount} onChange={(e) => setDaysCount?.(Number(e.target.value))} aria-label="Количество дней">
+            {[1, 2, 3, 4, 5, 6, 7].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <button
+            type="button"
+            className="dashboard__shift-btn"
+            onMouseEnter={() => setListRightHover(true)}
+            onMouseLeave={() => setListRightHover(false)}
+            onClick={() => setListOffset((o) => o + 1)}
+            aria-label="Вперёд"
+          >
+            <img src={listRightHover ? rightNavIcon : rightIcon} alt="" />
+          </button>
+        </>
       )}
       {mode === 'heatmap' && (
         <>
