@@ -91,7 +91,7 @@
   position: relative;
   width: 100%;
   border-radius: 8px;
-  touch-action: none;
+  touch-action: pan-y; /* allow finger scrolling; JS sets 'none' only while dragging */
   user-select: none;
 }
 

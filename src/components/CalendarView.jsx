@@ -256,6 +256,7 @@ function CalendarDayColumn({
       const d = dragRef.current;
       dragRef.current = null;
       setDragging(false);
+      if (timelineRef.current) timelineRef.current.style.touchAction = ''; // restore scrolling
       if (!d) return;
       if (d.type === 'create') {
         let s = Math.min(d.start, d.end);
@@ -287,6 +288,28 @@ function CalendarDayColumn({
 
   const beginTimelineCreate = (e) => {
     if (e.target !== timelineRef.current) return; // only empty area
+    // Touch: let the page scroll on a drag; create only on a clean tap.
+    if (e.pointerType === 'touch') {
+      const sx = e.clientX;
+      const sy = e.clientY;
+      let moved = false;
+      const onWaitMove = (me) => {
+        if (Math.abs(me.clientX - sx) > 10 || Math.abs(me.clientY - sy) > 10) moved = true;
+      };
+      const finish = (ue) => {
+        window.removeEventListener('pointermove', onWaitMove);
+        window.removeEventListener('pointerup', finish);
+        window.removeEventListener('pointercancel', finish);
+        if (!moved && ue.type === 'pointerup') {
+          const m = clientYToMinute(sy);
+          onOpenModal({ event_date: dateStr, all_day: false, start_minute: m, end_minute: Math.min(dayEndMin, m + 60), title: '', color: DEFAULT_TASK_COLOR });
+        }
+      };
+      window.addEventListener('pointermove', onWaitMove);
+      window.addEventListener('pointerup', finish);
+      window.addEventListener('pointercancel', finish);
+      return;
+    }
     e.preventDefault();
     const startMin = clientYToMinute(e.clientY);
     dragRef.current = { type: 'create', start: startMin, end: startMin, moved: false };
@@ -330,6 +353,9 @@ function CalendarDayColumn({
     const onWaitCancel = () => cleanup();
     timer = setTimeout(() => {
       cleanup();
+      // Finger has been held still, so no scroll is in progress: take over the
+      // gesture for moving (disable scrolling for its duration).
+      if (timelineRef.current) timelineRef.current.style.touchAction = 'none';
       startMove(startY, ev);
     }, 400);
     window.addEventListener('pointermove', onWaitMove);
@@ -339,6 +365,7 @@ function CalendarDayColumn({
 
   const beginResize = (e, ev, edge) => {
     e.stopPropagation();
+    if (e.pointerType === 'touch' && timelineRef.current) timelineRef.current.style.touchAction = 'none';
     dragRef.current = {
       type: edge === 'top' ? 'resize-top' : 'resize-bottom',
       id: ev.id,
