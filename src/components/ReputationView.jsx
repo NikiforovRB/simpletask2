@@ -131,25 +131,53 @@ function NumInput({ value, onChange, placeholder, max }) {
 function PromiseRow({ promise, onUpdate, onDelete, dragHandleProps }) {
   const state = promiseState(promise); // 'done' | 'failed' | 'neutral'
   const fulfilled = state === 'done';
+  const hasMetrics = promise.kind === 'time' || promise.kind === 'count';
   const [hover, setHover] = useState(false);
+  const [stacked, setStacked] = useState(false);
 
   const titleRef = useRef(null);
+  const mainRef = useRef(null);
+  const metricsRef = useRef(null);
+  const measureRef = useRef(null);
+
   const resizeTitle = () => {
     const el = titleRef.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   };
+
+  // Decide whether the title fits on one line next to the metrics; if not,
+  // metrics move to a second line. Measured with an off-layout span so the
+  // decision does not depend on the current (stacked/inline) layout.
+  const evaluateLayout = () => {
+    const main = mainRef.current;
+    const measure = measureRef.current;
+    if (!main || !measure) return;
+    const metricsW = metricsRef.current ? metricsRef.current.offsetWidth : 0;
+    const gap = 8;
+    const avail = main.clientWidth - (metricsW ? metricsW + gap : 0);
+    setStacked(measure.scrollWidth > avail + 1);
+  };
+
   useLayoutEffect(() => {
     resizeTitle();
     const el = titleRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
-    // Recompute height whenever the textarea's width changes (flex layout,
-    // window resize), so wrapped lines are never clipped.
     const ro = new ResizeObserver(() => resizeTitle());
     ro.observe(el);
     return () => ro.disconnect();
-  }, [promise.title]);
+  }, [promise.title, stacked]);
+
+  useLayoutEffect(() => {
+    if (!hasMetrics) return undefined;
+    evaluateLayout();
+    const el = mainRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => evaluateLayout());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [promise.title, hasMetrics]);
 
   // yesno cycle: neutral -> done -> failed -> neutral
   const cycleYesNo = () => {
@@ -194,43 +222,53 @@ function PromiseRow({ promise, onUpdate, onDelete, dragHandleProps }) {
         </span>
       )}
 
-      <textarea
-        ref={titleRef}
-        className="rep-row__title"
-        value={promise.title}
-        placeholder="Обещание"
-        rows={1}
-        onChange={(e) => onUpdate(promise.id, { title: e.target.value })}
-        onInput={resizeTitle}
-      />
+      <div className="rep-row__main" ref={mainRef}>
+        <textarea
+          ref={titleRef}
+          className="rep-row__title"
+          value={promise.title}
+          placeholder="Обещание"
+          rows={1}
+          onChange={(e) => onUpdate(promise.id, { title: e.target.value })}
+          onInput={resizeTitle}
+        />
 
-      {promise.kind === 'time' && (
-        <span className="rep-row__metrics">
-          <span className="rep-row__metric">
-            <span className="rep-row__metric-label">план</span>
-            <NumInput value={planH} onChange={(v) => setTime('plan_value', v, planM)} placeholder="ч" />
-            <NumInput value={planM} onChange={(v) => setTime('plan_value', planH, v)} placeholder="м" max={59} />
-          </span>
-          <span className="rep-row__arrow">→</span>
-          <span className="rep-row__metric">
-            <span className="rep-row__metric-label">факт</span>
-            <NumInput value={factH} onChange={(v) => setTime('fact_value', v, factM)} placeholder="ч" />
-            <NumInput value={factM} onChange={(v) => setTime('fact_value', factH, v)} placeholder="м" max={59} />
-          </span>
-        </span>
-      )}
+        {hasMetrics && stacked && <span className="rep-row__break" aria-hidden />}
 
-      {promise.kind === 'count' && (
-        <span className="rep-row__metrics">
-          <span className="rep-row__metric">
-            <span className="rep-row__metric-label">план</span>
-            <NumInput value={promise.plan_value} onChange={(v) => onUpdate(promise.id, { plan_value: v })} placeholder="0" />
+        {promise.kind === 'time' && (
+          <span className="rep-row__metrics" ref={metricsRef}>
+            <span className="rep-row__metric">
+              <span className="rep-row__metric-label">план</span>
+              <NumInput value={planH} onChange={(v) => setTime('plan_value', v, planM)} placeholder="ч" />
+              <NumInput value={planM} onChange={(v) => setTime('plan_value', planH, v)} placeholder="м" max={59} />
+            </span>
+            <span className="rep-row__arrow">→</span>
+            <span className="rep-row__metric">
+              <span className="rep-row__metric-label">факт</span>
+              <NumInput value={factH} onChange={(v) => setTime('fact_value', v, factM)} placeholder="ч" />
+              <NumInput value={factM} onChange={(v) => setTime('fact_value', factH, v)} placeholder="м" max={59} />
+            </span>
           </span>
-          <span className="rep-row__arrow">→</span>
-          <span className="rep-row__metric">
-            <span className="rep-row__metric-label">факт</span>
-            <NumInput value={promise.fact_value} onChange={(v) => onUpdate(promise.id, { fact_value: v })} placeholder="0" />
+        )}
+
+        {promise.kind === 'count' && (
+          <span className="rep-row__metrics" ref={metricsRef}>
+            <span className="rep-row__metric">
+              <span className="rep-row__metric-label">план</span>
+              <NumInput value={promise.plan_value} onChange={(v) => onUpdate(promise.id, { plan_value: v })} placeholder="0" />
+            </span>
+            <span className="rep-row__arrow">→</span>
+            <span className="rep-row__metric">
+              <span className="rep-row__metric-label">факт</span>
+              <NumInput value={promise.fact_value} onChange={(v) => onUpdate(promise.id, { fact_value: v })} placeholder="0" />
+            </span>
           </span>
+        )}
+      </div>
+
+      {hasMetrics && (
+        <span className="rep-row__measure" ref={measureRef} aria-hidden>
+          {promise.title || 'Обещание'}
         </span>
       )}
 
