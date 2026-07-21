@@ -1,5 +1,5 @@
 -- ============================================================
--- simple-tasks2 — FULL schema setup (migrations 001..036 combined)
+-- simple-tasks2 — FULL schema setup (migrations 001..037 combined)
 -- Run once in the Supabase SQL Editor of the target project.
 -- ============================================================
 
@@ -976,4 +976,11 @@ create policy "Users can manage own reputation_promises"
   with check (auth.uid() = user_id);
 
 alter table public.reputation_promises replica identity full;
+
+
+-- >>>>>>>>>> 037_calendar_show_checkboxes.sql >>>>>>>>>>
+
+-- Calendar: optional checkboxes on timeline events.
+alter table public.user_settings
+  add column if not exists calendar_show_checkboxes boolean not null default false;
 

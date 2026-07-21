@@ -187,7 +187,7 @@ function EventModal({ event, onClose, onSave, onDelete }) {
 }
 
 function CalendarDayColumn({
-  date, tasks, startHour, endHour, hourHeight, now,
+  date, tasks, startHour, endHour, hourHeight, now, showCheckboxes,
   onUpdateTiming, onOpenModal, onAddTaskAt, taskHandlers,
 }) {
   const dateStr = toLocalDateString(date);
@@ -465,6 +465,21 @@ function CalendarDayColumn({
             >
               <div className="calendar-event__resize calendar-event__resize--top" onPointerDown={(e) => beginResize(e, ev, 'top')} />
               <div className="calendar-event__body">
+                {showCheckboxes && (
+                  <button
+                    type="button"
+                    className={`calendar-event__check${ev.completed ? ' calendar-event__check--done' : ''}`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); taskHandlers.onToggle(ev.task); }}
+                    aria-label={ev.completed ? 'Вернуть' : 'Выполнено'}
+                  >
+                    {ev.completed && (
+                      <svg width="9" height="9" viewBox="0 0 16 16" aria-hidden>
+                        <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </button>
+                )}
                 <span className="calendar-event__label">
                   <span className="calendar-event__time">{fmtMinutes(s)}–{fmtMinutes(e2)}</span>
                   {ev.title ? <> • {ev.title}</> : null}
@@ -488,7 +503,7 @@ function CalendarDayColumn({
 }
 
 export function CalendarView({
-  days, tasks, startHour, endHour, scale = 1,
+  days, tasks, startHour, endHour, scale = 1, showCheckboxes = false,
   addTask, updateTask, deleteTask,
   onToggle, onAddTaskAt, onAddSubtask, onTaskContextMenu,
   editingTaskId, onEditingTaskConsumed,
@@ -543,6 +558,7 @@ export function CalendarView({
             endHour={endHour}
             hourHeight={hourHeight}
             now={now}
+            showCheckboxes={showCheckboxes}
             onUpdateTiming={updateTiming}
             onOpenModal={setEditingEvent}
             onAddTaskAt={onAddTaskAt}

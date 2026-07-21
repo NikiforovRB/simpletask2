@@ -164,6 +164,23 @@
   gap: 0.25rem;
 }
 
+.dashboard__settings-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.dashboard__settings-check input {
+  cursor: pointer;
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+}
+
 .dashboard__calendar-hours-sep {
   color: var(--text-secondary);
 }

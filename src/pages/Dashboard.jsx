@@ -292,6 +292,7 @@ export default function Dashboard() {
     setTheme,
     setCalendarHours,
     setCalendarScale,
+    setCalendarShowCheckboxes,
   } = useSettings();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
@@ -1984,6 +1985,14 @@ export default function Dashboard() {
             <button type="button" className={`dashboard__settings-option ${settings.new_tasks_position === 'end' ? 'dashboard__settings-option--active' : ''}`} onClick={() => { setNewTasksPosition('end'); setSettingsOpen(false); }}>
               В конец списка
             </button>
+            <label className="dashboard__settings-check">
+              <input
+                type="checkbox"
+                checked={settings.calendar_show_checkboxes}
+                onChange={(e) => setCalendarShowCheckboxes(e.target.checked)}
+              />
+              <span>Показывать чекбоксы на таймлайне</span>
+            </label>
           </div>
         </div>
       )}
@@ -2173,6 +2182,7 @@ export default function Dashboard() {
           startHour={settings.calendar_start_hour}
           endHour={settings.calendar_end_hour}
           scale={settings.calendar_scale}
+          showCheckboxes={settings.calendar_show_checkboxes}
           addTask={addTask}
           updateTask={updateTask}
           deleteTask={deleteTask}

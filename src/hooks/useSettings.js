@@ -56,6 +56,7 @@ export function useSettings() {
     calendar_start_hour: 8,
     calendar_end_hour: 22,
     calendar_scale: 1,
+    calendar_show_checkboxes: false,
   });
   const [loading, setLoading] = useState(true);
 
@@ -88,6 +89,7 @@ export function useSettings() {
           calendar_start_hour: clampHour(data.calendar_start_hour, 8, 0, 23),
           calendar_end_hour: clampHour(data.calendar_end_hour, 22, 1, 24),
           calendar_scale: clampScale(data.calendar_scale),
+          calendar_show_checkboxes: data.calendar_show_checkboxes === true,
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -119,6 +121,7 @@ export function useSettings() {
           calendar_start_hour: 8,
           calendar_end_hour: 22,
           calendar_scale: 1,
+          calendar_show_checkboxes: false,
         });
       }
       setLoading(false);
@@ -220,6 +223,13 @@ export function useSettings() {
     await supabase.from('user_settings').update({ calendar_scale: v }).eq('user_id', user.id);
   };
 
+  const setCalendarShowCheckboxes = async (v) => {
+    if (!user) return;
+    const val = !!v;
+    setSettings((s) => ({ ...s, calendar_show_checkboxes: val }));
+    await supabase.from('user_settings').update({ calendar_show_checkboxes: val }).eq('user_id', user.id);
+  };
+
   return {
     settings,
     setDaysCount,
@@ -235,6 +245,7 @@ export function useSettings() {
     setTheme,
     setCalendarHours,
     setCalendarScale,
+    setCalendarShowCheckboxes,
     loading,
   };
 }
