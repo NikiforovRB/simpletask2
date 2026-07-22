@@ -33,7 +33,11 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
     [tasks]
   );
   const completedTasks = useMemo(
-    () => tasks.filter((t) => !t.parent_id && t.completed_at && !t.scheduled_date && (t.list_type || 'inbox') === 'inbox').sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    () => tasks.filter((t) => !t.parent_id && t.completed_at && !t.scheduled_date && (t.list_type || 'inbox') === 'inbox').sort((a, b) => {
+      const ca = a.completed_at || '';
+      const cb = b.completed_at || '';
+      return ca === cb ? (a.position ?? 0) - (b.position ?? 0) : (ca < cb ? -1 : 1);
+    }),
     [tasks]
   );
 

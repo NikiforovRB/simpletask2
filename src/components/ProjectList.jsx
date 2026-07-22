@@ -33,7 +33,11 @@ export function ProjectList({ projectId, projectTitle, tasks, onToggle, onUpdate
     [tasks, projectIdStr]
   );
   const completedTasks = useMemo(
-    () => tasks.filter((t) => !t.parent_id && t.completed_at && (t.list_type || '') === 'project' && String(t.project_id) === projectIdStr).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    () => tasks.filter((t) => !t.parent_id && t.completed_at && (t.list_type || '') === 'project' && String(t.project_id) === projectIdStr).sort((a, b) => {
+      const ca = a.completed_at || '';
+      const cb = b.completed_at || '';
+      return ca === cb ? (a.position ?? 0) - (b.position ?? 0) : (ca < cb ? -1 : 1);
+    }),
     [tasks, projectIdStr]
   );
 
