@@ -102,7 +102,7 @@
 }
 
 .day-card__section--completed {
-  margin-top: 0.4rem;
+  margin-top: calc(0.4rem + 27px);
 }
 
 .day-card__completed-toggle {

@@ -1,5 +1,6 @@
 .no-date-list {
   margin-top: 1.5rem;
+  padding-bottom: 40px;
 }
 
 .no-date-list__header {
@@ -110,7 +111,7 @@
   font-size: 0.8125rem;
   cursor: pointer;
   padding: 0.5rem 0 0.35rem;
-  margin-top: 0.75rem;
+  margin-top: calc(0.75rem + 27px);
   margin-bottom: 0.35rem;
   border-bottom: 1px solid var(--divider);
   font-family: inherit;
