@@ -168,8 +168,9 @@
 }
 
 /* Touch devices: buttons are revealed by tapping the task (JS-driven),
-   then auto-hidden after 5s. See TaskItem.jsx. */
-.task-item--actions-visible .task-item__actions {
+   then auto-hidden after 5s. See TaskItem.jsx. Scoped with child combinators
+   so only the tapped task's buttons show, not its subtasks'. */
+.task-item--actions-visible > .task-item__row > .task-item__actions {
   opacity: 1;
 }
 
