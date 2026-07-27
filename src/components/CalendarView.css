@@ -178,8 +178,9 @@
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
-    /* The row gap only kicks in once the timeline wraps under the list. */
-    row-gap: 45px;
+    /* Row gap + the timeline's own top margin keep the stacked spacing at 45px
+       once the timeline wraps back under the list. */
+    row-gap: 25px;
     column-gap: 1.25rem;
   }
 
@@ -193,6 +194,7 @@
     flex: 1 1 260px;
     min-width: 240px;
     width: auto;
+    margin-top: 20px;
   }
 }
 
