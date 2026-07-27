@@ -48,6 +48,7 @@ import { HabitsView } from '../components/HabitsView';
 import { BoardView } from '../components/BoardView';
 import { GoalPlanView } from '../components/GoalPlanView';
 import { CalendarView } from '../components/CalendarView';
+import { TodayFocusTotal } from '../components/TodayFocusTotal';
 import { ReputationView } from '../components/ReputationView';
 import { NoDateList } from '../components/NoDateList';
 import { SomedayList } from '../components/SomedayList';
@@ -1315,6 +1316,9 @@ export default function Dashboard() {
                 <button type="button" className="dashboard__shift-btn" onMouseEnter={() => hasHover && setDateRightHover(true)} onMouseLeave={() => hasHover && setDateRightHover(false)} onClick={() => setDateOffset((o) => o + 1)} aria-label="Вперёд">
                   <img src={hasHover && dateRightHover ? rightNavIcon : rightIcon} alt="" />
                 </button>
+                {viewMode === 'plans' && (
+                  <TodayFocusTotal onOpen={() => handleMenuSelect('focus_analytics')} />
+                )}
               </>
             )}
             {viewMode === 'calendar' && (
@@ -1330,6 +1334,7 @@ export default function Dashboard() {
                     <option key={s} value={s}>{(Number.isInteger(s) ? String(s) : s.toFixed(1).replace('.', ',')) + 'x'}</option>
                   ))}
                 </select>
+                <TodayFocusTotal onOpen={() => handleMenuSelect('focus_analytics')} />
               </span>
             )}
             {viewMode === 'reputation' && (
