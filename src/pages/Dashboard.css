@@ -181,10 +181,6 @@
   accent-color: var(--accent);
 }
 
-.dashboard__calendar-hours-sep {
-  color: var(--text-secondary);
-}
-
 .dashboard__days {
   display: flex;
   flex-direction: column;

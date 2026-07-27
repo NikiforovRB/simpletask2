@@ -25,12 +25,6 @@ function normalizeTheme(v) {
   return v === 'light' ? 'light' : 'dark';
 }
 
-function clampHour(n, fallback, min, max) {
-  const v = Number(n);
-  if (Number.isFinite(v)) return Math.max(min, Math.min(max, Math.round(v)));
-  return fallback;
-}
-
 // Calendar timeline scale: snap to 0.2 steps within [1, 3].
 function clampScale(n) {
   const v = Number(n);
@@ -53,10 +47,9 @@ export function useSettings() {
     board_zoom: 100,
     board_dots: false,
     theme: 'dark',
-    calendar_start_hour: 8,
-    calendar_end_hour: 22,
     calendar_scale: 1,
     calendar_show_checkboxes: false,
+    calendar_two_columns: false,
   });
   const [loading, setLoading] = useState(true);
 
@@ -86,10 +79,9 @@ export function useSettings() {
           board_zoom: clampBoardZoom(data.board_zoom),
           board_dots: data.board_dots === true,
           theme: normalizeTheme(data.theme),
-          calendar_start_hour: clampHour(data.calendar_start_hour, 8, 0, 23),
-          calendar_end_hour: clampHour(data.calendar_end_hour, 22, 1, 24),
           calendar_scale: clampScale(data.calendar_scale),
           calendar_show_checkboxes: data.calendar_show_checkboxes === true,
+          calendar_two_columns: data.calendar_two_columns === true,
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -118,10 +110,9 @@ export function useSettings() {
           board_zoom: 100,
           board_dots: false,
           theme: 'dark',
-          calendar_start_hour: 8,
-          calendar_end_hour: 22,
           calendar_scale: 1,
           calendar_show_checkboxes: false,
+          calendar_two_columns: false,
         });
       }
       setLoading(false);
@@ -204,18 +195,6 @@ export function useSettings() {
     await supabase.from('user_settings').update({ theme: v }).eq('user_id', user.id);
   };
 
-  const setCalendarHours = async (startHour, endHour) => {
-    if (!user) return;
-    let start = clampHour(startHour, 8, 0, 23);
-    let end = clampHour(endHour, 22, 1, 24);
-    if (end <= start) end = Math.min(24, start + 1);
-    setSettings((s) => ({ ...s, calendar_start_hour: start, calendar_end_hour: end }));
-    await supabase
-      .from('user_settings')
-      .update({ calendar_start_hour: start, calendar_end_hour: end })
-      .eq('user_id', user.id);
-  };
-
   const setCalendarScale = async (scale) => {
     if (!user) return;
     const v = clampScale(scale);
@@ -228,6 +207,13 @@ export function useSettings() {
     const val = !!v;
     setSettings((s) => ({ ...s, calendar_show_checkboxes: val }));
     await supabase.from('user_settings').update({ calendar_show_checkboxes: val }).eq('user_id', user.id);
+  };
+
+  const setCalendarTwoColumns = async (v) => {
+    if (!user) return;
+    const val = !!v;
+    setSettings((s) => ({ ...s, calendar_two_columns: val }));
+    await supabase.from('user_settings').update({ calendar_two_columns: val }).eq('user_id', user.id);
   };
 
   return {
@@ -243,9 +229,9 @@ export function useSettings() {
     setBoardZoom,
     setBoardDots,
     setTheme,
-    setCalendarHours,
     setCalendarScale,
     setCalendarShowCheckboxes,
+    setCalendarTwoColumns,
     loading,
   };
 }

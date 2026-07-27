@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { useFocus } from '../contexts/FocusContext';
+import upIcon from '../assets/up.svg';
+import downIcon from '../assets/down.svg';
 import './FocusTimer.css';
 
 function fmt(totalSeconds) {
@@ -13,6 +16,20 @@ function fmt(totalSeconds) {
 
 const RADIUS = 130;
 const CIRC = 2 * Math.PI * RADIUS;
+
+// Minimized dial: a pie drawn as a thick-stroked circle (r = half the radius,
+// stroke-width = the full radius), so the dash offset sweeps a filled sector.
+const DIAL_R = 23.5;
+const DIAL_CIRC = 2 * Math.PI * DIAL_R;
+const PILL_MODE_KEY = 'focus_pill_expanded';
+
+function readPillExpanded() {
+  try {
+    return localStorage.getItem(PILL_MODE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 function PlayIcon() {
   return (
@@ -40,6 +57,15 @@ function StopIcon() {
 
 export function FocusTimer() {
   const focus = useFocus();
+  const [pillExpanded, setPillExpandedState] = useState(readPillExpanded);
+  const setPillExpanded = (v) => {
+    setPillExpandedState(v);
+    try {
+      localStorage.setItem(PILL_MODE_KEY, v ? '1' : '0');
+    } catch {
+      /* storage unavailable — the mode just won't persist */
+    }
+  };
   const {
     open, active, target, mode, phase, running,
     phaseElapsed, phaseTarget, phaseRemaining, workSeconds, cycles,
@@ -47,27 +73,83 @@ export function FocusTimer() {
     minimize, start, pause, stopAndClose, setMode, setPomoConfig, skipPhase, openFocus,
   } = focus;
 
+  const isPomo = mode === 'pomodoro';
+
   // Minimized floating pill — shown when a session is active but the overlay
-  // is closed, so the user can keep working and re-open it.
+  // is closed, so the user can keep working and re-open it. Two shapes:
+  // a compact pill and an expanded card with an hour dial under the timer.
   if (!open) {
     if (!active) return null;
+    // The dial advances once a minute; CSS eases between the steps.
+    const dialMinutes = isPomo && phaseTarget !== Infinity
+      ? Math.min(Math.floor(phaseElapsed / 60), Math.round(phaseTarget / 60))
+      : Math.floor((phaseElapsed % 3600) / 60);
+    const dialTotal = isPomo && phaseTarget !== Infinity ? Math.max(1, Math.round(phaseTarget / 60)) : 60;
+    const dialFraction = Math.min(1, dialMinutes / dialTotal);
     return (
-      <button
-        type="button"
-        className={`focus-pill ${running ? 'focus-pill--running' : 'focus-pill--paused'}`}
-        onClick={() => openFocus(target, mode)}
-        aria-label="Открыть таймер фокуса"
+      <div
+        className={`focus-pill ${running ? 'focus-pill--running' : 'focus-pill--paused'}${pillExpanded ? ' focus-pill--expanded' : ''}`}
       >
-        <span className="focus-pill__dot" />
-        <span className="focus-pill__time">
-          {mode === 'pomodoro' ? fmt(phaseRemaining ?? 0) : fmt(phaseElapsed)}
-        </span>
-        <span className="focus-pill__label">{mode === 'pomodoro' && phase === 'break' ? 'перерыв' : 'фокус'}</span>
-      </button>
+        <div className="focus-pill__row">
+          <button
+            type="button"
+            className="focus-pill__main"
+            onClick={() => openFocus(target, mode)}
+            aria-label="Открыть таймер фокуса"
+          >
+            <span className="focus-pill__dot" />
+            <span className="focus-pill__time">
+              {isPomo ? fmt(phaseRemaining ?? 0) : fmt(phaseElapsed)}
+            </span>
+            <span className="focus-pill__label">{isPomo && phase === 'break' ? 'перерыв' : 'фокус'}</span>
+          </button>
+          <button
+            type="button"
+            className="focus-pill__toggle"
+            onClick={() => setPillExpanded(!pillExpanded)}
+            aria-label={pillExpanded ? 'Компактный вид' : 'Развернуть циферблат'}
+            title={pillExpanded ? 'Компактный вид' : 'Развернуть циферблат'}
+          >
+            <img src={pillExpanded ? downIcon : upIcon} alt="" />
+          </button>
+        </div>
+
+        {pillExpanded && (
+          <div className="focus-pill__dial-wrap">
+            <svg className="focus-pill__dial" viewBox="0 0 100 100" width="104" height="104" aria-hidden>
+              <circle className="focus-pill__dial-plate" cx="50" cy="50" r="47" />
+              <circle
+                className="focus-pill__dial-fill"
+                cx="50"
+                cy="50"
+                r={DIAL_R}
+                strokeWidth={DIAL_R * 2}
+                strokeDasharray={DIAL_CIRC}
+                strokeDashoffset={DIAL_CIRC * (1 - dialFraction)}
+                transform="rotate(-90 50 50)"
+              />
+              <circle className="focus-pill__dial-ring" cx="50" cy="50" r="47" />
+              {[0, 90, 180, 270].map((deg) => (
+                <line
+                  key={deg}
+                  className="focus-pill__dial-tick"
+                  x1="50"
+                  y1="6"
+                  x2="50"
+                  y2="12"
+                  transform={`rotate(${deg} 50 50)`}
+                />
+              ))}
+            </svg>
+            <span className="focus-pill__dial-caption">
+              {dialMinutes} из {dialTotal} мин
+            </span>
+          </div>
+        )}
+      </div>
     );
   }
 
-  const isPomo = mode === 'pomodoro';
   const ringProgress = isPomo
     ? Math.min(1, phaseTarget ? phaseElapsed / phaseTarget : 0)
     : (phaseElapsed % 3600) / 3600; // stopwatch: sweep fills over one hour

@@ -8,11 +8,18 @@ import { DropSlot } from './DropSlot';
 import { getContainerId } from '../lib/dnd';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
+import clockIcon from '../assets/times.svg';
+import clockNavIcon from '../assets/times-nav.svg';
+import deleteIcon from '../assets/delete.svg';
+import deleteNavIcon from '../assets/delete-nav2.svg';
+import { DEFAULT_DAY_START_HOUR, DEFAULT_DAY_END_HOUR } from '../hooks/useCalendarDayHours';
 import './CalendarView.css';
 
 const BASE_HOUR_HEIGHT = 48; // px per hour at 1x
 const SNAP = 15; // minutes
 const MIN_DURATION = 15;
+const GUTTER = 44; // px reserved on the left for hour labels
+const RIGHT_PAD = 4;
 
 const snap15 = (m) => Math.round(m / SNAP) * SNAP;
 const pad = (n) => String(n).padStart(2, '0');
@@ -54,6 +61,128 @@ function taskToEvent(task) {
     end_minute: end,
     color: task.text_color || DEFAULT_TASK_COLOR,
   };
+}
+
+/**
+ * Split events into side-by-side columns so overlapping blocks stay readable.
+ * Events are grouped into clusters of transitively overlapping blocks; inside a
+ * cluster each event takes the first column that is already free at its start.
+ * Returns a Map id -> { lane, lanes } where `lanes` is the cluster's width.
+ */
+function layoutLanes(events) {
+  const sorted = [...events].sort(
+    (a, b) => a.start_minute - b.start_minute || a.end_minute - b.end_minute,
+  );
+  const result = new Map();
+  let cluster = [];
+  let clusterEnd = -Infinity;
+
+  const flush = () => {
+    if (!cluster.length) return;
+    const laneEnds = [];
+    const placed = [];
+    for (const ev of cluster) {
+      let lane = laneEnds.findIndex((end) => end <= ev.start_minute);
+      if (lane === -1) {
+        lane = laneEnds.length;
+        laneEnds.push(ev.end_minute);
+      } else {
+        laneEnds[lane] = ev.end_minute;
+      }
+      placed.push([ev.id, lane]);
+    }
+    for (const [id, lane] of placed) result.set(id, { lane, lanes: laneEnds.length });
+    cluster = [];
+    clusterEnd = -Infinity;
+  };
+
+  for (const ev of sorted) {
+    if (ev.start_minute >= clusterEnd) flush();
+    cluster.push(ev);
+    clusterEnd = Math.max(clusterEnd, ev.end_minute);
+  }
+  flush();
+  return result;
+}
+
+function DayHoursButton({ startHour, endHour, custom, onApply, onReset }) {
+  const [open, setOpen] = useState(false);
+  const [hover, setHover] = useState(false);
+  const hasHover = useMediaQuery('(hover: hover)');
+
+  return (
+    <span className={`calendar-day__hours${custom ? ' calendar-day__hours--custom' : ''}`}>
+      <button
+        type="button"
+        className="calendar-day__hours-btn"
+        onMouseEnter={() => hasHover && setHover(true)}
+        onMouseLeave={() => hasHover && setHover(false)}
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Интервал шкалы времени"
+        title={`Шкала времени: ${pad(startHour)}:00 – ${pad(endHour)}:00`}
+      >
+        <img src={hasHover && (hover || open) ? clockNavIcon : clockIcon} alt="" />
+      </button>
+      {open && (
+        <>
+          <div className="calendar-day__hours-backdrop" onClick={() => setOpen(false)} />
+          <div className="calendar-day__hours-pop">
+            <div className="calendar-day__hours-title">Шкала времени</div>
+            <div className="calendar-day__hours-row">
+              <select
+                className="dashboard__select"
+                value={startHour}
+                onChange={(e) => onApply(Number(e.target.value), endHour)}
+                aria-label="Начало"
+              >
+                {Array.from({ length: 24 }, (_, h) => h).map((h) => (
+                  <option key={h} value={h}>{pad(h)}:00</option>
+                ))}
+              </select>
+              <span className="calendar-day__hours-sep">–</span>
+              <select
+                className="dashboard__select"
+                value={endHour}
+                onChange={(e) => onApply(startHour, Number(e.target.value))}
+                aria-label="Конец"
+              >
+                {Array.from({ length: 24 }, (_, i) => i + 1).map((h) => (
+                  <option key={h} value={h}>{pad(h)}:00</option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="calendar-day__hours-reset"
+              onClick={() => { onReset(); setOpen(false); }}
+              disabled={!custom}
+            >
+              По умолчанию · {pad(DEFAULT_DAY_START_HOUR)}:00 – {pad(DEFAULT_DAY_END_HOUR)}:00
+            </button>
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
+function EventDeleteButton({ onDelete }) {
+  const [hover, setHover] = useState(false);
+  const hasHover = useMediaQuery('(hover: hover)');
+  return (
+    <button
+      type="button"
+      className="calendar-event__del"
+      onMouseEnter={() => hasHover && setHover(true)}
+      onMouseLeave={() => hasHover && setHover(false)}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => { e.stopPropagation(); onDelete(); }}
+      aria-label="Удалить задачу"
+      title="Удалить"
+    >
+      <img src={hasHover && hover ? deleteNavIcon : deleteIcon} alt="" />
+    </button>
+  );
 }
 
 function eventPatchToTask(patch) {
@@ -187,8 +316,8 @@ function EventModal({ event, onClose, onSave, onDelete }) {
 }
 
 function CalendarDayColumn({
-  date, tasks, startHour, endHour, hourHeight, now, showCheckboxes,
-  onUpdateTiming, onOpenModal, onAddTaskAt, taskHandlers,
+  date, tasks, startHour, endHour, customHours, hourHeight, now, showCheckboxes, twoColumns,
+  onUpdateTiming, onOpenModal, onAddTaskAt, onSetHours, onResetHours, taskHandlers,
 }) {
   const dateStr = toLocalDateString(date);
   const pxPerMin = hourHeight / 60;
@@ -390,10 +519,19 @@ function CalendarDayColumn({
 
   const containerId = getContainerId(dateStr, null, false);
 
+  const laneLayout = layoutLanes(timedEvents);
+
   return (
-    <section className="calendar-day">
+    <section className={`calendar-day${twoColumns ? ' calendar-day--split' : ''}`}>
       <div className="calendar-day__header">
         <span className="calendar-day__title">{formatDayLabel(dateStr)}</span>
+        <DayHoursButton
+          startHour={startHour}
+          endHour={endHour}
+          custom={customHours}
+          onApply={(s, e) => onSetHours(dateStr, s, e)}
+          onReset={() => onResetHours(dateStr)}
+        />
         <button
           type="button"
           className="calendar-day__add"
@@ -406,104 +544,118 @@ function CalendarDayColumn({
         </button>
       </div>
 
-      <ul className="calendar-day__notime">
-        <SortableContext items={noTimeTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-          {noTimeTasks.map((task, i) => (
-            <li key={task.id}>
-              <DropSlot id={containerId} index={i} />
-              <SortableTask
-                task={task}
-                containerId={containerId}
-                subtasks={taskHandlers.getSubtasks(task.id)}
-                getSubtasks={taskHandlers.getSubtasks}
-                onToggle={taskHandlers.onToggle}
-                onUpdate={taskHandlers.onUpdate}
-                onDelete={taskHandlers.onDelete}
-                onAddSubtask={taskHandlers.onAddSubtask}
-                onTaskContextMenu={taskHandlers.onTaskContextMenu}
-                editingTaskId={taskHandlers.editingTaskId}
-                onEditingTaskConsumed={taskHandlers.onEditingTaskConsumed}
-                onCreateSiblingTask={taskHandlers.onCreateSiblingTask}
-                onCreateSiblingSubtask={taskHandlers.onCreateSiblingSubtask}
-                onCreateSubtaskAndEdit={taskHandlers.onCreateSubtaskAndEdit}
-              />
-            </li>
-          ))}
-          <li><DropSlot id={containerId} index={noTimeTasks.length} /></li>
-        </SortableContext>
-      </ul>
+      <div className="calendar-day__body">
+        <ul className="calendar-day__notime">
+          <SortableContext items={noTimeTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            {noTimeTasks.map((task, i) => (
+              <li key={task.id}>
+                <DropSlot id={containerId} index={i} />
+                <SortableTask
+                  task={task}
+                  containerId={containerId}
+                  subtasks={taskHandlers.getSubtasks(task.id)}
+                  getSubtasks={taskHandlers.getSubtasks}
+                  onToggle={taskHandlers.onToggle}
+                  onUpdate={taskHandlers.onUpdate}
+                  onDelete={taskHandlers.onDelete}
+                  onAddSubtask={taskHandlers.onAddSubtask}
+                  onTaskContextMenu={taskHandlers.onTaskContextMenu}
+                  editingTaskId={taskHandlers.editingTaskId}
+                  onEditingTaskConsumed={taskHandlers.onEditingTaskConsumed}
+                  onCreateSiblingTask={taskHandlers.onCreateSiblingTask}
+                  onCreateSiblingSubtask={taskHandlers.onCreateSiblingSubtask}
+                  onCreateSubtaskAndEdit={taskHandlers.onCreateSubtaskAndEdit}
+                />
+              </li>
+            ))}
+            <li><DropSlot id={containerId} index={noTimeTasks.length} /></li>
+          </SortableContext>
+        </ul>
 
-      <div className="calendar-day__timeline" ref={timelineRef} style={{ height: timelineHeight }} onPointerDown={beginTimelineCreate}>
-        {hourLines.map((h) => (
-          <div key={h} className="calendar-hour" style={{ top: (h * 60 - dayStartMin) * pxPerMin }}>
-            <span className="calendar-hour__label">{pad(h)}:00</span>
-            <span className="calendar-hour__line" aria-hidden />
-          </div>
-        ))}
-
-        {showNow && (
-          <div className="calendar-now" style={{ top: (nowMin - dayStartMin) * pxPerMin }} aria-hidden />
-        )}
-
-        {timedEvents.map((ev) => {
-          const isDragged = drag && drag.id === ev.id;
-          const s = isDragged ? drag.start : ev.start_minute;
-          const e2 = isDragged ? drag.end : ev.end_minute;
-          // Skip events entirely outside the configured timeline window.
-          if (e2 <= dayStartMin || s >= dayEndMin) return null;
-          // Clip the block to the visible window, but keep the true times in the label.
-          const visStart = Math.max(s, dayStartMin);
-          const visEnd = Math.min(e2, dayEndMin);
-          const top = (visStart - dayStartMin) * pxPerMin;
-          const height = Math.max(4, (visEnd - visStart) * pxPerMin);
-          return (
-            <div
-              key={ev.id}
-              className={`calendar-event${ev.completed ? ' calendar-event--done' : ''}`}
-              style={{ top, height, '--ev-color': ev.color }}
-              onPointerDown={(e) => beginMove(e, ev)}
-            >
-              <div className="calendar-event__resize calendar-event__resize--top" onPointerDown={(e) => beginResize(e, ev, 'top')} />
-              <div className="calendar-event__body">
-                {showCheckboxes && (
-                  <button
-                    type="button"
-                    className={`calendar-event__check${ev.completed ? ' calendar-event__check--done' : ''}`}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); taskHandlers.onToggle(ev.task); }}
-                    aria-label={ev.completed ? 'Вернуть' : 'Выполнено'}
-                  >
-                    {ev.completed && (
-                      <svg width="9" height="9" viewBox="0 0 16 16" aria-hidden>
-                        <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </button>
-                )}
-                <span className="calendar-event__label">
-                  <span className="calendar-event__time">{fmtMinutes(s)}–{fmtMinutes(e2)}</span>
-                  {ev.title ? <> • {ev.title}</> : null}
-                </span>
-              </div>
-              <div className="calendar-event__resize calendar-event__resize--bottom" onPointerDown={(e) => beginResize(e, ev, 'bottom')} />
+        <div className="calendar-day__timeline" ref={timelineRef} style={{ height: timelineHeight }} onPointerDown={beginTimelineCreate}>
+          {hourLines.map((h) => (
+            <div key={h} className="calendar-hour" style={{ top: (h * 60 - dayStartMin) * pxPerMin }}>
+              <span className="calendar-hour__label">{pad(h)}:00</span>
+              <span className="calendar-hour__line" aria-hidden />
             </div>
-          );
-        })}
+          ))}
 
-        {drag && drag.type === 'create' && (() => {
-          const s = Math.min(drag.start, drag.end);
-          const e2 = Math.max(drag.start, drag.end);
-          const top = (s - dayStartMin) * pxPerMin;
-          const height = Math.max(4, (e2 - s) * pxPerMin);
-          return <div className="calendar-event calendar-event--preview" style={{ top, height }} />;
-        })()}
+          {showNow && (
+            <div className="calendar-now" style={{ top: (nowMin - dayStartMin) * pxPerMin }} aria-hidden />
+          )}
+
+          {timedEvents.map((ev) => {
+            const isDragged = drag && drag.id === ev.id;
+            const s = isDragged ? drag.start : ev.start_minute;
+            const e2 = isDragged ? drag.end : ev.end_minute;
+            // Skip events entirely outside the configured timeline window.
+            if (e2 <= dayStartMin || s >= dayEndMin) return null;
+            // Clip the block to the visible window, but keep the true times in the label.
+            const visStart = Math.max(s, dayStartMin);
+            const visEnd = Math.min(e2, dayEndMin);
+            const top = (visStart - dayStartMin) * pxPerMin;
+            const height = Math.max(4, (visEnd - visStart) * pxPerMin);
+            // Overlapping blocks share the width in side-by-side columns.
+            const { lane = 0, lanes = 1 } = laneLayout.get(ev.id) || {};
+            const track = `(100% - ${GUTTER + RIGHT_PAD}px)`;
+            const laneStyle = lanes > 1
+              ? {
+                left: `calc(${GUTTER}px + ${track} * ${lane} / ${lanes})`,
+                width: `calc(${track} / ${lanes} - 3px)`,
+                right: 'auto',
+              }
+              : null;
+            return (
+              <div
+                key={ev.id}
+                className={`calendar-event${ev.completed ? ' calendar-event--done' : ''}${isDragged ? ' calendar-event--dragging' : ''}`}
+                style={{ top, height, '--ev-color': ev.color, ...laneStyle }}
+                onPointerDown={(e) => beginMove(e, ev)}
+              >
+                <div className="calendar-event__resize calendar-event__resize--top" onPointerDown={(e) => beginResize(e, ev, 'top')} />
+                <div className="calendar-event__body">
+                  {showCheckboxes && (
+                    <button
+                      type="button"
+                      className={`calendar-event__check${ev.completed ? ' calendar-event__check--done' : ''}`}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); taskHandlers.onToggle(ev.task); }}
+                      aria-label={ev.completed ? 'Вернуть' : 'Выполнено'}
+                    >
+                      {ev.completed && (
+                        <svg width="9" height="9" viewBox="0 0 16 16" aria-hidden>
+                          <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
+                  <span className="calendar-event__label">
+                    <span className="calendar-event__time">{fmtMinutes(s)}–{fmtMinutes(e2)}</span>
+                    {ev.title ? <> • {ev.title}</> : null}
+                  </span>
+                  <EventDeleteButton onDelete={() => taskHandlers.onDelete(ev.id)} />
+                </div>
+                <div className="calendar-event__resize calendar-event__resize--bottom" onPointerDown={(e) => beginResize(e, ev, 'bottom')} />
+              </div>
+            );
+          })}
+
+          {drag && drag.type === 'create' && (() => {
+            const s = Math.min(drag.start, drag.end);
+            const e2 = Math.max(drag.start, drag.end);
+            const top = (s - dayStartMin) * pxPerMin;
+            const height = Math.max(4, (e2 - s) * pxPerMin);
+            return <div className="calendar-event calendar-event--preview" style={{ top, height }} />;
+          })()}
+        </div>
       </div>
     </section>
   );
 }
 
 export function CalendarView({
-  days, tasks, startHour, endHour, scale = 1, showCheckboxes = false,
+  days, tasks, scale = 1, showCheckboxes = false, twoColumns = false,
+  dayHours = {}, setDayHours, resetDayHours,
   addTask, updateTask, deleteTask,
   onToggle, onAddTaskAt, onAddSubtask, onTaskContextMenu,
   editingTaskId, onEditingTaskConsumed,
@@ -549,22 +701,30 @@ export function CalendarView({
   return (
     <div className="calendar-view">
       <div className="calendar-view__days">
-        {days.map((date) => (
-          <CalendarDayColumn
-            key={toLocalDateString(date)}
-            date={date}
-            tasks={tasks}
-            startHour={startHour}
-            endHour={endHour}
-            hourHeight={hourHeight}
-            now={now}
-            showCheckboxes={showCheckboxes}
-            onUpdateTiming={updateTiming}
-            onOpenModal={setEditingEvent}
-            onAddTaskAt={onAddTaskAt}
-            taskHandlers={taskHandlers}
-          />
-        ))}
+        {days.map((date) => {
+          const dateStr = toLocalDateString(date);
+          const custom = dayHours[dateStr];
+          return (
+            <CalendarDayColumn
+              key={dateStr}
+              date={date}
+              tasks={tasks}
+              startHour={custom?.start ?? DEFAULT_DAY_START_HOUR}
+              endHour={custom?.end ?? DEFAULT_DAY_END_HOUR}
+              customHours={!!custom}
+              hourHeight={hourHeight}
+              now={now}
+              showCheckboxes={showCheckboxes}
+              twoColumns={twoColumns}
+              onUpdateTiming={updateTiming}
+              onOpenModal={setEditingEvent}
+              onAddTaskAt={onAddTaskAt}
+              onSetHours={setDayHours}
+              onResetHours={resetDayHours}
+              taskHandlers={taskHandlers}
+            />
+          );
+        })}
       </div>
 
       {editingEvent && (

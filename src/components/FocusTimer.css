@@ -311,22 +311,114 @@
   transform: translateX(-50%);
   z-index: 900;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.35rem;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-elev);
   border-radius: 999px;
   padding: 0.5rem 1rem;
-  cursor: pointer;
   font-family: inherit;
   color: var(--text-strong);
   animation: focus-pill-in 0.24s cubic-bezier(0.2, 0.9, 0.3, 1.1);
-  transition: transform 0.12s ease;
+  transition: border-radius 0.22s ease, padding 0.22s ease;
 }
 
-.focus-pill:hover {
-  transform: translateX(-50%) translateY(-2px);
+.focus-pill--expanded {
+  border-radius: 20px;
+  padding: 0.7rem 1.1rem 0.9rem;
+}
+
+.focus-pill__row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.focus-pill__main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  transition: opacity 0.12s ease;
+}
+
+.focus-pill__main:hover {
+  opacity: 0.75;
+}
+
+.focus-pill__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.12s ease;
+}
+
+.focus-pill__toggle:hover {
+  opacity: 1;
+}
+
+.focus-pill__toggle img {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+}
+
+/* Hour dial (expanded minimized mode) */
+.focus-pill__dial-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  overflow: hidden;
+  animation: focus-dial-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.05);
+}
+
+@keyframes focus-dial-in {
+  from { opacity: 0; max-height: 0; transform: scale(0.86) translateY(-8px); }
+  to { opacity: 1; max-height: 160px; transform: scale(1) translateY(0); }
+}
+
+.focus-pill__dial-plate {
+  fill: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.focus-pill__dial-fill {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.focus-pill__dial-ring {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+
+.focus-pill__dial-tick {
+  stroke: var(--text-dim);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0.6;
+}
+
+.focus-pill__dial-caption {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes focus-pill-in {

@@ -37,6 +37,7 @@ import { supabase } from '../lib/supabase';
 import { useTasks } from '../hooks/useTasks';
 import { useSettings } from '../hooks/useSettings';
 import { useListCollapsed } from '../hooks/useListCollapsed';
+import { useCalendarDayHours } from '../hooks/useCalendarDayHours';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useProjects } from '../hooks/useProjects';
 import { useHabits } from '../hooks/useHabits';
@@ -290,10 +291,11 @@ export default function Dashboard() {
     setBoardZoom,
     setBoardDots,
     setTheme,
-    setCalendarHours,
     setCalendarScale,
     setCalendarShowCheckboxes,
+    setCalendarTwoColumns,
   } = useSettings();
+  const { dayHours, setDayHours, resetDayHours } = useCalendarDayHours();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
@@ -1316,28 +1318,7 @@ export default function Dashboard() {
               </>
             )}
             {viewMode === 'calendar' && (
-              <span className="dashboard__calendar-hours" title="Диапазон времени таймлайна">
-                <select
-                  value={settings.calendar_start_hour}
-                  onChange={(e) => setCalendarHours(Number(e.target.value), settings.calendar_end_hour)}
-                  className="dashboard__select"
-                  aria-label="Начало таймлайна"
-                >
-                  {Array.from({ length: 24 }, (_, h) => h).map((h) => (
-                    <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
-                  ))}
-                </select>
-                <span className="dashboard__calendar-hours-sep">–</span>
-                <select
-                  value={settings.calendar_end_hour}
-                  onChange={(e) => setCalendarHours(settings.calendar_start_hour, Number(e.target.value))}
-                  className="dashboard__select"
-                  aria-label="Конец таймлайна"
-                >
-                  {Array.from({ length: 24 }, (_, i) => i + 1).map((h) => (
-                    <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
-                  ))}
-                </select>
+              <span className="dashboard__calendar-hours">
                 <select
                   value={settings.calendar_scale}
                   onChange={(e) => setCalendarScale(Number(e.target.value))}
@@ -1993,6 +1974,14 @@ export default function Dashboard() {
               />
               <span>Показывать чекбоксы на таймлайне</span>
             </label>
+            <label className="dashboard__settings-check">
+              <input
+                type="checkbox"
+                checked={settings.calendar_two_columns}
+                onChange={(e) => setCalendarTwoColumns(e.target.checked)}
+              />
+              <span>Таймлайн вторым столбцом (на ПК)</span>
+            </label>
           </div>
         </div>
       )}
@@ -2179,10 +2168,12 @@ export default function Dashboard() {
         <CalendarView
           days={days}
           tasks={inboxTasks}
-          startHour={settings.calendar_start_hour}
-          endHour={settings.calendar_end_hour}
           scale={settings.calendar_scale}
           showCheckboxes={settings.calendar_show_checkboxes}
+          twoColumns={settings.calendar_two_columns}
+          dayHours={dayHours}
+          setDayHours={setDayHours}
+          resetDayHours={resetDayHours}
           addTask={addTask}
           updateTask={updateTask}
           deleteTask={deleteTask}
