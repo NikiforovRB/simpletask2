@@ -317,6 +317,7 @@ function EventModal({ event, onClose, onSave, onDelete }) {
 
 function CalendarDayColumn({
   date, tasks, startHour, endHour, customHours, hourHeight, now, showCheckboxes, twoColumns,
+  completedVisible, recentCompletedIds, getListCollapsed, setListCollapsed,
   onUpdateTiming, onOpenModal, onAddTaskAt, onSetHours, onResetHours, taskHandlers,
 }) {
   const dateStr = toLocalDateString(date);
@@ -335,6 +336,20 @@ function CalendarDayColumn({
   const noTimeTasks = tasks
     .filter((t) => !t.parent_id && !t.completed_at && t.scheduled_date === dateStr && (t.list_type || 'inbox') === 'inbox' && !t.scheduled_time)
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+  // Completed tasks of this day that aren't pinned to the timeline; timed ones
+  // stay on the timeline instead, so nothing shows up twice.
+  const completedTasks = tasks
+    .filter((t) => !t.parent_id && t.completed_at && t.scheduled_date === dateStr && (t.list_type || 'inbox') === 'inbox' && !t.scheduled_time)
+    .sort((a, b) => {
+      const ca = a.completed_at || '';
+      const cb = b.completed_at || '';
+      return ca === cb ? (a.position ?? 0) - (b.position ?? 0) : (ca < cb ? -1 : 1);
+    });
+
+  const completedKey = `completed_${dateStr}`;
+  const completedOpen = getListCollapsed ? !getListCollapsed(completedKey) : true;
+  const toggleCompleted = () => setListCollapsed?.(completedKey, !getListCollapsed?.(completedKey));
 
   const timedEvents = tasks
     .filter((t) => !t.parent_id && t.scheduled_date === dateStr && (t.list_type || 'inbox') === 'inbox' && t.scheduled_time)
@@ -518,6 +533,7 @@ function CalendarDayColumn({
   const showNow = isToday && nowMin >= dayStartMin && nowMin <= dayEndMin;
 
   const containerId = getContainerId(dateStr, null, false);
+  const completedContainerId = getContainerId(dateStr, null, true);
 
   const laneLayout = layoutLanes(timedEvents);
 
@@ -545,32 +561,71 @@ function CalendarDayColumn({
       </div>
 
       <div className="calendar-day__body">
-        <ul className="calendar-day__notime">
-          <SortableContext items={noTimeTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-            {noTimeTasks.map((task, i) => (
-              <li key={task.id}>
-                <DropSlot id={containerId} index={i} />
-                <SortableTask
-                  task={task}
-                  containerId={containerId}
-                  subtasks={taskHandlers.getSubtasks(task.id)}
-                  getSubtasks={taskHandlers.getSubtasks}
-                  onToggle={taskHandlers.onToggle}
-                  onUpdate={taskHandlers.onUpdate}
-                  onDelete={taskHandlers.onDelete}
-                  onAddSubtask={taskHandlers.onAddSubtask}
-                  onTaskContextMenu={taskHandlers.onTaskContextMenu}
-                  editingTaskId={taskHandlers.editingTaskId}
-                  onEditingTaskConsumed={taskHandlers.onEditingTaskConsumed}
-                  onCreateSiblingTask={taskHandlers.onCreateSiblingTask}
-                  onCreateSiblingSubtask={taskHandlers.onCreateSiblingSubtask}
-                  onCreateSubtaskAndEdit={taskHandlers.onCreateSubtaskAndEdit}
-                />
-              </li>
-            ))}
-            <li><DropSlot id={containerId} index={noTimeTasks.length} /></li>
-          </SortableContext>
-        </ul>
+        <div className="calendar-day__lists">
+          <ul className="calendar-day__notime">
+            <SortableContext items={noTimeTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+              {noTimeTasks.map((task, i) => (
+                <li key={task.id}>
+                  <DropSlot id={containerId} index={i} />
+                  <SortableTask
+                    task={task}
+                    containerId={containerId}
+                    subtasks={taskHandlers.getSubtasks(task.id)}
+                    getSubtasks={taskHandlers.getSubtasks}
+                    onToggle={taskHandlers.onToggle}
+                    onUpdate={taskHandlers.onUpdate}
+                    onDelete={taskHandlers.onDelete}
+                    onAddSubtask={taskHandlers.onAddSubtask}
+                    onTaskContextMenu={taskHandlers.onTaskContextMenu}
+                    editingTaskId={taskHandlers.editingTaskId}
+                    onEditingTaskConsumed={taskHandlers.onEditingTaskConsumed}
+                    onCreateSiblingTask={taskHandlers.onCreateSiblingTask}
+                    onCreateSiblingSubtask={taskHandlers.onCreateSiblingSubtask}
+                    onCreateSubtaskAndEdit={taskHandlers.onCreateSubtaskAndEdit}
+                  />
+                </li>
+              ))}
+              <li><DropSlot id={containerId} index={noTimeTasks.length} /></li>
+            </SortableContext>
+          </ul>
+
+          {completedVisible && completedTasks.length > 0 && (
+            <div className="calendar-day__completed">
+              <button type="button" className="calendar-day__completed-toggle" onClick={toggleCompleted}>
+                Выполненные задачи
+              </button>
+              {completedOpen && (
+                <ul className="calendar-day__notime calendar-day__notime--completed">
+                  <SortableContext items={completedTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                    {completedTasks.map((task, i) => (
+                      <li key={task.id}>
+                        <DropSlot id={completedContainerId} index={i} />
+                        <SortableTask
+                          task={task}
+                          containerId={completedContainerId}
+                          subtasks={taskHandlers.getSubtasks(task.id)}
+                          getSubtasks={taskHandlers.getSubtasks}
+                          onToggle={taskHandlers.onToggle}
+                          onUpdate={taskHandlers.onUpdate}
+                          onDelete={taskHandlers.onDelete}
+                          onAddSubtask={taskHandlers.onAddSubtask}
+                          onTaskContextMenu={taskHandlers.onTaskContextMenu}
+                          editingTaskId={taskHandlers.editingTaskId}
+                          onEditingTaskConsumed={taskHandlers.onEditingTaskConsumed}
+                          onCreateSiblingTask={taskHandlers.onCreateSiblingTask}
+                          onCreateSiblingSubtask={taskHandlers.onCreateSiblingSubtask}
+                          onCreateSubtaskAndEdit={taskHandlers.onCreateSubtaskAndEdit}
+                          isRecentlyCompleted={recentCompletedIds?.has(task.id)}
+                        />
+                      </li>
+                    ))}
+                    <li><DropSlot id={completedContainerId} index={completedTasks.length} /></li>
+                  </SortableContext>
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="calendar-day__timeline" ref={timelineRef} style={{ height: timelineHeight }} onPointerDown={beginTimelineCreate}>
           {hourLines.map((h) => (
@@ -656,6 +711,7 @@ function CalendarDayColumn({
 export function CalendarView({
   days, tasks, scale = 1, showCheckboxes = false, twoColumns = false,
   dayHours = {}, setDayHours, resetDayHours,
+  completedVisible = true, recentCompletedIds, getListCollapsed, setListCollapsed,
   addTask, updateTask, deleteTask,
   onToggle, onAddTaskAt, onAddSubtask, onTaskContextMenu,
   editingTaskId, onEditingTaskConsumed,
@@ -716,6 +772,10 @@ export function CalendarView({
               now={now}
               showCheckboxes={showCheckboxes}
               twoColumns={twoColumns}
+              completedVisible={completedVisible}
+              recentCompletedIds={recentCompletedIds}
+              getListCollapsed={getListCollapsed}
+              setListCollapsed={setListCollapsed}
               onUpdateTiming={updateTiming}
               onOpenModal={setEditingEvent}
               onAddTaskAt={onAddTaskAt}

@@ -393,6 +393,7 @@ export default function Dashboard() {
   const completedVisibleListKey = useMemo(() => {
     if (viewMode === 'today') return 'today';
     if (viewMode === 'plans') return 'plans';
+    if (viewMode === 'calendar') return 'calendar';
     if (viewMode === 'goal_plan') return 'goal_plan';
     if (viewMode === 'no_date') return 'no_date';
     if (viewMode === 'someday') return 'someday';
@@ -1348,7 +1349,7 @@ export default function Dashboard() {
                 className="dashboard__board-header-slot dashboard__board-header-slot--right"
               />
             )}
-            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'calendar' && viewMode !== 'reputation' && (
+            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'reputation' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
@@ -2179,6 +2180,10 @@ export default function Dashboard() {
           dayHours={dayHours}
           setDayHours={setDayHours}
           resetDayHours={resetDayHours}
+          completedVisible={completedVisible}
+          recentCompletedIds={recentCompletedIds}
+          getListCollapsed={getListCollapsed}
+          setListCollapsed={setListCollapsed}
           addTask={addTask}
           updateTask={updateTask}
           deleteTask={deleteTask}
