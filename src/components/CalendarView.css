@@ -74,7 +74,7 @@
     transition: opacity 0.15s ease;
   }
   .calendar-day__header:hover .calendar-day__hours-btn,
-  .calendar-day__hours--custom .calendar-day__hours-btn {
+  .calendar-day__hours--open .calendar-day__hours-btn {
     opacity: 1;
   }
 }

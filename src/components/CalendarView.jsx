@@ -111,7 +111,7 @@ function DayHoursButton({ startHour, endHour, custom, onApply, onReset }) {
   const hasHover = useMediaQuery('(hover: hover)');
 
   return (
-    <span className={`calendar-day__hours${custom ? ' calendar-day__hours--custom' : ''}`}>
+    <span className={`calendar-day__hours${open ? ' calendar-day__hours--open' : ''}`}>
       <button
         type="button"
         className="calendar-day__hours-btn"
@@ -605,6 +605,7 @@ function CalendarDayColumn({
                           containerId={completedContainerId}
                           subtasks={taskHandlers.getSubtasks(task.id)}
                           getSubtasks={taskHandlers.getSubtasks}
+                          isCompleted
                           onToggle={taskHandlers.onToggle}
                           onUpdate={taskHandlers.onUpdate}
                           onDelete={taskHandlers.onDelete}
