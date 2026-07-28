@@ -129,21 +129,29 @@ export function FocusTimer() {
                 transform="rotate(-90 50 50)"
               />
               <circle className="focus-pill__dial-ring" cx="50" cy="50" r="47" />
-              {[0, 90, 180, 270].map((deg) => (
+              {Array.from({ length: 12 }, (_, i) => i * 30).map((deg) => (
                 <line
                   key={deg}
-                  className="focus-pill__dial-tick"
+                  className={`focus-pill__dial-tick${deg % 90 === 0 ? ' focus-pill__dial-tick--major' : ''}`}
                   x1="50"
                   y1="6"
                   x2="50"
-                  y2="12"
+                  y2={deg % 90 === 0 ? 13 : 10}
                   transform={`rotate(${deg} 50 50)`}
                 />
               ))}
             </svg>
-            <span className="focus-pill__dial-caption">
-              {dialMinutes} из {dialTotal} мин
-            </span>
+            <button
+              type="button"
+              className="focus-pill__dial-stop"
+              onClick={stopAndClose}
+              aria-label="Завершить"
+              title="Завершить"
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+                <rect x="5.5" y="5.5" width="7" height="7" rx="1.5" fill="currentColor" />
+              </svg>
+            </button>
           </div>
         )}
       </div>

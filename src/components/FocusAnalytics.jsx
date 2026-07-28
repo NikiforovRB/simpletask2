@@ -7,7 +7,31 @@ import deleteIcon from '../assets/delete.svg';
 import deleteNav2Icon from '../assets/delete-nav2.svg';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
+import leftIcon from '../assets/left.svg';
+import rightIcon from '../assets/right.svg';
 import './FocusAnalytics.css';
+
+const TL_KEYS = { days: 'focus_tl_days', start: 'focus_tl_start', end: 'focus_tl_end' };
+
+function readStored(key, fallback, min, max) {
+  try {
+    const v = Number(localStorage.getItem(key));
+    if (!Number.isFinite(v)) return fallback;
+    return Math.max(min, Math.min(max, Math.round(v)));
+  } catch {
+    return fallback;
+  }
+}
+
+function store(key, value) {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    /* storage unavailable — the preference just won't persist */
+  }
+}
+
+const pad2 = (n) => String(n).padStart(2, '0');
 
 function SessionIconButton({ icon, hoverIcon, onClick, label }) {
   const [hover, setHover] = useState(false);
@@ -63,10 +87,32 @@ export function FocusAnalytics() {
   const [addTime, setAddTime] = useState('12:00');
   const [addHours, setAddHours] = useState('0');
   const [addMinutes, setAddMinutes] = useState('25');
+  // Day timeline: how many days, which hour window, and how far back we paged.
+  const [tlDays, setTlDays] = useState(() => readStored(TL_KEYS.days, 7, 1, 7));
+  const [tlStart, setTlStart] = useState(() => readStored(TL_KEYS.start, 6, 0, 23));
+  const [tlEnd, setTlEnd] = useState(() => readStored(TL_KEYS.end, 24, 1, 24));
+  const [tlOffset, setTlOffset] = useState(0);
+  const [nowTick, setNowTick] = useState(() => new Date());
+
+  const applyTlDays = (n) => { setTlDays(n); store(TL_KEYS.days, n); };
+  const applyTlHours = (start, end) => {
+    const s = Math.max(0, Math.min(23, start));
+    const e = end <= s ? Math.min(24, s + 1) : Math.max(1, Math.min(24, end));
+    setTlStart(s);
+    setTlEnd(e);
+    store(TL_KEYS.start, s);
+    store(TL_KEYS.end, e);
+  };
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
+  }, []);
+
+  // Moves the "now" marker on today's timeline row.
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(new Date()), 60 * 1000);
+    return () => clearInterval(id);
   }, []);
 
   const todayDs = toLocalDateString(new Date());
@@ -81,7 +127,8 @@ export function FocusAnalytics() {
           id: LIVE_ID,
           task_title: target?.title || 'Фокус без задачи',
           duration_seconds: workSeconds,
-          started_at: new Date().toISOString(),
+          // Back-dated so the session sits where it actually started.
+          started_at: new Date(Date.now() - workSeconds * 1000).toISOString(),
           live: true,
         },
         ...base,
@@ -117,23 +164,56 @@ export function FocusAnalytics() {
     return { byDay: dayMap, totals: { allTotal, count, todayTotal, weekTotal } };
   }, [allSessions, todayDs]);
 
-  const chartDays = useMemo(() => {
-    const arr = [];
-    for (let i = 13; i >= 0; i--) {
+  // Rows of the day timeline: oldest first, ending with the paged-to day.
+  const timelineDays = useMemo(() => {
+    const rows = [];
+    for (let i = tlDays - 1; i >= 0; i--) {
       const d = new Date();
-      d.setDate(d.getDate() - i);
+      d.setHours(12, 0, 0, 0);
+      d.setDate(d.getDate() + tlOffset - i);
       const ds = toLocalDateString(d);
-      arr.push({
+      const entry = byDay.get(ds);
+      const segments = (entry?.sessions || [])
+        .map((s) => {
+          const st = new Date(s.started_at);
+          if (Number.isNaN(st.getTime())) return null;
+          const startMin = st.getHours() * 60 + st.getMinutes();
+          const minutes = Math.max(1, (s.duration_seconds || 0) / 60);
+          return {
+            id: s.id,
+            live: !!s.live,
+            title: s.task_title || 'Без названия',
+            startMin,
+            endMin: startMin + minutes,
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.startMin - b.startMin);
+      rows.push({
         ds,
-        total: byDay.get(ds)?.total || 0,
-        weekday: ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'][d.getDay()],
-        dayNum: d.getDate(),
+        total: entry?.total || 0,
+        segments,
+        isToday: ds === todayDs,
+        label: `${d.getDate()} ${['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'][d.getMonth()]}, ${['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'][d.getDay()]}`,
       });
     }
-    return arr;
-  }, [byDay]);
+    return rows;
+  }, [byDay, tlDays, tlOffset, todayDs]);
 
-  const chartMax = Math.max(1, ...chartDays.map((d) => d.total));
+  // Hour labels / grid lines: thinned out so a wide window stays readable.
+  const axisHours = useMemo(() => {
+    const span = tlEnd - tlStart;
+    const step = span <= 8 ? 1 : span <= 14 ? 2 : 3;
+    const hours = [];
+    for (let h = tlStart; h < tlEnd; h += step) hours.push(h);
+    if (hours[hours.length - 1] !== tlEnd) hours.push(tlEnd);
+    return hours;
+  }, [tlStart, tlEnd]);
+
+  const tlRangeStart = tlStart * 60;
+  const tlSpan = (tlEnd - tlStart) * 60;
+  const toPct = (minute) => ((minute - tlRangeStart) / tlSpan) * 100;
+  const nowMinute = nowTick.getHours() * 60 + nowTick.getMinutes();
 
   const selectedDetail = useMemo(() => {
     const entry = byDay.get(selectedDay);
@@ -224,30 +304,137 @@ export function FocusAnalytics() {
           ))}
         </div>
 
-        <div className="focus-analytics__section-title">Последние 14 дней</div>
-        <div className="focus-analytics__chart">
-          {chartDays.map((d, i) => {
-            const heightPct = mounted ? Math.max(d.total > 0 ? 6 : 0, (d.total / chartMax) * 100) : 0;
-            const isSelected = d.ds === selectedDay;
-            return (
-              <button
-                type="button"
-                key={d.ds}
-                className={`focus-analytics__bar-col ${isSelected ? 'is-selected' : ''}`}
-                onClick={() => setSelectedDay(d.ds)}
-                title={`${d.dayNum} — ${fmtDuration(d.total)}`}
+        <div className="focus-analytics__tl-head">
+          <span className="focus-analytics__section-title focus-analytics__section-title--inline">
+            Шкала дня
+          </span>
+          <div className="focus-analytics__tl-controls">
+            <select
+              className="dashboard__select"
+              value={tlDays}
+              onChange={(e) => applyTlDays(Number(e.target.value))}
+              aria-label="Количество дней"
+              title="Количество дней"
+            >
+              {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="dashboard__shift-btn"
+              onClick={() => setTlOffset((o) => o - 1)}
+              aria-label="Назад"
+            >
+              <img src={leftIcon} alt="" />
+            </button>
+            <button
+              type="button"
+              className="dashboard__shift-btn dashboard__shift-btn--today"
+              onClick={() => setTlOffset(0)}
+              aria-label="Сегодня"
+            >
+              <span className="dashboard__shift-today-dot" aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="dashboard__shift-btn"
+              onClick={() => setTlOffset((o) => Math.min(0, o + 1))}
+              aria-label="Вперёд"
+              disabled={tlOffset >= 0}
+            >
+              <img src={rightIcon} alt="" />
+            </button>
+            <span className="focus-analytics__tl-hours">
+              <select
+                className="dashboard__select"
+                value={tlStart}
+                onChange={(e) => applyTlHours(Number(e.target.value), tlEnd)}
+                aria-label="Начало шкалы"
               >
-                <div className="focus-analytics__bar-track">
-                  <div
-                    className="focus-analytics__bar-fill"
-                    style={{ height: `${heightPct}%`, transitionDelay: `${i * 35}ms` }}
+                {Array.from({ length: 24 }, (_, h) => h).map((h) => (
+                  <option key={h} value={h}>{pad2(h)}:00</option>
+                ))}
+              </select>
+              <span className="focus-analytics__tl-sep">–</span>
+              <select
+                className="dashboard__select"
+                value={tlEnd}
+                onChange={(e) => applyTlHours(tlStart, Number(e.target.value))}
+                aria-label="Конец шкалы"
+              >
+                {Array.from({ length: 24 }, (_, i) => i + 1).map((h) => (
+                  <option key={h} value={h}>{pad2(h)}:00</option>
+                ))}
+              </select>
+            </span>
+          </div>
+        </div>
+
+        <div className="focus-analytics__tl">
+          <div className="focus-analytics__tl-axis">
+            <span />
+            <span className="focus-analytics__tl-axis-track">
+              {axisHours.map((h, i) => (
+                <span
+                  key={h}
+                  className="focus-analytics__tl-axis-label"
+                  style={{
+                    left: `${toPct(h * 60)}%`,
+                    transform: i === 0
+                      ? 'translateX(0)'
+                      : i === axisHours.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
+                  }}
+                >
+                  {pad2(h)}:00
+                </span>
+              ))}
+            </span>
+            <span className="focus-analytics__tl-total" />
+          </div>
+
+          {timelineDays.map((row) => (
+            <button
+              type="button"
+              key={row.ds}
+              className={`focus-analytics__tl-row${row.ds === selectedDay ? ' is-selected' : ''}`}
+              onClick={() => setSelectedDay(row.ds)}
+              title={`${row.label} · ${fmtDuration(row.total)}`}
+            >
+              <span className="focus-analytics__tl-daylabel">
+                {row.isToday ? 'Сегодня' : row.label}
+              </span>
+              <span className="focus-analytics__tl-track">
+                {axisHours.map((h) => (
+                  <span
+                    key={h}
+                    className="focus-analytics__tl-grid"
+                    style={{ left: `${toPct(h * 60)}%` }}
+                    aria-hidden
                   />
-                </div>
-                <div className="focus-analytics__bar-label">{d.dayNum}</div>
-                <div className="focus-analytics__bar-wd">{d.weekday}</div>
-              </button>
-            );
-          })}
+                ))}
+                {row.segments.map((seg, i) => {
+                  const s = Math.max(seg.startMin, tlRangeStart);
+                  const e = Math.min(seg.endMin, tlRangeStart + tlSpan);
+                  if (e <= s) return null;
+                  return (
+                    <span
+                      key={`${seg.id}-${i}`}
+                      className={`focus-analytics__tl-seg${seg.live ? ' is-live' : ''}`}
+                      style={{ left: `${toPct(s)}%`, width: `${((e - s) / tlSpan) * 100}%` }}
+                      title={`${pad2(Math.floor(seg.startMin / 60))}:${pad2(Math.round(seg.startMin % 60))} · ${seg.title}`}
+                    />
+                  );
+                })}
+                {row.isToday && nowMinute >= tlRangeStart && nowMinute <= tlRangeStart + tlSpan && (
+                  <span className="focus-analytics__tl-now" style={{ left: `${toPct(nowMinute)}%` }} aria-hidden />
+                )}
+              </span>
+              <span className="focus-analytics__tl-total">
+                {row.total > 0 ? fmtDuration(row.total) : ''}
+              </span>
+            </button>
+          ))}
         </div>
 
         <div className="focus-analytics__section-title">

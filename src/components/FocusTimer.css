@@ -315,7 +315,7 @@
   align-items: center;
   gap: 0.35rem;
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  border: none;
   box-shadow: var(--shadow-elev);
   border-radius: 999px;
   padding: 0.5rem 1rem;
@@ -379,17 +379,16 @@
 
 /* Hour dial (expanded minimized mode) */
 .focus-pill__dial-wrap {
+  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
-  overflow: hidden;
+  justify-content: center;
   animation: focus-dial-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.05);
 }
 
 @keyframes focus-dial-in {
-  from { opacity: 0; max-height: 0; transform: scale(0.86) translateY(-8px); }
-  to { opacity: 1; max-height: 160px; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: scale(0.86) translateY(-8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .focus-pill__dial-plate {
@@ -398,7 +397,7 @@
 
 .focus-pill__dial-fill {
   fill: none;
-  stroke: color-mix(in srgb, var(--accent) 40%, transparent);
+  stroke: var(--accent);
   transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -410,15 +409,54 @@
 
 .focus-pill__dial-tick {
   stroke: var(--text-dim);
-  stroke-width: 1.5;
+  stroke-width: 1.25;
   stroke-linecap: round;
-  opacity: 0.6;
+  opacity: 0.45;
 }
 
-.focus-pill__dial-caption {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
+.focus-pill__dial-tick--major {
+  stroke-width: 1.5;
+  opacity: 0.7;
+}
+
+/* "Завершить" — appears over the dial centre on hover. */
+.focus-pill__dial-stop {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+
+.focus-pill__dial-stop:active {
+  transform: scale(0.94);
+}
+
+@media (hover: hover) {
+  .focus-pill__dial-wrap:hover .focus-pill__dial-stop {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+}
+
+@media (hover: none) {
+  .focus-pill__dial-stop {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
 }
 
 @keyframes focus-pill-in {
