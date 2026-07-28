@@ -391,32 +391,28 @@
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+/* Plate and sector colours come from the component (one shade per hour). */
 .focus-pill__dial-plate {
-  fill: color-mix(in srgb, var(--accent) 7%, transparent);
+  transition: fill 0.4s ease;
 }
 
 .focus-pill__dial-fill {
   fill: none;
-  stroke: var(--accent);
-  transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s ease;
 }
 
+/* The plate is dark in both themes, so the rim is a faint white line. */
 .focus-pill__dial-ring {
   fill: none;
-  stroke: var(--border-strong);
+  stroke: rgba(255, 255, 255, 0.12);
   stroke-width: 1.5;
 }
 
 .focus-pill__dial-tick {
-  stroke: var(--text-dim);
-  stroke-width: 1.25;
-  stroke-linecap: round;
-  opacity: 0.45;
-}
-
-.focus-pill__dial-tick--major {
+  stroke: #ffffff;
   stroke-width: 1.5;
-  opacity: 0.7;
+  stroke-linecap: round;
+  opacity: 0.4;
 }
 
 /* "Завершить" — appears over the dial centre on hover. */

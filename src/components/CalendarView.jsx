@@ -1,7 +1,8 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { toLocalDateString, formatDayLabel, TASK_COLORS, DEFAULT_TASK_COLOR } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useFocus } from '../contexts/FocusContext';
 import { CalendarPopover } from './CalendarPopover';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
@@ -20,6 +21,12 @@ const SNAP = 15; // minutes
 const MIN_DURATION = 15;
 const GUTTER = 44; // px reserved on the left for hour labels
 const RIGHT_PAD = 4;
+const FOCUS_STRIP_W = 15; // px, vertical focus-session scale
+const FOCUS_STRIP_GAP = 4;
+// Space the timeline gives up on the right when the focus scale is shown.
+const FOCUS_RIGHT_PAD = RIGHT_PAD + FOCUS_STRIP_W + FOCUS_STRIP_GAP;
+const FOCUS_SEG_COLOR = '#15c466';
+const FOCUS_SEG_LIVE_COLOR = '#5a86ee';
 
 const snap15 = (m) => Math.round(m / SNAP) * SNAP;
 const pad = (n) => String(n).padStart(2, '0');
@@ -315,8 +322,54 @@ function EventModal({ event, onClose, onSave, onDelete }) {
   );
 }
 
+// Vertical focus-session scale drawn beside the timeline. It reads the focus
+// context on its own so a ticking session re-renders only this strip.
+function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin }) {
+  const { sessions, active, workSeconds } = useFocus();
+  // Round to whole minutes: the live block only needs to move once a minute.
+  const liveMinutes = active ? Math.floor(workSeconds / 60) : 0;
+
+  const segments = useMemo(() => {
+    const out = [];
+    const add = (startedAt, seconds, live) => {
+      const st = new Date(startedAt);
+      if (Number.isNaN(st.getTime())) return;
+      if (toLocalDateString(st) !== dateStr) return;
+      const startMin = st.getHours() * 60 + st.getMinutes();
+      out.push({ startMin, endMin: startMin + Math.max(1, seconds / 60), live });
+    };
+    for (const s of sessions || []) add(s.started_at, s.duration_seconds || 0, false);
+    if (active && liveMinutes >= 1) {
+      add(new Date(Date.now() - liveMinutes * 60 * 1000), liveMinutes * 60, true);
+    }
+    return out.sort((a, b) => a.startMin - b.startMin);
+  }, [sessions, dateStr, active, liveMinutes]);
+
+  return (
+    <div className="calendar-day__focus" style={{ width: FOCUS_STRIP_W }}>
+      {segments.map((seg, i) => {
+        const s = Math.max(seg.startMin, dayStartMin);
+        const e = Math.min(seg.endMin, dayEndMin);
+        if (e <= s) return null;
+        return (
+          <div
+            key={i}
+            className="calendar-day__focus-seg"
+            style={{
+              top: (s - dayStartMin) * pxPerMin,
+              height: Math.max(2, (e - s) * pxPerMin),
+              background: seg.live ? FOCUS_SEG_LIVE_COLOR : FOCUS_SEG_COLOR,
+            }}
+            title={`${fmtMinutes(Math.round(seg.startMin))}–${fmtMinutes(Math.round(Math.min(seg.endMin, 24 * 60)))} · фокус`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 function CalendarDayColumn({
-  date, tasks, startHour, endHour, customHours, hourHeight, now, showCheckboxes, twoColumns,
+  date, tasks, startHour, endHour, customHours, hourHeight, now, showCheckboxes, twoColumns, focusScale,
   completedVisible, recentCompletedIds, getListCollapsed, setListCollapsed,
   onUpdateTiming, onOpenModal, onAddTaskAt, onSetHours, onResetHours, taskHandlers,
 }) {
@@ -628,7 +681,12 @@ function CalendarDayColumn({
           )}
         </div>
 
-        <div className="calendar-day__timeline" ref={timelineRef} style={{ height: timelineHeight }} onPointerDown={beginTimelineCreate}>
+        <div
+          className={`calendar-day__timeline${focusScale ? ' calendar-day__timeline--focus' : ''}`}
+          ref={timelineRef}
+          style={{ height: timelineHeight }}
+          onPointerDown={beginTimelineCreate}
+        >
           {hourLines.map((h) => (
             <div key={h} className="calendar-hour" style={{ top: (h * 60 - dayStartMin) * pxPerMin }}>
               <span className="calendar-hour__label">{pad(h)}:00</span>
@@ -653,7 +711,7 @@ function CalendarDayColumn({
             const height = Math.max(4, (visEnd - visStart) * pxPerMin);
             // Overlapping blocks share the width in side-by-side columns.
             const { lane = 0, lanes = 1 } = laneLayout.get(ev.id) || {};
-            const track = `(100% - ${GUTTER + RIGHT_PAD}px)`;
+            const track = `(100% - ${GUTTER + (focusScale ? FOCUS_RIGHT_PAD : RIGHT_PAD)}px)`;
             const laneStyle = lanes > 1
               ? {
                 left: `calc(${GUTTER}px + ${track} * ${lane} / ${lanes})`,
@@ -703,6 +761,15 @@ function CalendarDayColumn({
             const height = Math.max(4, (e2 - s) * pxPerMin);
             return <div className="calendar-event calendar-event--preview" style={{ top, height }} />;
           })()}
+
+          {focusScale && (
+            <FocusStrip
+              dateStr={dateStr}
+              dayStartMin={dayStartMin}
+              dayEndMin={dayEndMin}
+              pxPerMin={pxPerMin}
+            />
+          )}
         </div>
       </div>
     </section>
@@ -710,7 +777,7 @@ function CalendarDayColumn({
 }
 
 export function CalendarView({
-  days, tasks, scale = 1, showCheckboxes = false, twoColumns = false,
+  days, tasks, scale = 1, showCheckboxes = false, twoColumns = false, focusScale = false,
   dayHours = {}, setDayHours, resetDayHours,
   completedVisible = true, recentCompletedIds, getListCollapsed, setListCollapsed,
   addTask, updateTask, deleteTask,
@@ -773,6 +840,7 @@ export function CalendarView({
               now={now}
               showCheckboxes={showCheckboxes}
               twoColumns={twoColumns}
+              focusScale={focusScale}
               completedVisible={completedVisible}
               recentCompletedIds={recentCompletedIds}
               getListCollapsed={getListCollapsed}

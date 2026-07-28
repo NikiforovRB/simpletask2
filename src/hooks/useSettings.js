@@ -50,6 +50,7 @@ export function useSettings() {
     calendar_scale: 1,
     calendar_show_checkboxes: false,
     calendar_two_columns: false,
+    calendar_focus_scale: false,
   });
   const [loading, setLoading] = useState(true);
 
@@ -82,6 +83,7 @@ export function useSettings() {
           calendar_scale: clampScale(data.calendar_scale),
           calendar_show_checkboxes: data.calendar_show_checkboxes === true,
           calendar_two_columns: data.calendar_two_columns === true,
+          calendar_focus_scale: data.calendar_focus_scale === true,
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -113,6 +115,7 @@ export function useSettings() {
           calendar_scale: 1,
           calendar_show_checkboxes: false,
           calendar_two_columns: false,
+          calendar_focus_scale: false,
         });
       }
       setLoading(false);
@@ -216,6 +219,13 @@ export function useSettings() {
     await supabase.from('user_settings').update({ calendar_two_columns: val }).eq('user_id', user.id);
   };
 
+  const setCalendarFocusScale = async (v) => {
+    if (!user) return;
+    const val = !!v;
+    setSettings((s) => ({ ...s, calendar_focus_scale: val }));
+    await supabase.from('user_settings').update({ calendar_focus_scale: val }).eq('user_id', user.id);
+  };
+
   return {
     settings,
     setDaysCount,
@@ -232,6 +242,7 @@ export function useSettings() {
     setCalendarScale,
     setCalendarShowCheckboxes,
     setCalendarTwoColumns,
+    setCalendarFocusScale,
     loading,
   };
 }

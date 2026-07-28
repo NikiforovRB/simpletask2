@@ -22,6 +22,10 @@ const CIRC = 2 * Math.PI * RADIUS;
 const DIAL_R = 23.5;
 const DIAL_CIRC = 2 * Math.PI * DIAL_R;
 const PILL_MODE_KEY = 'focus_pill_expanded';
+const DIAL_PLATE_COLOR = '#2e2e32';
+// One shade per hour of the session: the sweeping sector uses the current
+// hour's colour, while the already completed hour stays behind it as the plate.
+const DIAL_HOUR_COLORS = ['#5a86ee', '#3e65c2', '#264794', '#17306b'];
 
 function readPillExpanded() {
   try {
@@ -86,6 +90,11 @@ export function FocusTimer() {
       : Math.floor((phaseElapsed % 3600) / 60);
     const dialTotal = isPomo && phaseTarget !== Infinity ? Math.max(1, Math.round(phaseTarget / 60)) : 60;
     const dialFraction = Math.min(1, dialMinutes / dialTotal);
+    // Pomodoro phases never run past an hour, so they always use the first shade.
+    const dialHour = isPomo && phaseTarget !== Infinity ? 0 : Math.floor(phaseElapsed / 3600);
+    const lastShade = DIAL_HOUR_COLORS.length - 1;
+    const dialFillColor = DIAL_HOUR_COLORS[Math.min(dialHour, lastShade)];
+    const dialPlateColor = dialHour > 0 ? DIAL_HOUR_COLORS[Math.min(dialHour - 1, lastShade)] : DIAL_PLATE_COLOR;
     return (
       <div
         className={`focus-pill ${running ? 'focus-pill--running' : 'focus-pill--paused'}${pillExpanded ? ' focus-pill--expanded' : ''}`}
@@ -117,12 +126,13 @@ export function FocusTimer() {
         {pillExpanded && (
           <div className="focus-pill__dial-wrap">
             <svg className="focus-pill__dial" viewBox="0 0 100 100" width="104" height="104" aria-hidden>
-              <circle className="focus-pill__dial-plate" cx="50" cy="50" r="47" />
+              <circle className="focus-pill__dial-plate" cx="50" cy="50" r="47" fill={dialPlateColor} />
               <circle
                 className="focus-pill__dial-fill"
                 cx="50"
                 cy="50"
                 r={DIAL_R}
+                stroke={dialFillColor}
                 strokeWidth={DIAL_R * 2}
                 strokeDasharray={DIAL_CIRC}
                 strokeDashoffset={DIAL_CIRC * (1 - dialFraction)}
@@ -132,11 +142,11 @@ export function FocusTimer() {
               {Array.from({ length: 12 }, (_, i) => i * 30).map((deg) => (
                 <line
                   key={deg}
-                  className={`focus-pill__dial-tick${deg % 90 === 0 ? ' focus-pill__dial-tick--major' : ''}`}
+                  className="focus-pill__dial-tick"
                   x1="50"
                   y1="6"
                   x2="50"
-                  y2={deg % 90 === 0 ? 13 : 10}
+                  y2="12"
                   transform={`rotate(${deg} 50 50)`}
                 />
               ))}

@@ -317,6 +317,7 @@ export default function Dashboard() {
     setCalendarScale,
     setCalendarShowCheckboxes,
     setCalendarTwoColumns,
+    setCalendarFocusScale,
   } = useSettings();
   const { dayHours, setDayHours, resetDayHours } = useCalendarDayHours();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
@@ -2030,6 +2031,14 @@ export default function Dashboard() {
               />
               <span>Таймлайн вторым столбцом (на ПК)</span>
             </label>
+            <label className="dashboard__settings-check">
+              <input
+                type="checkbox"
+                checked={settings.calendar_focus_scale}
+                onChange={(e) => setCalendarFocusScale(e.target.checked)}
+              />
+              <span>Отображать шкалу фокус-сессий</span>
+            </label>
           </div>
         </div>
       )}
@@ -2219,6 +2228,7 @@ export default function Dashboard() {
           scale={settings.calendar_scale}
           showCheckboxes={settings.calendar_show_checkboxes}
           twoColumns={settings.calendar_two_columns}
+          focusScale={settings.calendar_focus_scale}
           dayHours={dayHours}
           setDayHours={setDayHours}
           resetDayHours={resetDayHours}
