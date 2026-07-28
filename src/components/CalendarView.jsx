@@ -337,10 +337,10 @@ function CalendarDayColumn({
     .filter((t) => !t.parent_id && !t.completed_at && t.scheduled_date === dateStr && (t.list_type || 'inbox') === 'inbox' && !t.scheduled_time)
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
-  // Completed tasks of this day that aren't pinned to the timeline; timed ones
-  // stay on the timeline instead, so nothing shows up twice.
+  // Every completed task of the day, timed ones included: they keep their slot
+  // on the timeline and are listed here as well, just like in Plans.
   const completedTasks = tasks
-    .filter((t) => !t.parent_id && t.completed_at && t.scheduled_date === dateStr && (t.list_type || 'inbox') === 'inbox' && !t.scheduled_time)
+    .filter((t) => !t.parent_id && t.completed_at && t.scheduled_date === dateStr && (t.list_type || 'inbox') === 'inbox')
     .sort((a, b) => {
       const ca = a.completed_at || '';
       const cb = b.completed_at || '';
