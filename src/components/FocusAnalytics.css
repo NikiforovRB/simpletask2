@@ -158,7 +158,7 @@
 
 .focus-analytics__tl-track {
   position: relative;
-  height: 10px;
+  height: 14px;
   border-radius: 5px;
   background: var(--bg-surface-2);
   overflow: hidden;
@@ -168,13 +168,18 @@
   background: var(--bg-surface-3);
 }
 
+/* Hour dividers stay visible on top of the filled areas. */
 .focus-analytics__tl-grid {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 1px;
-  background: var(--bg-app);
-  opacity: 0.6;
+  background: rgba(255, 255, 255, 0.2);
+  z-index: 2;
+}
+
+[data-theme="light"] .focus-analytics__tl-grid {
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .focus-analytics__tl-seg {
@@ -182,7 +187,6 @@
   top: 0;
   bottom: 0;
   min-width: 3px;
-  border-radius: 3px;
   background: #15c466;
   animation: focus-tl-seg-in 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }

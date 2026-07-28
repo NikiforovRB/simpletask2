@@ -210,6 +210,13 @@ export function FocusAnalytics() {
     return hours;
   }, [tlStart, tlEnd]);
 
+  // Dividers on every hour boundary inside the window (the edges are the track's own borders).
+  const hourLines = useMemo(() => {
+    const hours = [];
+    for (let h = tlStart + 1; h < tlEnd; h += 1) hours.push(h);
+    return hours;
+  }, [tlStart, tlEnd]);
+
   const tlRangeStart = tlStart * 60;
   const tlSpan = (tlEnd - tlStart) * 60;
   const toPct = (minute) => ((minute - tlRangeStart) / tlSpan) * 100;
@@ -405,14 +412,6 @@ export function FocusAnalytics() {
                 {row.isToday ? 'Сегодня' : row.label}
               </span>
               <span className="focus-analytics__tl-track">
-                {axisHours.map((h) => (
-                  <span
-                    key={h}
-                    className="focus-analytics__tl-grid"
-                    style={{ left: `${toPct(h * 60)}%` }}
-                    aria-hidden
-                  />
-                ))}
                 {row.segments.map((seg, i) => {
                   const s = Math.max(seg.startMin, tlRangeStart);
                   const e = Math.min(seg.endMin, tlRangeStart + tlSpan);
@@ -426,6 +425,14 @@ export function FocusAnalytics() {
                     />
                   );
                 })}
+                {hourLines.map((h) => (
+                  <span
+                    key={h}
+                    className="focus-analytics__tl-grid"
+                    style={{ left: `${toPct(h * 60)}%` }}
+                    aria-hidden
+                  />
+                ))}
                 {row.isToday && nowMinute >= tlRangeStart && nowMinute <= tlRangeStart + tlSpan && (
                   <span className="focus-analytics__tl-now" style={{ left: `${toPct(nowMinute)}%` }} aria-hidden />
                 )}
