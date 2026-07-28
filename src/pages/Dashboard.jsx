@@ -79,6 +79,8 @@ import starIcon from '../assets/star.svg';
 import starNavIcon from '../assets/star-nav.svg';
 import calendarIcon from '../assets/calendar.svg';
 import calendarNavIcon from '../assets/calendar-nav.svg';
+import plansIcon from '../assets/plans.svg';
+import plansNavIcon from '../assets/plans-nav.svg';
 import goalIcon from '../assets/goal.svg';
 import goalNavIcon from '../assets/goal-nav.svg';
 import layersIcon from '../assets/layers.svg';
@@ -187,6 +189,26 @@ const BUILTIN_MENU_ITEMS = [
 
 const menuHiddenKey = (kind, id) =>
   kind === 'builtin' ? `menu_hidden::${id}` : `menu_hidden::project::${id}`;
+
+// Icon-only shortcut to another section, used in the header of views that have
+// no day controls of their own.
+function HeaderSectionLink({ icon, hoverIcon, label, onClick }) {
+  const [hover, setHover] = useState(false);
+  const hasHover = useMediaQuery('(hover: hover)');
+  return (
+    <button
+      type="button"
+      className="dashboard__icon-btn"
+      onMouseEnter={() => hasHover && setHover(true)}
+      onMouseLeave={() => hasHover && setHover(false)}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+    >
+      <img src={hasHover && hover ? hoverIcon : icon} alt="" />
+    </button>
+  );
+}
 
 function MenuOrderVisibilityToggle({ hidden, onToggle }) {
   return (
@@ -1338,6 +1360,22 @@ export default function Dashboard() {
                 <TodayFocusTotal onOpen={() => handleMenuSelect('focus_analytics')} />
               </span>
             )}
+            {viewMode === 'focus_analytics' && (
+              <>
+                <HeaderSectionLink
+                  icon={plansIcon}
+                  hoverIcon={plansNavIcon}
+                  label="Планы"
+                  onClick={() => handleMenuSelect('plans')}
+                />
+                <HeaderSectionLink
+                  icon={calendarIcon}
+                  hoverIcon={calendarNavIcon}
+                  label="Календарь"
+                  onClick={() => handleMenuSelect('calendar')}
+                />
+              </>
+            )}
             {viewMode === 'reputation' && (
               <div ref={setRepHeaderSlot} className="dashboard__rep-header-slot" />
             )}
@@ -1401,7 +1439,7 @@ export default function Dashboard() {
                   onMouseLeave={() => hasHover && setPlansHover(false)}
                   onClick={() => handleMenuSelect('plans')}
                 >
-                  <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
+                  <img src={viewMode === 'plans' || (hasHover && plansHover) ? plansNavIcon : plansIcon} alt="" />
                   <span>Планы</span>
                 </button>
               )}
@@ -1591,7 +1629,7 @@ export default function Dashboard() {
                   onMouseLeave={() => hasHover && setPlansHover(false)}
                   onClick={() => handleMenuSelect('plans')}
                 >
-                  <img src={viewMode === 'plans' || (hasHover && plansHover) ? calendarNavIcon : calendarIcon} alt="" />
+                  <img src={viewMode === 'plans' || (hasHover && plansHover) ? plansNavIcon : plansIcon} alt="" />
                   <span>Планы</span>
                 </button>
               )}
@@ -2008,7 +2046,7 @@ export default function Dashboard() {
                 const icon = (() => {
                   switch (item.key) {
                     case 'today': return starIcon;
-                    case 'plans': return calendarIcon;
+                    case 'plans': return plansIcon;
                     case 'calendar': return calendarIcon;
                     case 'goal_plan': return goalIcon;
                     case 'reputation': return goalIcon;
