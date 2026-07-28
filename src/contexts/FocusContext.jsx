@@ -72,9 +72,12 @@ export function FocusProvider({ children }) {
   }, []);
 
   // Mirror the live session into the database so a page reload can pick it up.
-  const persistActive = useCallback(() => {
+  // `targetOverride` lets a caller persist a target it has just set, before the
+  // corresponding state update has been applied.
+  const persistActive = useCallback((targetOverride) => {
     const eng = engineRef.current;
     if (!user?.id || !eng.sessionStartedAt) return Promise.resolve();
+    const t = targetOverride === undefined ? target : targetOverride;
     return enqueueWrite(() => supabase.from('focus_active_sessions').upsert(
       {
         user_id: user.id,
@@ -88,9 +91,9 @@ export function FocusProvider({ children }) {
         pomo_work: eng.pomoWork,
         pomo_break: eng.pomoBreak,
         session_started_at: eng.sessionStartedAt,
-        target_ref: target?.ref ?? null,
-        target_title: target?.title ?? null,
-        target_source: target?.source ?? null,
+        target_ref: t?.ref ?? null,
+        target_title: t?.title ?? null,
+        target_source: t?.source ?? null,
         last_seen_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
@@ -303,6 +306,24 @@ export function FocusProvider({ children }) {
     forceRender();
   }, [forceRender, target, stopAndLog]);
 
+  // Start counting right away, without showing the overlay (header shortcut).
+  const startQuick = useCallback((nextTarget = null, mode = 'stopwatch') => {
+    const eng = engineRef.current;
+    if (eng.sessionStartedAt) return; // a session is already in progress
+    engineRef.current = {
+      ...initialEngine,
+      mode: mode === 'pomodoro' ? 'pomodoro' : 'stopwatch',
+      pomoWork: eng.pomoWork,
+      pomoBreak: eng.pomoBreak,
+      running: true,
+      phaseStartTs: Date.now(),
+      sessionStartedAt: new Date().toISOString(),
+    };
+    setTarget(nextTarget);
+    forceRender();
+    persistActive(nextTarget);
+  }, [forceRender, persistActive]);
+
   // Hide the overlay but keep the session running in the background.
   const minimize = useCallback(() => setOpen(false), []);
 
@@ -356,6 +377,7 @@ export function FocusProvider({ children }) {
     pomoWork: eng.pomoWork,
     pomoBreak: eng.pomoBreak,
     openFocus,
+    startQuick,
     minimize,
     start,
     pause,

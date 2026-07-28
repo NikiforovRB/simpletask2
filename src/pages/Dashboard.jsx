@@ -48,7 +48,7 @@ import { HabitsView } from '../components/HabitsView';
 import { BoardView } from '../components/BoardView';
 import { GoalPlanView } from '../components/GoalPlanView';
 import { CalendarView } from '../components/CalendarView';
-import { TodayFocusTotal } from '../components/TodayFocusTotal';
+import { TodayFocusTotal, FocusQuickStart } from '../components/TodayFocusTotal';
 import { ReputationView } from '../components/ReputationView';
 import { NoDateList } from '../components/NoDateList';
 import { SomedayList } from '../components/SomedayList';
@@ -1340,7 +1340,10 @@ export default function Dashboard() {
                   <img src={hasHover && dateRightHover ? rightNavIcon : rightIcon} alt="" />
                 </button>
                 {viewMode === 'plans' && (
-                  <TodayFocusTotal onOpen={() => handleMenuSelect('focus_analytics')} />
+                  <>
+                    <TodayFocusTotal onOpen={() => handleMenuSelect('focus_analytics')} />
+                    <FocusQuickStart />
+                  </>
                 )}
               </>
             )}
@@ -1358,6 +1361,7 @@ export default function Dashboard() {
                   ))}
                 </select>
                 <TodayFocusTotal onOpen={() => handleMenuSelect('focus_analytics')} />
+                <FocusQuickStart />
               </span>
             )}
             {viewMode === 'focus_analytics' && (

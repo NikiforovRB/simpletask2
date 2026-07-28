@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useFocus } from '../contexts/FocusContext';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { toLocalDateString } from '../constants';
+import playIcon from '../assets/play.svg';
+import playNavIcon from '../assets/play-nav.svg';
 import './TodayFocusTotal.css';
+
+const QUICK_SESSION_TITLE = 'Работа';
 
 function fmtDuration(totalSeconds) {
   const s = Math.max(0, Math.round(totalSeconds));
@@ -49,6 +54,32 @@ export function TodayFocusTotal({ onOpen }) {
     >
       <span className="focus-total__label">Сегодня</span>
       <span className="focus-total__value">{fmtDuration(total)}</span>
+    </button>
+  );
+}
+
+/**
+ * One-tap start of a plain «Работа» focus session. Hidden while a session is
+ * already running; on desktop it only appears when the header is hovered.
+ */
+export function FocusQuickStart() {
+  const { active, startQuick } = useFocus();
+  const [hover, setHover] = useState(false);
+  const hasHover = useMediaQuery('(hover: hover)');
+
+  if (active) return null;
+
+  return (
+    <button
+      type="button"
+      className="focus-quick"
+      onMouseEnter={() => hasHover && setHover(true)}
+      onMouseLeave={() => hasHover && setHover(false)}
+      onClick={() => startQuick({ ref: null, title: QUICK_SESSION_TITLE, source: 'custom' }, 'stopwatch')}
+      aria-label={`Запустить фокус-сессию «${QUICK_SESSION_TITLE}»`}
+      title={`Фокус: ${QUICK_SESSION_TITLE}`}
+    >
+      <img src={hasHover && hover ? playNavIcon : playIcon} alt="" />
     </button>
   );
 }
