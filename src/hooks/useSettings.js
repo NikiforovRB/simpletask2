@@ -25,6 +25,14 @@ function normalizeTheme(v) {
   return v === 'light' ? 'light' : 'dark';
 }
 
+// Colours offered for the filled areas on the calendar focus scale.
+export const FOCUS_SCALE_COLORS = ['#15c466', '#5a86ee'];
+
+function normalizeFocusColor(v) {
+  const c = String(v || '').toLowerCase();
+  return FOCUS_SCALE_COLORS.includes(c) ? c : FOCUS_SCALE_COLORS[0];
+}
+
 // Calendar timeline scale: snap to 0.2 steps within [1, 3].
 function clampScale(n) {
   const v = Number(n);
@@ -51,6 +59,7 @@ export function useSettings() {
     calendar_show_checkboxes: false,
     calendar_two_columns: false,
     calendar_focus_scale: false,
+    calendar_focus_color: FOCUS_SCALE_COLORS[0],
   });
   const [loading, setLoading] = useState(true);
 
@@ -84,6 +93,7 @@ export function useSettings() {
           calendar_show_checkboxes: data.calendar_show_checkboxes === true,
           calendar_two_columns: data.calendar_two_columns === true,
           calendar_focus_scale: data.calendar_focus_scale === true,
+          calendar_focus_color: normalizeFocusColor(data.calendar_focus_color),
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -116,6 +126,7 @@ export function useSettings() {
           calendar_show_checkboxes: false,
           calendar_two_columns: false,
           calendar_focus_scale: false,
+          calendar_focus_color: FOCUS_SCALE_COLORS[0],
         });
       }
       setLoading(false);
@@ -226,6 +237,13 @@ export function useSettings() {
     await supabase.from('user_settings').update({ calendar_focus_scale: val }).eq('user_id', user.id);
   };
 
+  const setCalendarFocusColor = async (v) => {
+    if (!user) return;
+    const val = normalizeFocusColor(v);
+    setSettings((s) => ({ ...s, calendar_focus_color: val }));
+    await supabase.from('user_settings').update({ calendar_focus_color: val }).eq('user_id', user.id);
+  };
+
   return {
     settings,
     setDaysCount,
@@ -243,6 +261,7 @@ export function useSettings() {
     setCalendarShowCheckboxes,
     setCalendarTwoColumns,
     setCalendarFocusScale,
+    setCalendarFocusColor,
     loading,
   };
 }

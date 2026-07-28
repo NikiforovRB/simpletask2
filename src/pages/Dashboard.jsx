@@ -35,7 +35,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useTasks } from '../hooks/useTasks';
-import { useSettings } from '../hooks/useSettings';
+import { useSettings, FOCUS_SCALE_COLORS } from '../hooks/useSettings';
 import { useListCollapsed } from '../hooks/useListCollapsed';
 import { useCalendarDayHours } from '../hooks/useCalendarDayHours';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -318,6 +318,7 @@ export default function Dashboard() {
     setCalendarShowCheckboxes,
     setCalendarTwoColumns,
     setCalendarFocusScale,
+    setCalendarFocusColor,
   } = useSettings();
   const { dayHours, setDayHours, resetDayHours } = useCalendarDayHours();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
@@ -2039,6 +2040,21 @@ export default function Dashboard() {
               />
               <span>Отображать шкалу фокус-сессий</span>
             </label>
+            {settings.calendar_focus_scale && (
+              <div className="dashboard__settings-colors">
+                {FOCUS_SCALE_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`dashboard__settings-color${settings.calendar_focus_color === c ? ' dashboard__settings-color--active' : ''}`}
+                    style={{ background: c }}
+                    onClick={() => setCalendarFocusColor(c)}
+                    aria-label={`Цвет шкалы ${c}`}
+                    title={c}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2229,6 +2245,7 @@ export default function Dashboard() {
           showCheckboxes={settings.calendar_show_checkboxes}
           twoColumns={settings.calendar_two_columns}
           focusScale={settings.calendar_focus_scale}
+          focusColor={settings.calendar_focus_color}
           dayHours={dayHours}
           setDayHours={setDayHours}
           resetDayHours={resetDayHours}

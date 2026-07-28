@@ -26,7 +26,6 @@ const FOCUS_STRIP_GAP = 4;
 // Space the timeline gives up on the right when the focus scale is shown.
 const FOCUS_RIGHT_PAD = RIGHT_PAD + FOCUS_STRIP_W + FOCUS_STRIP_GAP;
 const FOCUS_SEG_COLOR = '#15c466';
-const FOCUS_SEG_LIVE_COLOR = '#5a86ee';
 
 const snap15 = (m) => Math.round(m / SNAP) * SNAP;
 const pad = (n) => String(n).padStart(2, '0');
@@ -324,7 +323,7 @@ function EventModal({ event, onClose, onSave, onDelete }) {
 
 // Vertical focus-session scale drawn beside the timeline. It reads the focus
 // context on its own so a ticking session re-renders only this strip.
-function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin }) {
+function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin, color = FOCUS_SEG_COLOR }) {
   const { sessions, active, workSeconds } = useFocus();
   // Round to whole minutes: the live block only needs to move once a minute.
   const liveMinutes = active ? Math.floor(workSeconds / 60) : 0;
@@ -354,11 +353,11 @@ function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin }) {
         return (
           <div
             key={i}
-            className="calendar-day__focus-seg"
+            className={`calendar-day__focus-seg${seg.live ? ' calendar-day__focus-seg--live' : ''}`}
             style={{
               top: (s - dayStartMin) * pxPerMin,
               height: Math.max(2, (e - s) * pxPerMin),
-              background: seg.live ? FOCUS_SEG_LIVE_COLOR : FOCUS_SEG_COLOR,
+              background: color,
             }}
             title={`${fmtMinutes(Math.round(seg.startMin))}–${fmtMinutes(Math.round(Math.min(seg.endMin, 24 * 60)))} · фокус`}
           />
@@ -369,7 +368,7 @@ function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin }) {
 }
 
 function CalendarDayColumn({
-  date, tasks, startHour, endHour, customHours, hourHeight, now, showCheckboxes, twoColumns, focusScale,
+  date, tasks, startHour, endHour, customHours, hourHeight, now, showCheckboxes, twoColumns, focusScale, focusColor,
   completedVisible, recentCompletedIds, getListCollapsed, setListCollapsed,
   onUpdateTiming, onOpenModal, onAddTaskAt, onSetHours, onResetHours, taskHandlers,
 }) {
@@ -768,6 +767,7 @@ function CalendarDayColumn({
               dayStartMin={dayStartMin}
               dayEndMin={dayEndMin}
               pxPerMin={pxPerMin}
+              color={focusColor}
             />
           )}
         </div>
@@ -777,7 +777,8 @@ function CalendarDayColumn({
 }
 
 export function CalendarView({
-  days, tasks, scale = 1, showCheckboxes = false, twoColumns = false, focusScale = false,
+  days, tasks, scale = 1, showCheckboxes = false, twoColumns = false,
+  focusScale = false, focusColor = FOCUS_SEG_COLOR,
   dayHours = {}, setDayHours, resetDayHours,
   completedVisible = true, recentCompletedIds, getListCollapsed, setListCollapsed,
   addTask, updateTask, deleteTask,
@@ -841,6 +842,7 @@ export function CalendarView({
               showCheckboxes={showCheckboxes}
               twoColumns={twoColumns}
               focusScale={focusScale}
+              focusColor={focusColor}
               completedVisible={completedVisible}
               recentCompletedIds={recentCompletedIds}
               getListCollapsed={getListCollapsed}

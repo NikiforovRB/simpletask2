@@ -271,6 +271,16 @@
   right: 0;
 }
 
+/* The session still running keeps the same colour but breathes a little. */
+.calendar-day__focus-seg--live {
+  animation: calendar-focus-live 1.8s ease-in-out infinite;
+}
+
+@keyframes calendar-focus-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
 /* The timeline gives up room on the right so nothing runs under the scale. */
 .calendar-day__timeline--focus .calendar-hour,
 .calendar-day__timeline--focus .calendar-now,
