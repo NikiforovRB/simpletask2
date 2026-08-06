@@ -1,3 +1,5 @@
+import { promiseState } from '../hooks/useReputation';
+
 /**
  * Plans and Calendar can list the reputation promises of a day among its tasks.
  * A promise's anchor (`list_position`) lives in "task index" space: 2.5 sits
@@ -48,6 +50,21 @@ export function mergeDayItems(renderedTasks, promises, taskAnchor, taskCount) {
   });
   items.sort((a, b) => a.anchor - b.anchor || (a.kind === b.kind ? 0 : a.kind === 'task' ? -1 : 1));
   return items;
+}
+
+/**
+ * Splits the day's promises into the ones that belong in the list and the kept
+ * ones that go to "Выполненные задачи". With the setting off nothing moves: a
+ * kept promise stays where it is, like it always did.
+ */
+export function splitDonePromises(promises, moveDoneToCompleted) {
+  if (!moveDoneToCompleted) return { open: promises || [], done: [] };
+  const open = [];
+  const done = [];
+  for (const promise of promises || []) {
+    (promiseState(promise) === 'done' ? done : open).push(promise);
+  }
+  return { open, done };
 }
 
 /** The anchor of an item inserted at `index`, midway between its neighbours. */

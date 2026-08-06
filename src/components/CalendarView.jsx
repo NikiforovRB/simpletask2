@@ -6,8 +6,8 @@ import { useFocus } from '../contexts/FocusContext';
 import { CalendarPopover } from './CalendarPopover';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
-import { SortableReputationRow } from './ReputationTaskRow';
-import { mergeDayItems } from '../lib/dayItems';
+import { CompletedReputationRow, SortableReputationRow } from './ReputationTaskRow';
+import { mergeDayItems, splitDonePromises } from '../lib/dayItems';
 import { getContainerId } from '../lib/dnd';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
@@ -372,7 +372,7 @@ function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin, color = FOCUS_S
 function CalendarDayColumn({
   date, tasks, startHour, endHour, customHours, hourHeight, now, showCheckboxes, twoColumns, focusScale, focusColor,
   completedVisible, recentCompletedIds, getListCollapsed, setListCollapsed,
-  reputationPromises, onUpdateReputation, onDeleteReputation,
+  reputationPromises, reputationInCompleted, onUpdateReputation, onDeleteReputation,
   onUpdateTiming, onOpenModal, onAddTaskAt, onSetHours, onResetHours, taskHandlers,
 }) {
   const dateStr = toLocalDateString(date);
@@ -396,9 +396,14 @@ function CalendarDayColumn({
 
   const noTimeTasks = dayTasks.filter((t) => !t.scheduled_time);
 
+  const { open: openPromises, done: donePromises } = splitDonePromises(
+    reputationPromises,
+    reputationInCompleted,
+  );
+
   const dayItems = mergeDayItems(
     noTimeTasks,
-    reputationPromises,
+    openPromises,
     (task) => dayTasks.indexOf(task),
     dayTasks.length,
   );
@@ -666,13 +671,22 @@ function CalendarDayColumn({
             </SortableContext>
           </ul>
 
-          {completedVisible && completedTasks.length > 0 && (
+          {completedVisible && (completedTasks.length > 0 || donePromises.length > 0) && (
             <div className="calendar-day__completed">
               <button type="button" className="calendar-day__completed-toggle" onClick={toggleCompleted}>
                 Выполненные задачи
               </button>
               {completedOpen && (
                 <ul className="calendar-day__notime calendar-day__notime--completed">
+                  {donePromises.map((promise) => (
+                    <li key={promise.id}>
+                      <CompletedReputationRow
+                        promise={promise}
+                        onUpdate={onUpdateReputation}
+                        onDelete={onDeleteReputation}
+                      />
+                    </li>
+                  ))}
                   <SortableContext items={completedTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                     {completedTasks.map((task, i) => (
                       <li key={task.id}>
@@ -806,7 +820,7 @@ export function CalendarView({
   focusScale = false, focusColor = FOCUS_SEG_COLOR,
   dayHours = {}, setDayHours, resetDayHours,
   completedVisible = true, recentCompletedIds, getListCollapsed, setListCollapsed,
-  reputationByDate, onUpdateReputation, onDeleteReputation,
+  reputationByDate, reputationInCompleted = false, onUpdateReputation, onDeleteReputation,
   addTask, updateTask, deleteTask,
   onToggle, onAddTaskAt, onAddSubtask, onTaskContextMenu,
   editingTaskId, onEditingTaskConsumed,
@@ -874,6 +888,7 @@ export function CalendarView({
               getListCollapsed={getListCollapsed}
               setListCollapsed={setListCollapsed}
               reputationPromises={reputationByDate?.get(dateStr)}
+              reputationInCompleted={reputationInCompleted}
               onUpdateReputation={onUpdateReputation}
               onDeleteReputation={onDeleteReputation}
               onUpdateTiming={updateTiming}

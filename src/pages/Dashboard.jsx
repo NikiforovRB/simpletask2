@@ -61,7 +61,7 @@ import { useFocus } from '../contexts/FocusContext';
 import { useReminderScheduler } from '../hooks/useReminderScheduler';
 import { registerReminderServiceWorker } from '../lib/reminders';
 import { getContainerId, getContainerIdForBucket, getContainerIdFromTask, parseContainerId } from '../lib/dnd';
-import { anchorForIndex, mergeDayItems, parseRepDndId } from '../lib/dayItems';
+import { anchorForIndex, mergeDayItems, parseRepDndId, splitDonePromises } from '../lib/dayItems';
 import { toLocalDateString } from '../constants';
 import { parseSlotId } from '../components/DropSlot';
 import {
@@ -324,6 +324,7 @@ export default function Dashboard() {
     setCalendarFocusColor,
     setFocusTimerShowTotal,
     setShowReputationInLists,
+    setReputationInCompleted,
   } = useSettings();
   const { dayHours, setDayHours, resetDayHours } = useCalendarDayHours();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
@@ -1056,9 +1057,12 @@ export default function Dashboard() {
       if (!c || c.completed || c.parent_id || (c.list_type ?? 'inbox') !== 'inbox' || !c.scheduled_date) return null;
       const dayTasks = getTasksInContainer(tasks, containerId);
       const promises = reputationPromises.filter((p) => p.promise_date === c.scheduled_date);
-      return { date: c.scheduled_date, items: mergeDayItems(dayTasks, promises) };
+      // Promises listed under "Выполненные задачи" are not part of the day list,
+      // so they must not take up a slot in it either.
+      const { open } = splitDonePromises(promises, settings.reputation_in_completed);
+      return { date: c.scheduled_date, items: mergeDayItems(dayTasks, open) };
     },
-    [tasks, reputationPromises],
+    [tasks, reputationPromises, settings.reputation_in_completed],
   );
 
   const handleDragEnd = useCallback(
@@ -2185,6 +2189,16 @@ export default function Dashboard() {
                 />
                 <span>Отображать список «Репутация перед собой»</span>
               </label>
+              {settings.show_reputation_in_lists && (
+                <label className="dashboard__settings-check">
+                  <input
+                    type="checkbox"
+                    checked={settings.reputation_in_completed}
+                    onChange={(e) => setReputationInCompleted(e.target.checked)}
+                  />
+                  <span>Отображать задачи из списка «Репутация перед собой» в списке выполненных задач</span>
+                </label>
+              )}
             </div>
 
             <div className="dashboard__settings-group">
@@ -2382,6 +2396,7 @@ export default function Dashboard() {
               setListCollapsed={setListCollapsed}
               allowListCollapse={viewMode === 'plans'}
               reputationPromises={reputationByDate?.get(toLocalDateString(date))}
+              reputationInCompleted={settings.reputation_in_completed}
               onUpdateReputation={updateReputationPromise}
               onDeleteReputation={deleteReputationPromise}
             />
@@ -2402,6 +2417,7 @@ export default function Dashboard() {
           setDayHours={setDayHours}
           resetDayHours={resetDayHours}
           reputationByDate={reputationByDate}
+          reputationInCompleted={settings.reputation_in_completed}
           onUpdateReputation={updateReputationPromise}
           onDeleteReputation={deleteReputationPromise}
           completedVisible={completedVisible}

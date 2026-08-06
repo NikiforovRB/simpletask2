@@ -1,79 +1,124 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
+/**
+ * The promises are read in two places at once — the reputation section and the
+ * day lists of Plans / Calendar — so every instance of the hook shares one set
+ * of rows. A promise added or edited anywhere shows up in both sections right
+ * away, instead of only after a reload (which is all a per-instance state could
+ * offer, since the two copies never heard about each other's writes).
+ */
+let store = { userId: null, promises: [], loading: true };
+const listeners = new Set();
+let channel = null;
+let instances = 0;
+
+function publish(patch) {
+  store = { ...store, ...patch };
+  for (const listener of listeners) listener();
+}
+
+function subscribe(onChange) {
+  listeners.add(onChange);
+  return () => { listeners.delete(onChange); };
+}
+
+const getStore = () => store;
+
+async function loadPromises(userId) {
+  if (!userId) {
+    publish({ promises: [], loading: false });
+    return;
+  }
+  const { data, error } = await supabase
+    .from('reputation_promises')
+    .select('*')
+    .eq('user_id', userId)
+    .order('promise_date', { ascending: true })
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (store.userId !== userId) return; // the user changed while we were loading
+  publish(error ? { loading: false } : { promises: data || [], loading: false });
+}
+
 export function useReputation() {
   const { user } = useAuth();
-  const [promises, setPromises] = useState([]);
-  const [loading, setLoading] = useState(true);
-  // The hook runs in more than one place (the reputation view and the day
-  // lists), so each instance needs its own channel name.
-  const channelIdRef = useRef(`reputation_promises_${Math.random().toString(16).slice(2)}`);
+  const userId = user?.id ?? null;
+  const state = useSyncExternalStore(subscribe, getStore);
 
-  const fetchPromises = useCallback(async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('reputation_promises')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('promise_date', { ascending: true })
-      .order('position', { ascending: true })
-      .order('created_at', { ascending: true });
-    if (!error) setPromises(data || []);
-    setLoading(false);
-  }, [user?.id]);
-
+  // One fetch and one realtime channel serve every instance.
   useEffect(() => {
-    if (!user) {
-      setPromises([]);
-      setLoading(false);
-      return;
+    instances += 1;
+    if (store.userId !== userId) {
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+      publish({ userId, promises: [], loading: !!userId });
+      loadPromises(userId);
     }
-    fetchPromises();
-    const channel = supabase
-      .channel(channelIdRef.current)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'reputation_promises', filter: `user_id=eq.${user.id}` },
-        fetchPromises,
-      )
-      .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, [user?.id, fetchPromises]);
+    if (userId && !channel) {
+      channel = supabase
+        .channel(`reputation_promises_${userId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'reputation_promises', filter: `user_id=eq.${userId}` },
+          () => loadPromises(userId),
+        )
+        .subscribe();
+    }
+    return () => {
+      instances -= 1;
+      if (instances === 0 && channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+    };
+  }, [userId]);
 
   const addPromise = useCallback(
     async (payload) => {
-      if (!user) return null;
-      const sameDay = promises.filter((p) => p.promise_date === payload.promise_date);
+      if (!userId) return null;
+      const sameDay = store.promises.filter((p) => p.promise_date === payload.promise_date);
       const position = sameDay.length ? Math.max(...sameDay.map((p) => p.position ?? 0)) + 1 : 0;
       const { data, error } = await supabase
         .from('reputation_promises')
-        .insert({ user_id: user.id, position, ...payload })
+        .insert({ user_id: userId, position, ...payload })
         .select()
         .single();
       if (!error && data) {
-        setPromises((prev) => [...prev, data]);
+        publish({ promises: [...store.promises, data] });
         return data;
       }
-      if (!error) await fetchPromises();
+      await loadPromises(userId);
       return null;
     },
-    [user?.id, promises, fetchPromises],
+    [userId],
   );
 
   const updatePromise = useCallback(async (id, patch) => {
-    setPromises((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    publish({ promises: store.promises.map((p) => (p.id === id ? { ...p, ...patch } : p)) });
     const { error } = await supabase.from('reputation_promises').update(patch).eq('id', id);
-    if (error) await fetchPromises();
-  }, [fetchPromises]);
+    if (error) await loadPromises(store.userId);
+  }, []);
 
   const deletePromise = useCallback(async (id) => {
-    setPromises((prev) => prev.filter((p) => p.id !== id));
+    publish({ promises: store.promises.filter((p) => p.id !== id) });
     const { error } = await supabase.from('reputation_promises').delete().eq('id', id);
-    if (error) await fetchPromises();
-  }, [fetchPromises]);
+    if (error) await loadPromises(store.userId);
+  }, []);
 
-  return { promises, loading, addPromise, updatePromise, deletePromise, refetch: fetchPromises };
+  const refetch = useCallback(() => loadPromises(store.userId), []);
+
+  return {
+    promises: state.promises,
+    loading: state.loading,
+    addPromise,
+    updatePromise,
+    deletePromise,
+    refetch,
+  };
 }
 
 /**

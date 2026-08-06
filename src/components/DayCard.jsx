@@ -2,9 +2,9 @@ import { useState, useMemo } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
-import { SortableReputationRow } from './ReputationTaskRow';
+import { CompletedReputationRow, SortableReputationRow } from './ReputationTaskRow';
 import { getContainerId } from '../lib/dnd';
-import { mergeDayItems } from '../lib/dayItems';
+import { mergeDayItems, splitDonePromises } from '../lib/dayItems';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DEFAULT_TASK_COLOR, formatDayLabel, toLocalDateString } from '../constants';
 import plusIcon from '../assets/plus.svg';
@@ -33,6 +33,7 @@ export function DayCard({
   setListCollapsed,
   allowListCollapse = false,
   reputationPromises,
+  reputationInCompleted = false,
   onUpdateReputation,
   onDeleteReputation,
 }) {
@@ -70,10 +71,15 @@ export function DayCard({
     [tasks, dateStr]
   );
 
-  // Tasks with the day's reputation promises interleaved at their anchors.
+  // Tasks with the day's reputation promises interleaved at their anchors. Kept
+  // promises can be listed among the completed tasks instead.
+  const { open: openPromises, done: donePromises } = useMemo(
+    () => splitDonePromises(reputationPromises, reputationInCompleted),
+    [reputationPromises, reputationInCompleted],
+  );
   const dayItems = useMemo(
-    () => mergeDayItems(mainTasks, reputationPromises),
-    [mainTasks, reputationPromises],
+    () => mergeDayItems(mainTasks, openPromises),
+    [mainTasks, openPromises],
   );
 
   const getSubtasks = (parentId) => (byParent.get(parentId) || []).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
@@ -148,13 +154,22 @@ export function DayCard({
             </ul>
       </div>
 
-      {completedVisible && completedTasks.length > 0 && (
+      {completedVisible && (completedTasks.length > 0 || donePromises.length > 0) && (
       <div className="day-card__section day-card__section--completed">
         <button type="button" className="day-card__completed-toggle" onClick={toggleCompleted}>
           Выполненные задачи
         </button>
         {completedOpen && (
           <ul className="day-card__list day-card__list--completed">
+            {donePromises.map((promise) => (
+              <li key={promise.id}>
+                <CompletedReputationRow
+                  promise={promise}
+                  onUpdate={onUpdateReputation}
+                  onDelete={onDeleteReputation}
+                />
+              </li>
+            ))}
             <SortableContext items={completedTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               {completedTasks.map((task, i) => (
                 <li key={task.id}>
