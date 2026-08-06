@@ -38,6 +38,7 @@ import { useTasks } from '../hooks/useTasks';
 import { useSettings, FOCUS_SCALE_COLORS } from '../hooks/useSettings';
 import { useListCollapsed } from '../hooks/useListCollapsed';
 import { useCalendarDayHours } from '../hooks/useCalendarDayHours';
+import { useReputation } from '../hooks/useReputation';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useProjects } from '../hooks/useProjects';
 import { useHabits } from '../hooks/useHabits';
@@ -320,9 +321,11 @@ export default function Dashboard() {
     setCalendarFocusScale,
     setCalendarFocusColor,
     setFocusTimerShowTotal,
+    setShowReputationInLists,
   } = useSettings();
   const { dayHours, setDayHours, resetDayHours } = useCalendarDayHours();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
+  const { promises: reputationPromises, updatePromise: updateReputationPromise } = useReputation();
   const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
   const {
@@ -886,6 +889,19 @@ export default function Dashboard() {
       : getDays(baseDate, settings.days_count);
 
   const inboxTasks = useMemo(() => tasks.filter((t) => (t.list_type || 'inbox') === 'inbox'), [tasks]);
+
+  // Promises grouped by their day, for the optional reputation rows in the
+  // Plans and Calendar day lists.
+  const reputationByDate = useMemo(() => {
+    if (!settings.show_reputation_in_lists) return null;
+    const map = new Map();
+    for (const p of reputationPromises || []) {
+      const list = map.get(p.promise_date);
+      if (list) list.push(p);
+      else map.set(p.promise_date, [p]);
+    }
+    return map;
+  }, [settings.show_reputation_in_lists, reputationPromises]);
 
   const handleToggle = useCallback(
     async (task) => {
@@ -2009,68 +2025,111 @@ export default function Dashboard() {
 
       {settingsOpen && (
         <div className="dashboard__settings-overlay" onClick={() => setSettingsOpen(false)}>
-          <div className="dashboard__settings-popup" onClick={(e) => e.stopPropagation()}>
-            <div className="dashboard__settings-title">Новые задачи</div>
-            <button type="button" className={`dashboard__settings-option ${settings.new_tasks_position === 'start' ? 'dashboard__settings-option--active' : ''}`} onClick={() => { setNewTasksPosition('start'); setSettingsOpen(false); }}>
-              В начало списка
-            </button>
-            <button type="button" className={`dashboard__settings-option ${settings.new_tasks_position === 'end' ? 'dashboard__settings-option--active' : ''}`} onClick={() => { setNewTasksPosition('end'); setSettingsOpen(false); }}>
-              В конец списка
-            </button>
-            <label className="dashboard__settings-check">
-              <input
-                type="checkbox"
-                checked={settings.calendar_show_checkboxes}
-                onChange={(e) => setCalendarShowCheckboxes(e.target.checked)}
-              />
-              <span>Показывать чекбоксы на таймлайне</span>
-            </label>
-            <label className="dashboard__settings-check">
-              <input
-                type="checkbox"
-                checked={settings.calendar_two_columns}
-                onChange={(e) => setCalendarTwoColumns(e.target.checked)}
-              />
-              <span>Таймлайн вторым столбцом (на ПК)</span>
-            </label>
-            <label className="dashboard__settings-check">
-              <input
-                type="checkbox"
-                checked={settings.calendar_focus_scale}
-                onChange={(e) => setCalendarFocusScale(e.target.checked)}
-              />
-              <span>Отображать шкалу фокус-сессий</span>
-            </label>
-            {settings.calendar_focus_scale && (
-              <div className="dashboard__settings-colors">
-                {FOCUS_SCALE_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={`dashboard__settings-color${settings.calendar_focus_color === c ? ' dashboard__settings-color--active' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => setCalendarFocusColor(c)}
-                    aria-label={`Цвет шкалы ${c}`}
-                    title={c}
-                  />
-                ))}
-              </div>
-            )}
-            <div className="dashboard__settings-title dashboard__settings-title--section">Свёрнутый таймер фокуса</div>
-            <button
-              type="button"
-              className={`dashboard__settings-option ${!settings.focus_timer_show_total ? 'dashboard__settings-option--active' : ''}`}
-              onClick={() => setFocusTimerShowTotal(false)}
-            >
-              Время текущей сессии
-            </button>
-            <button
-              type="button"
-              className={`dashboard__settings-option ${settings.focus_timer_show_total ? 'dashboard__settings-option--active' : ''}`}
-              onClick={() => setFocusTimerShowTotal(true)}
-            >
-              Всего за сегодня
-            </button>
+          <div
+            className="dashboard__settings-popup dashboard__settings-popup--main"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dashboard__settings-head">
+              <span className="dashboard__settings-heading">Настройки</span>
+              <button
+                type="button"
+                className="dashboard__settings-close"
+                onClick={() => setSettingsOpen(false)}
+                aria-label="Закрыть"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="dashboard__settings-group">
+              <div className="dashboard__settings-title">Новые задачи</div>
+              <button type="button" className={`dashboard__settings-option ${settings.new_tasks_position === 'start' ? 'dashboard__settings-option--active' : ''}`} onClick={() => setNewTasksPosition('start')}>
+                В начало списка
+              </button>
+              <button type="button" className={`dashboard__settings-option ${settings.new_tasks_position === 'end' ? 'dashboard__settings-option--active' : ''}`} onClick={() => setNewTasksPosition('end')}>
+                В конец списка
+              </button>
+            </div>
+
+            <div className="dashboard__settings-group">
+              <div className="dashboard__settings-title">Календарь</div>
+              <label className="dashboard__settings-check">
+                <input
+                  type="checkbox"
+                  checked={settings.calendar_show_checkboxes}
+                  onChange={(e) => setCalendarShowCheckboxes(e.target.checked)}
+                />
+                <span>Показывать чекбоксы на таймлайне</span>
+              </label>
+              <label className="dashboard__settings-check">
+                <input
+                  type="checkbox"
+                  checked={settings.calendar_two_columns}
+                  onChange={(e) => setCalendarTwoColumns(e.target.checked)}
+                />
+                <span>Таймлайн вторым столбцом (на ПК)</span>
+              </label>
+              <label className="dashboard__settings-check">
+                <input
+                  type="checkbox"
+                  checked={settings.calendar_focus_scale}
+                  onChange={(e) => setCalendarFocusScale(e.target.checked)}
+                />
+                <span>Отображать шкалу фокус-сессий</span>
+              </label>
+              {settings.calendar_focus_scale && (
+                <div className="dashboard__settings-row">
+                  <span className="dashboard__settings-row-label">Цвет шкалы</span>
+                  <div className="dashboard__settings-colors">
+                    {FOCUS_SCALE_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className={`dashboard__settings-color${settings.calendar_focus_color === c ? ' dashboard__settings-color--active' : ''}`}
+                        style={{ background: c }}
+                        onClick={() => setCalendarFocusColor(c)}
+                        aria-label={`Цвет шкалы ${c}`}
+                        title={c}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="dashboard__settings-group">
+              <div className="dashboard__settings-title">Списки</div>
+              <label className="dashboard__settings-check">
+                <input
+                  type="checkbox"
+                  checked={settings.show_reputation_in_lists}
+                  onChange={(e) => setShowReputationInLists(e.target.checked)}
+                />
+                <span>Отображать список «Репутация перед собой»</span>
+              </label>
+            </div>
+
+            <div className="dashboard__settings-group">
+              <div className="dashboard__settings-title">Свёрнутый таймер фокуса</div>
+              <button
+                type="button"
+                className={`dashboard__settings-option ${!settings.focus_timer_show_total ? 'dashboard__settings-option--active' : ''}`}
+                onClick={() => setFocusTimerShowTotal(false)}
+              >
+                Время текущей сессии
+              </button>
+              <button
+                type="button"
+                className={`dashboard__settings-option ${settings.focus_timer_show_total ? 'dashboard__settings-option--active' : ''}`}
+                onClick={() => setFocusTimerShowTotal(true)}
+              >
+                Всего за сегодня
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2248,6 +2307,8 @@ export default function Dashboard() {
               getListCollapsed={getListCollapsed}
               setListCollapsed={setListCollapsed}
               allowListCollapse={viewMode === 'plans'}
+              reputationPromises={reputationByDate?.get(toLocalDateString(date))}
+              onUpdateReputation={updateReputationPromise}
             />
           ))}
         </div>
@@ -2265,6 +2326,8 @@ export default function Dashboard() {
           dayHours={dayHours}
           setDayHours={setDayHours}
           resetDayHours={resetDayHours}
+          reputationByDate={reputationByDate}
+          onUpdateReputation={updateReputationPromise}
           completedVisible={completedVisible}
           recentCompletedIds={recentCompletedIds}
           getListCollapsed={getListCollapsed}

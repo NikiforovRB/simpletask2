@@ -1,0 +1,78 @@
+.rep-inline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* The tint covers the whole promise, checkbox included. */
+.rep-inline__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.5rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(243, 55, 55, 0.12);
+}
+
+.rep-inline__check {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 4px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--border);
+  color: #fff;
+  transition: background 0.12s ease, transform 0.1s ease;
+}
+
+button.rep-inline__check {
+  cursor: pointer;
+}
+
+button.rep-inline__check:hover {
+  background: var(--border-strong);
+}
+
+button.rep-inline__check:active {
+  transform: scale(0.92);
+}
+
+.rep-inline__check--done,
+button.rep-inline__check--done:hover {
+  background: var(--success);
+}
+
+.rep-inline__check--failed,
+button.rep-inline__check--failed:hover {
+  background: var(--danger);
+}
+
+.rep-inline__title {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Gilroy Task', 'Gilroy', system-ui, sans-serif;
+  font-weight: var(--task-font-weight, 500);
+  font-size: calc(0.9375rem * var(--task-font-scale, 1));
+  line-height: calc(1.5rem * var(--task-font-scale, 1));
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.rep-inline__row--done .rep-inline__title {
+  color: var(--text-dim);
+}
+
+.rep-inline__metrics {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}

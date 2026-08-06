@@ -6,6 +6,7 @@ import { useFocus } from '../contexts/FocusContext';
 import { CalendarPopover } from './CalendarPopover';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
+import { ReputationInlineList } from './ReputationInlineList';
 import { getContainerId } from '../lib/dnd';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
@@ -370,6 +371,7 @@ function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin, color = FOCUS_S
 function CalendarDayColumn({
   date, tasks, startHour, endHour, customHours, hourHeight, now, showCheckboxes, twoColumns, focusScale, focusColor,
   completedVisible, recentCompletedIds, getListCollapsed, setListCollapsed,
+  reputationPromises, onUpdateReputation,
   onUpdateTiming, onOpenModal, onAddTaskAt, onSetHours, onResetHours, taskHandlers,
 }) {
   const dateStr = toLocalDateString(date);
@@ -640,6 +642,7 @@ function CalendarDayColumn({
               <li><DropSlot id={containerId} index={noTimeTasks.length} /></li>
             </SortableContext>
           </ul>
+          <ReputationInlineList promises={reputationPromises} onUpdate={onUpdateReputation} />
 
           {completedVisible && completedTasks.length > 0 && (
             <div className="calendar-day__completed">
@@ -781,6 +784,7 @@ export function CalendarView({
   focusScale = false, focusColor = FOCUS_SEG_COLOR,
   dayHours = {}, setDayHours, resetDayHours,
   completedVisible = true, recentCompletedIds, getListCollapsed, setListCollapsed,
+  reputationByDate, onUpdateReputation,
   addTask, updateTask, deleteTask,
   onToggle, onAddTaskAt, onAddSubtask, onTaskContextMenu,
   editingTaskId, onEditingTaskConsumed,
@@ -847,6 +851,8 @@ export function CalendarView({
               recentCompletedIds={recentCompletedIds}
               getListCollapsed={getListCollapsed}
               setListCollapsed={setListCollapsed}
+              reputationPromises={reputationByDate?.get(dateStr)}
+              onUpdateReputation={onUpdateReputation}
               onUpdateTiming={updateTiming}
               onOpenModal={setEditingEvent}
               onAddTaskAt={onAddTaskAt}

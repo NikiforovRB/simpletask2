@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -6,6 +6,9 @@ export function useReputation() {
   const { user } = useAuth();
   const [promises, setPromises] = useState([]);
   const [loading, setLoading] = useState(true);
+  // The hook runs in more than one place (the reputation view and the day
+  // lists), so each instance needs its own channel name.
+  const channelIdRef = useRef(`reputation_promises_${Math.random().toString(16).slice(2)}`);
 
   const fetchPromises = useCallback(async () => {
     if (!user) return;
@@ -28,7 +31,7 @@ export function useReputation() {
     }
     fetchPromises();
     const channel = supabase
-      .channel('reputation_promises')
+      .channel(channelIdRef.current)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'reputation_promises', filter: `user_id=eq.${user.id}` },

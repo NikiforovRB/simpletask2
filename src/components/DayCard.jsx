@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
+import { ReputationInlineList } from './ReputationInlineList';
 import { getContainerId } from '../lib/dnd';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DEFAULT_TASK_COLOR, formatDayLabel, toLocalDateString } from '../constants';
@@ -30,6 +31,8 @@ export function DayCard({
   getListCollapsed,
   setListCollapsed,
   allowListCollapse = false,
+  reputationPromises,
+  onUpdateReputation,
 }) {
   const dateStr = toLocalDateString(date);
   const dayKey = `day_${dateStr}`;
@@ -124,6 +127,7 @@ export function DayCard({
               </SortableContext>
               <li><DropSlot id={getContainerId(dateStr, null, false)} index={mainTasks.length} /></li>
             </ul>
+            <ReputationInlineList promises={reputationPromises} onUpdate={onUpdateReputation} />
       </div>
 
       {completedVisible && completedTasks.length > 0 && (

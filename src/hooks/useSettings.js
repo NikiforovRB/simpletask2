@@ -61,6 +61,7 @@ export function useSettings() {
     calendar_focus_scale: false,
     calendar_focus_color: FOCUS_SCALE_COLORS[0],
     focus_timer_show_total: false,
+    show_reputation_in_lists: false,
   });
   const [loading, setLoading] = useState(true);
 
@@ -96,6 +97,7 @@ export function useSettings() {
           calendar_focus_scale: data.calendar_focus_scale === true,
           calendar_focus_color: normalizeFocusColor(data.calendar_focus_color),
           focus_timer_show_total: data.focus_timer_show_total === true,
+          show_reputation_in_lists: data.show_reputation_in_lists === true,
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -130,6 +132,7 @@ export function useSettings() {
           calendar_focus_scale: false,
           calendar_focus_color: FOCUS_SCALE_COLORS[0],
           focus_timer_show_total: false,
+          show_reputation_in_lists: false,
         });
       }
       setLoading(false);
@@ -254,6 +257,13 @@ export function useSettings() {
     await supabase.from('user_settings').update({ focus_timer_show_total: val }).eq('user_id', user.id);
   };
 
+  const setShowReputationInLists = async (v) => {
+    if (!user) return;
+    const val = !!v;
+    setSettings((s) => ({ ...s, show_reputation_in_lists: val }));
+    await supabase.from('user_settings').update({ show_reputation_in_lists: val }).eq('user_id', user.id);
+  };
+
   return {
     settings,
     setDaysCount,
@@ -273,6 +283,7 @@ export function useSettings() {
     setCalendarFocusScale,
     setCalendarFocusColor,
     setFocusTimerShowTotal,
+    setShowReputationInLists,
     loading,
   };
 }

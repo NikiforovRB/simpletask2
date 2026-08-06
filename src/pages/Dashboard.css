@@ -164,27 +164,71 @@
   gap: 0.25rem;
 }
 
+/* Row with the label on the left and an iOS-style switch on the right; the
+   input itself is drawn as the switch (row-reverse puts it at the end). */
 .dashboard__settings-check {
   display: flex;
+  flex-direction: row-reverse;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
   cursor: pointer;
   color: var(--text-primary);
   font-size: 0.9rem;
+  transition: background 0.15s ease;
 }
 
-.dashboard__settings-check input {
+.dashboard__settings-check:hover {
+  background: var(--bg-hover);
+}
+
+.dashboard__settings-check span {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The switch itself, shared with the toggles of the other settings modals
+   (board block styling, habit editor) so every modal reads the same. The knob
+   is painted as a background gradient rather than a pseudo-element, which
+   Firefox does not render on inputs. */
+.dashboard__settings-check input[type="checkbox"],
+.board-view__styling-toggle input[type="checkbox"],
+.habits-view__toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 2.3rem;
+  width: 2.3rem;
+  height: 1.3rem;
+  margin: 0;
+  border: none;
+  border-radius: 999px;
+  background-color: var(--border-strong);
+  background-image: radial-gradient(circle 0.5rem at 0.65rem 50%, #fff 97%, transparent 100%);
+  background-repeat: no-repeat;
+  background-position: 0 0;
   cursor: pointer;
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--accent);
+  transition: background-color 0.18s ease, background-position 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+
+.dashboard__settings-check input[type="checkbox"]:checked,
+.board-view__styling-toggle input[type="checkbox"]:checked,
+.habits-view__toggle input[type="checkbox"]:checked {
+  background-color: var(--accent);
+  background-position: 1rem 0;
+}
+
+.dashboard__settings-check input[type="checkbox"]:focus-visible,
+.board-view__styling-toggle input[type="checkbox"]:focus-visible,
+.habits-view__toggle input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .dashboard__settings-colors {
   display: flex;
   gap: 0.5rem;
-  margin: 0.55rem 0 0 1.5rem;
 }
 
 .dashboard__settings-color {
@@ -319,13 +363,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 1rem;
+  animation: dashboard-overlay-in 0.16s ease;
+}
+
+@keyframes dashboard-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .dashboard__settings-popup {
   background: var(--bg-surface);
   color: var(--text-primary);
-  padding: 1.25rem;
-  min-width: 220px;
+  padding: 1.15rem 1.25rem 1.25rem;
+  min-width: 240px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-elev);
+  animation: dashboard-popup-in 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.05);
+}
+
+@keyframes dashboard-popup-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .dashboard__settings-popup--edit-project {
@@ -336,10 +396,66 @@
   min-width: 340px;
 }
 
+.dashboard__settings-popup--main {
+  width: 360px;
+  max-width: 100%;
+  padding: 1rem 1rem 1.15rem;
+}
+
+.dashboard__settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0.25rem 0.85rem;
+}
+
+.dashboard__settings-heading {
+  font-size: 1.0625rem;
+  font-weight: 500;
+  color: var(--text-strong);
+}
+
+.dashboard__settings-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dashboard__settings-close:hover {
+  background: var(--bg-elev);
+  color: var(--text-strong);
+}
+
+/* One card per group of related settings. */
+.dashboard__settings-group {
+  background: var(--bg-elev);
+  border-radius: 14px;
+  padding: 0.6rem 0.55rem 0.65rem;
+}
+
+.dashboard__settings-group + .dashboard__settings-group {
+  margin-top: 0.6rem;
+}
+
 .dashboard__settings-title {
-  color: var(--text-muted);
-  font-size: 0.8125rem;
-  margin-bottom: 0.75rem;
+  color: var(--text-faint);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin: 0 0 0.5rem 0.55rem;
+}
+
+.dashboard__settings-group .dashboard__settings-title {
+  margin-top: 0.15rem;
 }
 
 .dashboard__settings-title--section {
@@ -349,28 +465,60 @@
 .dashboard__confirm-text {
   color: var(--text-primary);
   font-size: 0.9375rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.9rem;
 }
 
 .dashboard__settings-option {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   width: 100%;
   text-align: left;
   background: none;
   border: none;
   color: var(--text-muted);
-  padding: 0.5rem 0;
+  padding: 0.5rem 0.55rem;
+  border-radius: 10px;
   font-size: 0.9375rem;
   cursor: pointer;
   font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .dashboard__settings-option:hover {
   color: var(--text-strong);
+  background: var(--bg-hover);
 }
 
 .dashboard__settings-option--active {
   color: var(--accent);
+}
+
+/* Check mark on the selected option instead of colour alone. */
+.dashboard__settings-option--active::after {
+  content: '';
+  width: 0.75rem;
+  height: 0.45rem;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  border-radius: 1px;
+  transform: rotate(-45deg) translate(1px, -2px);
+  flex-shrink: 0;
+}
+
+/* Label + control on one line (e.g. the focus scale colour swatches). */
+.dashboard__settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.55rem 0.25rem;
+}
+
+.dashboard__settings-row-label {
+  font-size: 0.875rem;
+  color: var(--text-dim);
 }
 
 /* Segmented "Список задач / Доска" toggle. A single rounded container holds
@@ -448,35 +596,44 @@
   width: 100%;
   box-sizing: border-box;
   background: var(--bg-elev);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   color: var(--text-primary);
-  padding: 0.5rem 0.75rem;
+  padding: 0.6rem 0.8rem;
   font-size: 0.9375rem;
   margin-bottom: 0.75rem;
-  border-radius: 6px;
+  border-radius: 10px;
   font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .dashboard__settings-input:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .dashboard__settings-submit {
   display: block;
   width: 100%;
-  background: var(--text-dim);
-  color: var(--text-on-accent);
-  border: none;
-  padding: 0.5rem 0.75rem;
+  background: var(--bg-elev);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  padding: 0.6rem 0.8rem;
   font-size: 0.9375rem;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
   font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 
 .dashboard__settings-submit:hover {
   background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.dashboard__settings-submit:active {
+  transform: scale(0.99);
 }
 
 .dashboard__settings-edit-actions {
@@ -493,17 +650,19 @@
   flex: 1;
   background: transparent;
   color: var(--text-dim);
-  border: 1px solid var(--border-strong);
-  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  padding: 0.6rem 0.8rem;
   font-size: 0.9375rem;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
   font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .dashboard__settings-delete:hover {
   color: var(--danger);
   border-color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .dashboard__share {

@@ -66,6 +66,46 @@ function StopIcon() {
   );
 }
 
+/**
+ * Pause/resume and stop, revealed on hover over a minimized timer so a session
+ * can be handled without opening the overlay.
+ */
+function PillActions({ running, onPause, onResume, onStop }) {
+  return (
+    <div className="focus-pill__actions">
+      <button
+        type="button"
+        className="focus-pill__action"
+        onClick={running ? onPause : onResume}
+        aria-label={running ? 'Пауза' : 'Продолжить'}
+        title={running ? 'Пауза' : 'Продолжить'}
+      >
+        {running ? (
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+            <rect x="5.5" y="4.5" width="2.5" height="9" rx="1.25" fill="currentColor" />
+            <rect x="10" y="4.5" width="2.5" height="9" rx="1.25" fill="currentColor" />
+          </svg>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+            <path d="M6.5 4.6l7 4.4-7 4.4V4.6z" fill="currentColor" />
+          </svg>
+        )}
+      </button>
+      <button
+        type="button"
+        className="focus-pill__action"
+        onClick={onStop}
+        aria-label="Завершить"
+        title="Завершить"
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+          <rect x="5.5" y="5.5" width="7" height="7" rx="1.5" fill="currentColor" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export function FocusTimer({ showTodayTotal = false }) {
   const focus = useFocus();
   const [pillMode, setPillModeState] = useState(readPillMode);
@@ -183,18 +223,12 @@ export function FocusTimer({ showTodayTotal = false }) {
                 />
               ))}
             </svg>
-            <button
-              type="button"
-              className="focus-pill__dial-stop"
-              onClick={stopAndClose}
-              aria-label="Завершить"
-              title="Завершить"
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
-                <rect x="5.5" y="5.5" width="7" height="7" rx="1.5" fill="currentColor" />
-              </svg>
-            </button>
+            <PillActions running={running} onPause={pause} onResume={start} onStop={stopAndClose} />
           </div>
+        )}
+
+        {isDigits && (
+          <PillActions running={running} onPause={pause} onResume={start} onStop={stopAndClose} />
         )}
       </div>
     );

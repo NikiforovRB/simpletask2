@@ -537,10 +537,14 @@ body.board-styling-side-open .dashboard.dashboard--board-pdf-only .dashboard__bo
   cursor: pointer;
 }
 
+/* Label left, switch right — same shape as the rows of the main settings
+   modal (the switch itself is styled in Dashboard.css). */
 .board-view__styling-toggle {
   display: flex;
+  flex-direction: row-reverse;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin: 0.75rem 0;
   font-size: 0.875rem;
   color: var(--text-primary);
