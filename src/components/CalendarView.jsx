@@ -326,8 +326,8 @@ function EventModal({ event, onClose, onSave, onDelete }) {
 // Vertical focus-session scale drawn beside the timeline. It reads the focus
 // context on its own so a ticking session re-renders only this strip.
 function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin, color = FOCUS_SEG_COLOR }) {
-  const { sessions, active, workSeconds } = useFocus();
-  // Round to whole minutes: the live block only needs to move once a minute.
+  const { sessions, active, workSeconds, sessionStartedAt } = useFocus();
+  // Round to whole minutes: the live block only needs to grow once a minute.
   const liveMinutes = active ? Math.floor(workSeconds / 60) : 0;
 
   const segments = useMemo(() => {
@@ -340,11 +340,11 @@ function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin, color = FOCUS_S
       out.push({ startMin, endMin: startMin + Math.max(1, seconds / 60), live });
     };
     for (const s of sessions || []) add(s.started_at, s.duration_seconds || 0, false);
-    if (active && liveMinutes >= 1) {
-      add(new Date(Date.now() - liveMinutes * 60 * 1000), liveMinutes * 60, true);
+    if (active && sessionStartedAt && liveMinutes >= 1) {
+      add(sessionStartedAt, liveMinutes * 60, true);
     }
     return out.sort((a, b) => a.startMin - b.startMin);
-  }, [sessions, dateStr, active, liveMinutes]);
+  }, [sessions, dateStr, active, liveMinutes, sessionStartedAt]);
 
   return (
     <div className="calendar-day__focus" style={{ width: FOCUS_STRIP_W }}>

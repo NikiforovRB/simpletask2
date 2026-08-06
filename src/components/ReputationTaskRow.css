@@ -1,5 +1,7 @@
-/* The tint covers the whole promise, checkbox included. */
+/* The tint covers the whole promise, checkbox included. It needs to be stronger
+   on the dark theme to read as the same shade of red. */
 .rep-task {
+  --rep-tint: rgba(243, 55, 55, 0.12);
   position: relative;
   display: flex;
   align-items: center;
@@ -7,7 +9,11 @@
   min-height: 1.5rem;
   padding: 0.25rem 0.4rem;
   border-radius: 6px;
-  background: rgba(243, 55, 55, 0.12);
+  background: var(--rep-tint);
+}
+
+[data-theme='dark'] .rep-task {
+  --rep-tint: rgba(243, 55, 55, 0.22);
 }
 
 .rep-task--overlay {
@@ -85,7 +91,7 @@ button.rep-task__check--failed:hover {
   gap: 0.5rem;
   padding-left: 0.5rem;
   background-color: var(--bg-app);
-  background-image: linear-gradient(rgba(243, 55, 55, 0.12), rgba(243, 55, 55, 0.12));
+  background-image: linear-gradient(var(--rep-tint), var(--rep-tint));
   opacity: 0;
   transition: opacity 0.15s ease;
 }

@@ -104,7 +104,10 @@ const TASK_BAR_COLOR = '#15c466';
 const LIVE_ID = '__live__';
 
 export function FocusAnalytics() {
-  const { sessions, sessionsLoading, logSession, deleteSession, updateSession, active, workSeconds, target } = useFocus();
+  const {
+    sessions, sessionsLoading, logSession, deleteSession, updateSession,
+    active, workSeconds, sessionStartedAt, target,
+  } = useFocus();
   const [mounted, setMounted] = useState(false);
   const [selectedDay, setSelectedDay] = useState(toLocalDateString(new Date()));
   const [editingId, setEditingId] = useState(null);
@@ -149,21 +152,22 @@ export function FocusAnalytics() {
   // so totals update in real time while a focus timer is running.
   const allSessions = useMemo(() => {
     const base = sessions || [];
-    if (active && workSeconds >= 1) {
+    if (active && sessionStartedAt && workSeconds >= 1) {
       return [
         {
           id: LIVE_ID,
           task_title: target?.title || 'Фокус без задачи',
           duration_seconds: workSeconds,
-          // Back-dated so the session sits where it actually started.
-          started_at: new Date(Date.now() - workSeconds * 1000).toISOString(),
+          // The real start of the running session: deriving it from the elapsed
+          // time would drift over every pause and break.
+          started_at: sessionStartedAt,
           live: true,
         },
         ...base,
       ];
     }
     return base;
-  }, [sessions, active, workSeconds, target]);
+  }, [sessions, active, workSeconds, sessionStartedAt, target]);
 
   // Aggregate seconds per local day.
   const { byDay, totals } = useMemo(() => {
