@@ -120,11 +120,12 @@ button.rep-task__check--failed:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* Delete + drag handle, revealed on hover like on a task. The backdrop repeats
-   the row tint over the app background so it covers the text underneath. */
+/* Colour, spacing, delete and the drag handle, revealed on hover like on a
+   task. The backdrop repeats the row tint over the app background so it covers
+   the text underneath. */
 .rep-task__actions {
   position: absolute;
-  right: 0.4rem;
+  right: 0;
   top: 0;
   bottom: 0;
   display: flex;
@@ -143,15 +144,10 @@ button.rep-task__check--failed:hover {
   }
 }
 
-/* Without hover the buttons stay visible, so they take part in the row layout
-   instead of covering the end of the title. */
-@media (hover: none) {
-  .rep-task__actions {
-    position: static;
-    opacity: 1;
-    background: none;
-    padding-left: 0;
-  }
+/* Touch devices: the buttons start out hidden and are revealed by tapping the
+   row, then auto-hidden after 5s — the same as on a task. See the component. */
+.rep-task--actions-visible .rep-task__actions {
+  opacity: 1;
 }
 
 .rep-task__action-btn {

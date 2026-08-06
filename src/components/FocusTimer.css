@@ -352,8 +352,8 @@
   margin-top: 0.35rem;
 }
 
-/* Fade the digits back while the pause/stop buttons sit on top of them. Half
-   opacity darkens them on the dark theme and lightens them on the light one. */
+/* Fade the digits back while the stop button sits on top of them. Half opacity
+   darkens them on the dark theme and lightens them on the light one. */
 .focus-pill--digits .focus-pill__time {
   transition: opacity 0.16s ease;
 }
@@ -449,7 +449,7 @@
   opacity: 0.4;
 }
 
-/* Пауза + Завершить — appear over the dial / the digits on hover. */
+/* Завершить — appears over the dial / the digits on hover. */
 .focus-pill__actions {
   position: absolute;
   top: 50%;

@@ -11,14 +11,15 @@ export const DEFAULT_POMODORO_BREAK = 5;
 
 // How often the running session refreshes its heartbeat in the database.
 const HEARTBEAT_MS = 30 * 1000;
-// A running session whose heartbeat is older than this was abandoned (browser
-// closed, device asleep): on the next load it is logged up to its last
-// heartbeat instead of silently swallowing the whole gap.
-const STALE_MS = 30 * 60 * 1000;
-// Resuming a session that has been paused for longer than this starts a new
-// one. Otherwise a session forgotten in the paused state would be logged as
-// having spanned every hour until the day it is resumed.
-const RESUME_GAP_MS = 15 * 60 * 1000;
+// A stored session whose heartbeat is older than this is not being counted by
+// anybody: the tab was closed, the device went to sleep, or the row is left
+// over from a run that already ended somewhere else. It is finished off on the
+// next load instead of being picked up and carried on.
+const HEARTBEAT_GAP_MS = HEARTBEAT_MS * 3;
+// How much work we are willing to log for a session nobody ever stopped. A
+// timer left running for longer than this was forgotten, not worked, so it is
+// dropped rather than filed as one huge block that swamps the real numbers.
+const MAX_UNATTENDED_SECONDS = 3 * 60 * 60;
 
 const newSessionId = () => (
   globalThis.crypto?.randomUUID
@@ -31,14 +32,13 @@ const initialEngine = {
   mode: 'stopwatch', // 'stopwatch' | 'pomodoro'
   phase: 'work', // 'work' | 'break' (pomodoro only)
   running: false,
-  phaseBaseSeconds: 0, // elapsed seconds in current phase before the last resume
-  phaseStartTs: 0, // Date.now() of the last resume (0 when paused)
+  phaseBaseSeconds: 0, // elapsed seconds in the phase before it was last started
+  phaseStartTs: 0, // Date.now() of the phase start (0 when there is no session)
   workLoggedSeconds: 0, // completed work seconds (finished work phases)
   cycles: 0, // completed pomodoro work phases
   pomoWork: DEFAULT_POMODORO_WORK,
   pomoBreak: DEFAULT_POMODORO_BREAK,
   sessionStartedAt: null, // ISO of when the current session began
-  lastWorkTs: 0, // Date.now() of the last moment the timer was counting
 };
 
 /** Work seconds a stored active-session row had accrued at `endMs`. */
@@ -256,7 +256,7 @@ export function FocusProvider({ children }) {
   }, [persistActive]);
 
   // Adopt the session described by an active-session row (page load, or a
-  // session started/paused on another device).
+  // session started on another device).
   const applyRemoteRow = useCallback((row) => {
     engineRef.current = {
       sessionId: row.session_id || null,
@@ -270,12 +270,12 @@ export function FocusProvider({ children }) {
       pomoWork: row.pomo_work || DEFAULT_POMODORO_WORK,
       pomoBreak: row.pomo_break || DEFAULT_POMODORO_BREAK,
       sessionStartedAt: row.session_started_at,
-      // A running session is counting right now; a paused one last counted when
-      // it was written, which is the moment it was paused.
-      lastWorkTs: row.running
-        ? Date.now()
-        : (Date.parse(row.updated_at || row.last_seen_at) || Date.now()),
     };
+    // The row already exists, so our writes for it must only ever patch it. A
+    // device that adopted a session and then missed its stop would otherwise
+    // recreate the row on its next heartbeat, and that zombie row is what later
+    // gets logged a second time.
+    persistedIdRef.current = row.session_id || null;
     setTarget(row.target_ref || row.target_title
       ? { ref: row.target_ref, title: row.target_title, source: row.target_source }
       : null);
@@ -327,85 +327,53 @@ export function FocusProvider({ children }) {
       // Don't clobber a session the user has already started in this tab.
       if (engineRef.current.sessionStartedAt) return;
 
-      const lastSeen = new Date(data.last_seen_at).getTime();
-      const abandoned = data.running && Date.now() - lastSeen > STALE_MS;
-      if (abandoned) {
-        // Log the work up to the last heartbeat — but only over a stretch that
-        // holds no finished sessions yet. Two sessions can never run at once,
-        // so an overlap means this run was already stopped somewhere else and
-        // counting it again would inflate the totals.
-        const { data: latest } = await supabase
-          .from('focus_sessions')
-          .select('ended_at')
-          .eq('user_id', userId)
-          .order('ended_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const loggedUntil = latest?.ended_at ? Date.parse(latest.ended_at) : NaN;
-        const startMs = Math.max(
-          Date.parse(data.session_started_at) || 0,
-          Number.isFinite(loggedUntil) ? loggedUntil : 0,
-        );
-        const seconds = Math.min(
-          rowWorkSeconds(data, lastSeen),
-          Math.max(0, (lastSeen - startMs) / 1000),
-        );
-        if (seconds >= 60) {
-          await logSession({
-            taskRef: data.target_ref ?? null,
-            taskTitle: data.target_title || 'Фокус без задачи',
-            source: data.target_source || 'custom',
-            mode: data.mode,
-            durationSeconds: seconds,
-            startedAt: new Date(startMs).toISOString(),
-            endedAt: new Date(lastSeen).toISOString(),
-          });
-        }
-        await supabase.from('focus_active_sessions').delete().eq('user_id', userId);
+      // A live heartbeat means the session is genuinely still running (here or
+      // on another device), so we join it and keep counting.
+      const lastSeen = Date.parse(data.last_seen_at);
+      const watched = data.running
+        && Number.isFinite(lastSeen)
+        && Date.now() - lastSeen <= HEARTBEAT_GAP_MS;
+      if (watched) {
+        applyRemoteRow(data);
         return;
       }
 
-      // A shorter break in the heartbeat means the timer was not being watched
-      // for a while (tab closed, device asleep). Crediting that gap as focus
-      // time would overstate the day, so the session comes back paused at its
-      // last heartbeat and the user decides whether to carry on.
-      const gap = data.running && Date.now() - lastSeen > HEARTBEAT_MS * 3;
-      if (gap) {
-        const resumedAt = Date.parse(data.phase_start_at);
-        const liveAtLastSeen = Number.isFinite(resumedAt)
-          ? Math.max(0, (lastSeen - resumedAt) / 1000)
-          : 0;
-        applyRemoteRow({
-          ...data,
-          running: false,
-          phase_base_seconds: (data.phase_base_seconds || 0) + liveAtLastSeen,
-          phase_start_at: null,
-          updated_at: data.last_seen_at,
-        });
-        // Tell the other devices about the pause, keeping the stored target.
-        persistActive(
-          data.target_ref || data.target_title
-            ? { ref: data.target_ref, title: data.target_title, source: data.target_source }
-            : null,
-        );
-        return;
-      }
+      // Nobody is counting this session any more. Claim the row before writing
+      // anything: whoever removes it is the one that files the entry, so two
+      // devices opening the app cannot log the same session twice.
+      const endMs = Number.isFinite(lastSeen) ? lastSeen : Date.now();
+      const accrued = rowWorkSeconds(data, endMs);
+      if (!(await claimStop(data.session_id, data.session_started_at))) return;
 
-      applyRemoteRow(data);
+      // Log only over a stretch that holds no finished sessions yet: two
+      // sessions can never run at once, so an overlap means this run was
+      // already stopped elsewhere and counting it again would inflate totals.
+      const { data: latest } = await supabase
+        .from('focus_sessions')
+        .select('ended_at')
+        .eq('user_id', userId)
+        .order('ended_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const loggedUntil = latest?.ended_at ? Date.parse(latest.ended_at) : NaN;
+      const startMs = Math.max(
+        Date.parse(data.session_started_at) || 0,
+        Number.isFinite(loggedUntil) ? loggedUntil : 0,
+      );
+      const seconds = Math.min(accrued, Math.max(0, (endMs - startMs) / 1000));
+      if (seconds < 60 || seconds > MAX_UNATTENDED_SECONDS) return;
+      await logSession({
+        taskRef: data.target_ref ?? null,
+        taskTitle: data.target_title || 'Фокус без задачи',
+        source: data.target_source || 'custom',
+        mode: data.mode,
+        durationSeconds: seconds,
+        startedAt: new Date(startMs).toISOString(),
+        endedAt: new Date(endMs).toISOString(),
+      });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
-
-  const pause = useCallback(() => {
-    const eng = engineRef.current;
-    if (!eng.running) return;
-    eng.phaseBaseSeconds = liveElapsed(eng);
-    eng.running = false;
-    eng.phaseStartTs = 0;
-    eng.lastWorkTs = Date.now();
-    forceRender();
-    persistActive();
-  }, [forceRender, liveElapsed, persistActive]);
 
   // Total work seconds accrued this session (for logging): completed work
   // phases + current work-phase partial (stopwatch counts everything as work).
@@ -424,9 +392,6 @@ export function FocusProvider({ children }) {
     const startedAt = eng.sessionStartedAt;
     const sessionId = eng.sessionId;
     const mode = eng.mode;
-    // A paused session ended when it was paused, not when the user got round to
-    // pressing stop — otherwise the entry would claim every hour in between.
-    const endedMs = eng.running || !eng.lastWorkTs ? Date.now() : eng.lastWorkTs;
     engineRef.current = {
       ...initialEngine,
       mode,
@@ -438,7 +403,6 @@ export function FocusProvider({ children }) {
     const claimed = await claimStop(sessionId, startedAt);
     if (!claimed) return 0;
     if (workSeconds >= 1) {
-      const startedMs = Date.parse(startedAt);
       await logSession({
         taskRef: target?.ref ?? null,
         taskTitle: target?.title ?? 'Фокус без задачи',
@@ -446,7 +410,7 @@ export function FocusProvider({ children }) {
         mode,
         durationSeconds: workSeconds,
         startedAt,
-        endedAt: new Date(Math.max(endedMs, startedMs || endedMs)).toISOString(),
+        endedAt: new Date().toISOString(),
       });
     }
     return workSeconds;
@@ -455,22 +419,15 @@ export function FocusProvider({ children }) {
   const start = useCallback(() => {
     const eng = engineRef.current;
     if (eng.running) return;
-    // Picking the timer up again long after it was paused is new work: close the
-    // old session (it ended at the pause) and count from here.
-    if (eng.sessionStartedAt && eng.lastWorkTs && Date.now() - eng.lastWorkTs > RESUME_GAP_MS) {
-      stopAndLog();
-    }
-    const next = engineRef.current;
-    next.running = true;
-    next.phaseStartTs = Date.now();
-    next.lastWorkTs = Date.now();
-    if (!next.sessionStartedAt) {
-      next.sessionStartedAt = new Date().toISOString();
-      next.sessionId = newSessionId();
+    eng.running = true;
+    eng.phaseStartTs = Date.now();
+    if (!eng.sessionStartedAt) {
+      eng.sessionStartedAt = new Date().toISOString();
+      eng.sessionId = newSessionId();
     }
     forceRender();
     persistActive();
-  }, [forceRender, persistActive, stopAndLog]);
+  }, [forceRender, persistActive]);
 
   const stopAndClose = useCallback(async () => {
     await stopAndLog();
@@ -512,7 +469,6 @@ export function FocusProvider({ children }) {
       pomoBreak: eng.pomoBreak,
       running: true,
       phaseStartTs: Date.now(),
-      lastWorkTs: Date.now(),
       sessionStartedAt: new Date().toISOString(),
       sessionId: newSessionId(),
     };
@@ -578,7 +534,6 @@ export function FocusProvider({ children }) {
     startQuick,
     minimize,
     start,
-    pause,
     stopAndLog,
     stopAndClose,
     setMode,

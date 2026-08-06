@@ -50,14 +50,6 @@ function PlayIcon() {
   );
 }
 
-function PauseIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path d="M5.5 3.5v9M10.5 3.5v9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function StopIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
@@ -67,30 +59,13 @@ function StopIcon() {
 }
 
 /**
- * Pause/resume and stop, revealed on hover over a minimized timer so a session
- * can be handled without opening the overlay.
+ * Stop, revealed on hover over a minimized timer so a session can be finished
+ * without opening the overlay. A running session is only ever stopped — there
+ * is no pausing, so its logged time always matches the clock.
  */
-function PillActions({ running, onPause, onResume, onStop }) {
+function PillActions({ onStop }) {
   return (
     <div className="focus-pill__actions">
-      <button
-        type="button"
-        className="focus-pill__action"
-        onClick={running ? onPause : onResume}
-        aria-label={running ? 'Пауза' : 'Продолжить'}
-        title={running ? 'Пауза' : 'Продолжить'}
-      >
-        {running ? (
-          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
-            <rect x="5.5" y="4.5" width="2.5" height="9" rx="1.25" fill="currentColor" />
-            <rect x="10" y="4.5" width="2.5" height="9" rx="1.25" fill="currentColor" />
-          </svg>
-        ) : (
-          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
-            <path d="M6.5 4.6l7 4.4-7 4.4V4.6z" fill="currentColor" />
-          </svg>
-        )}
-      </button>
       <button
         type="button"
         className="focus-pill__action"
@@ -119,10 +94,10 @@ export function FocusTimer({ showTodayTotal = false }) {
     }
   };
   const {
-    open, active, target, mode, phase, running,
+    open, active, target, mode, phase,
     phaseElapsed, phaseTarget, phaseRemaining, workSeconds, cycles,
     pomoWork, pomoBreak, sessions,
-    minimize, start, pause, stopAndClose, setMode, setPomoConfig, skipPhase, openFocus,
+    minimize, start, stopAndClose, setMode, setPomoConfig, skipPhase, openFocus,
   } = focus;
 
   const isPomo = mode === 'pomodoro';
@@ -170,7 +145,7 @@ export function FocusTimer({ showTodayTotal = false }) {
       : (isPomo && phase === 'break' ? 'перерыв' : 'фокус');
     return (
       <div
-        className={`focus-pill ${running ? 'focus-pill--running' : 'focus-pill--paused'}${isDial ? ' focus-pill--expanded' : ''}${isDigits ? ' focus-pill--digits' : ''}`}
+        className={`focus-pill focus-pill--running${isDial ? ' focus-pill--expanded' : ''}${isDigits ? ' focus-pill--digits' : ''}`}
       >
         <div className="focus-pill__row">
           <button
@@ -223,13 +198,11 @@ export function FocusTimer({ showTodayTotal = false }) {
                 />
               ))}
             </svg>
-            <PillActions running={running} onPause={pause} onResume={start} onStop={stopAndClose} />
+            <PillActions onStop={stopAndClose} />
           </div>
         )}
 
-        {isDigits && (
-          <PillActions running={running} onPause={pause} onResume={start} onStop={stopAndClose} />
-        )}
+        {isDigits && <PillActions onStop={stopAndClose} />}
       </div>
     );
   }
@@ -328,15 +301,10 @@ export function FocusTimer({ showTodayTotal = false }) {
         )}
 
         <div className="focus-card__controls">
-          {!running ? (
+          {!active && (
             <button type="button" className="focus-card__btn focus-card__btn--primary" onClick={start}>
               <PlayIcon />
-              {active ? 'Продолжить' : 'Старт'}
-            </button>
-          ) : (
-            <button type="button" className="focus-card__btn focus-card__btn--primary" onClick={pause}>
-              <PauseIcon />
-              Пауза
+              Старт
             </button>
           )}
           {isPomo && active && (

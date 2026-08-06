@@ -79,6 +79,44 @@ export function ReputationTaskRow({
   const colorButtonRef = useRef(null);
   const cancelEditRef = useRef(false);
 
+  // Without hover the buttons start out hidden, like a task's: tapping the row
+  // reveals them, and they go away again after 5 seconds.
+  const [touchActionsVisible, setTouchActionsVisible] = useState(false);
+  const hideTimerRef = useRef(null);
+
+  const clearHideTimer = () => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  };
+
+  const scheduleHide = () => {
+    clearHideTimer();
+    hideTimerRef.current = setTimeout(() => {
+      setTouchActionsVisible(false);
+      hideTimerRef.current = null;
+    }, 5000);
+  };
+
+  const revealTouchActions = () => {
+    if (hasHover) return;
+    setTouchActionsVisible(true);
+    scheduleHide();
+  };
+
+  useEffect(() => () => clearHideTimer(), []);
+
+  // The buttons stay put while the colour picker is open, and the countdown
+  // starts over once it closes.
+  const setColorPickerOpen = (open) => {
+    setShowColorPicker(open);
+    if (hasHover) return;
+    setTouchActionsVisible(true);
+    if (open) clearHideTimer();
+    else scheduleHide();
+  };
+
   const resizeInput = () => {
     const el = inputRef.current;
     if (!el) return;
@@ -101,7 +139,7 @@ export function ReputationTaskRow({
     const onDown = (e) => {
       if (colorPickerRef.current?.contains(e.target)) return;
       if (colorButtonRef.current?.contains(e.target)) return;
-      setShowColorPicker(false);
+      setColorPickerOpen(false);
     };
     document.addEventListener('pointerdown', onDown);
     return () => document.removeEventListener('pointerdown', onDown);
@@ -147,9 +185,9 @@ export function ReputationTaskRow({
 
   return (
     <div
-      className={`rep-task rep-task--${state}${overlay ? ' rep-task--overlay' : ''}${isCompleted ? ' rep-task--completed' : ''}${editing ? ' rep-task--editing' : ''}`}
+      className={`rep-task rep-task--${state}${overlay ? ' rep-task--overlay' : ''}${isCompleted ? ' rep-task--completed' : ''}${editing ? ' rep-task--editing' : ''}${touchActionsVisible ? ' rep-task--actions-visible' : ''}`}
     >
-      <div className="rep-task__row">
+      <div className="rep-task__row" onClick={revealTouchActions}>
         {promise.kind === 'yesno' ? (
           <button
             type="button"
@@ -194,7 +232,7 @@ export function ReputationTaskRow({
                 className="rep-task__color-btn"
                 ref={colorButtonRef}
                 style={{ background: color }}
-                onClick={() => setShowColorPicker((v) => !v)}
+                onClick={() => setColorPickerOpen(!showColorPicker)}
                 aria-label="Цвет текста"
               />
             </span>
@@ -247,7 +285,7 @@ export function ReputationTaskRow({
                   style={{ background: c }}
                   onClick={() => {
                     onUpdate?.(promise.id, { text_color: c });
-                    setShowColorPicker(false);
+                    setColorPickerOpen(false);
                   }}
                 />
               </span>
