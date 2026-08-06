@@ -51,6 +51,7 @@ import { GoalPlanView } from '../components/GoalPlanView';
 import { CalendarView } from '../components/CalendarView';
 import { TodayFocusTotal, FocusQuickStart } from '../components/TodayFocusTotal';
 import { ReputationView } from '../components/ReputationView';
+import { ReputationTaskRow } from '../components/ReputationTaskRow';
 import { NoDateList } from '../components/NoDateList';
 import { SomedayList } from '../components/SomedayList';
 import { ProjectList } from '../components/ProjectList';
@@ -60,6 +61,7 @@ import { useFocus } from '../contexts/FocusContext';
 import { useReminderScheduler } from '../hooks/useReminderScheduler';
 import { registerReminderServiceWorker } from '../lib/reminders';
 import { getContainerId, getContainerIdForBucket, getContainerIdFromTask, parseContainerId } from '../lib/dnd';
+import { anchorForIndex, mergeDayItems, parseRepDndId } from '../lib/dayItems';
 import { toLocalDateString } from '../constants';
 import { parseSlotId } from '../components/DropSlot';
 import {
@@ -325,7 +327,11 @@ export default function Dashboard() {
   } = useSettings();
   const { dayHours, setDayHours, resetDayHours } = useCalendarDayHours();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
-  const { promises: reputationPromises, updatePromise: updateReputationPromise } = useReputation();
+  const {
+    promises: reputationPromises,
+    updatePromise: updateReputationPromise,
+    deletePromise: deleteReputationPromise,
+  } = useReputation();
   const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
   const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
   const {
@@ -1041,6 +1047,20 @@ export default function Dashboard() {
     [tasks, addTask, updateTask]
   );
 
+  // Tasks and reputation promises of one day list, in the order they are shown.
+  // Promise anchors live in this list's index space, so a drop can be turned
+  // into an anchor between two neighbours.
+  const getDayItems = useCallback(
+    (containerId) => {
+      const c = parseContainerId(containerId);
+      if (!c || c.completed || c.parent_id || (c.list_type ?? 'inbox') !== 'inbox' || !c.scheduled_date) return null;
+      const dayTasks = getTasksInContainer(tasks, containerId);
+      const promises = reputationPromises.filter((p) => p.promise_date === c.scheduled_date);
+      return { date: c.scheduled_date, items: mergeDayItems(dayTasks, promises) };
+    },
+    [tasks, reputationPromises],
+  );
+
   const handleDragEnd = useCallback(
     async (event) => {
       const { active, over } = event;
@@ -1061,12 +1081,29 @@ export default function Dashboard() {
         return;
       }
       if (!over) return;
+      const droppedBelowMiddle = () => {
+        const translated = active.rect.current.translated;
+        const overMiddleY = over.rect.top + over.rect.height / 2;
+        const pointerY = translated ? translated.top + translated.height / 2 : overMiddleY;
+        return pointerY > overMiddleY;
+      };
       let containerId;
-      let index;
+      let index; // insertion index among the tasks of the container
+      let mergedIndex; // insertion index among the tasks *and* promises of a day
       const slot = parseSlotId(over.id);
+      const overPromiseId = parseRepDndId(over.id);
       if (slot) {
         containerId = slot.containerId;
         index = slot.index;
+      } else if (overPromiseId) {
+        const overPromise = reputationPromises.find((p) => p.id === overPromiseId);
+        if (!overPromise) return;
+        containerId = getContainerId(overPromise.promise_date, null, false);
+        const day = getDayItems(containerId);
+        if (!day) return;
+        const at = day.items.findIndex((it) => it.promise?.id === overPromiseId);
+        if (at < 0) return;
+        mergedIndex = at + (droppedBelowMiddle() ? 1 : 0);
       } else {
         const overTask = tasks.find((t) => t.id === over.id);
         if (!overTask) return;
@@ -1074,11 +1111,44 @@ export default function Dashboard() {
         const list = getTasksInContainer(tasks, containerId);
         const idx = list.findIndex((t) => t.id === over.id);
         if (idx < 0) return;
-        const translated = active.rect.current.translated;
-        const overMiddleY = over.rect.top + over.rect.height / 2;
-        const pointerY = translated ? translated.top + translated.height / 2 : overMiddleY;
-        index = idx + (pointerY > overMiddleY ? 1 : 0);
+        index = idx + (droppedBelowMiddle() ? 1 : 0);
       }
+
+      // A promise row was dragged: only its anchor inside the day list (and,
+      // across day cards, its date) changes — the tasks stay untouched.
+      const draggedPromiseId = parseRepDndId(active.id);
+      if (draggedPromiseId) {
+        const moved = reputationPromises.find((p) => p.id === draggedPromiseId);
+        const day = getDayItems(containerId);
+        if (!moved || !day) return;
+        let at = mergedIndex;
+        if (at == null) {
+          // Dropped on a slot line, which is drawn right above its task.
+          const taskAt = day.items.findIndex((it) => it.kind === 'task' && it.anchor === index);
+          at = taskAt < 0 ? day.items.length : taskAt;
+        }
+        const selfAt = day.items.findIndex((it) => it.promise?.id === draggedPromiseId);
+        if (selfAt >= 0 && selfAt < at) at -= 1;
+        const rest = day.items.filter((it) => it.promise?.id !== draggedPromiseId);
+        const patch = { list_position: anchorForIndex(rest, at) };
+        if (moved.promise_date !== day.date) {
+          const sameDay = reputationPromises.filter((p) => p.promise_date === day.date);
+          patch.promise_date = day.date;
+          patch.position = sameDay.length ? Math.max(...sameDay.map((p) => p.position ?? 0)) + 1 : 0;
+        }
+        updateReputationPromise(draggedPromiseId, patch);
+        return;
+      }
+
+      // A task dropped on a promise row lands where that row is.
+      if (index == null) {
+        const day = getDayItems(containerId);
+        if (!day) return;
+        index = day.items
+          .slice(0, mergedIndex)
+          .filter((it) => it.kind === 'task' && it.task.id !== active.id).length;
+      }
+
       const movedTask = tasks.find((t) => t.id === active.id);
       if (!movedTask) return;
       const targetConfig = parseContainerId(containerId);
@@ -1122,7 +1192,7 @@ export default function Dashboard() {
         }
       });
     },
-    [tasks, projects, habits, moveTask, updateTask, reorderProjects, reorderHabits]
+    [tasks, projects, habits, moveTask, updateTask, reorderProjects, reorderHabits, reputationPromises, updateReputationPromise, getDayItems]
   );
 
   const sensors = useSensors(
@@ -1159,6 +1229,10 @@ export default function Dashboard() {
   );
 
   const activeTask = activeDragId ? tasks.find((t) => t.id === activeDragId) : null;
+  const activeDragPromise = useMemo(() => {
+    const id = parseRepDndId(activeDragId);
+    return id ? reputationPromises.find((p) => p.id === id) : null;
+  }, [activeDragId, reputationPromises]);
 
   // Pointer-down on the right-edge resize handle of the side menu. Tracks
   // pointer movement against `window` so the drag survives the cursor
@@ -2309,6 +2383,7 @@ export default function Dashboard() {
               allowListCollapse={viewMode === 'plans'}
               reputationPromises={reputationByDate?.get(toLocalDateString(date))}
               onUpdateReputation={updateReputationPromise}
+              onDeleteReputation={deleteReputationPromise}
             />
           ))}
         </div>
@@ -2328,6 +2403,7 @@ export default function Dashboard() {
           resetDayHours={resetDayHours}
           reputationByDate={reputationByDate}
           onUpdateReputation={updateReputationPromise}
+          onDeleteReputation={deleteReputationPromise}
           completedVisible={completedVisible}
           recentCompletedIds={recentCompletedIds}
           getListCollapsed={getListCollapsed}
@@ -2545,6 +2621,10 @@ export default function Dashboard() {
                 <span className="task-item__title" style={{ color: activeTask.text_color || '#e0e0e0' }}>{activeTask.title}</span>
               </div>
             </div>
+          </div>
+        ) : activeDragPromise ? (
+          <div className="draggable-task draggable-task--overlay" style={{ cursor: 'grabbing', pointerEvents: 'none' }}>
+            <ReputationTaskRow promise={activeDragPromise} overlay />
           </div>
         ) : activeProjectDrag ? (
           <div className="dashboard-menu__project-drag-overlay" style={{ cursor: 'grabbing', pointerEvents: 'none' }}>

@@ -6,7 +6,8 @@ import { useFocus } from '../contexts/FocusContext';
 import { CalendarPopover } from './CalendarPopover';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
-import { ReputationInlineList } from './ReputationInlineList';
+import { SortableReputationRow } from './ReputationTaskRow';
+import { mergeDayItems } from '../lib/dayItems';
 import { getContainerId } from '../lib/dnd';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
@@ -371,7 +372,7 @@ function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin, color = FOCUS_S
 function CalendarDayColumn({
   date, tasks, startHour, endHour, customHours, hourHeight, now, showCheckboxes, twoColumns, focusScale, focusColor,
   completedVisible, recentCompletedIds, getListCollapsed, setListCollapsed,
-  reputationPromises, onUpdateReputation,
+  reputationPromises, onUpdateReputation, onDeleteReputation,
   onUpdateTiming, onOpenModal, onAddTaskAt, onSetHours, onResetHours, taskHandlers,
 }) {
   const dateStr = toLocalDateString(date);
@@ -387,9 +388,20 @@ function CalendarDayColumn({
   const hasHover = useMediaQuery('(hover: hover)');
   const [plusHover, setPlusHover] = useState(false);
 
-  const noTimeTasks = tasks
-    .filter((t) => !t.parent_id && !t.completed_at && t.scheduled_date === dateStr && (t.list_type || 'inbox') === 'inbox' && !t.scheduled_time)
+  // Drop slots and promise anchors are indexed against every open task of the
+  // day, timed ones included, so they mean the same thing here as in Plans.
+  const dayTasks = tasks
+    .filter((t) => !t.parent_id && !t.completed_at && t.scheduled_date === dateStr && (t.list_type || 'inbox') === 'inbox')
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+  const noTimeTasks = dayTasks.filter((t) => !t.scheduled_time);
+
+  const dayItems = mergeDayItems(
+    noTimeTasks,
+    reputationPromises,
+    (task) => dayTasks.indexOf(task),
+    dayTasks.length,
+  );
 
   // Every completed task of the day, timed ones included: they keep their slot
   // on the timeline and are listed here as well, just like in Plans.
@@ -617,32 +629,42 @@ function CalendarDayColumn({
       <div className="calendar-day__body">
         <div className="calendar-day__lists">
           <ul className="calendar-day__notime">
-            <SortableContext items={noTimeTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-              {noTimeTasks.map((task, i) => (
-                <li key={task.id}>
-                  <DropSlot id={containerId} index={i} />
-                  <SortableTask
-                    task={task}
-                    containerId={containerId}
-                    subtasks={taskHandlers.getSubtasks(task.id)}
-                    getSubtasks={taskHandlers.getSubtasks}
-                    onToggle={taskHandlers.onToggle}
-                    onUpdate={taskHandlers.onUpdate}
-                    onDelete={taskHandlers.onDelete}
-                    onAddSubtask={taskHandlers.onAddSubtask}
-                    onTaskContextMenu={taskHandlers.onTaskContextMenu}
-                    editingTaskId={taskHandlers.editingTaskId}
-                    onEditingTaskConsumed={taskHandlers.onEditingTaskConsumed}
-                    onCreateSiblingTask={taskHandlers.onCreateSiblingTask}
-                    onCreateSiblingSubtask={taskHandlers.onCreateSiblingSubtask}
-                    onCreateSubtaskAndEdit={taskHandlers.onCreateSubtaskAndEdit}
-                  />
+            <SortableContext items={dayItems.map((it) => it.dndId)} strategy={verticalListSortingStrategy}>
+              {dayItems.map((item) => (
+                <li key={item.dndId}>
+                  {item.kind === 'promise' ? (
+                    <SortableReputationRow
+                      promise={item.promise}
+                      containerId={containerId}
+                      onUpdate={onUpdateReputation}
+                      onDelete={onDeleteReputation}
+                    />
+                  ) : (
+                    <>
+                      <DropSlot id={containerId} index={item.anchor} />
+                      <SortableTask
+                        task={item.task}
+                        containerId={containerId}
+                        subtasks={taskHandlers.getSubtasks(item.task.id)}
+                        getSubtasks={taskHandlers.getSubtasks}
+                        onToggle={taskHandlers.onToggle}
+                        onUpdate={taskHandlers.onUpdate}
+                        onDelete={taskHandlers.onDelete}
+                        onAddSubtask={taskHandlers.onAddSubtask}
+                        onTaskContextMenu={taskHandlers.onTaskContextMenu}
+                        editingTaskId={taskHandlers.editingTaskId}
+                        onEditingTaskConsumed={taskHandlers.onEditingTaskConsumed}
+                        onCreateSiblingTask={taskHandlers.onCreateSiblingTask}
+                        onCreateSiblingSubtask={taskHandlers.onCreateSiblingSubtask}
+                        onCreateSubtaskAndEdit={taskHandlers.onCreateSubtaskAndEdit}
+                      />
+                    </>
+                  )}
                 </li>
               ))}
-              <li><DropSlot id={containerId} index={noTimeTasks.length} /></li>
+              <li><DropSlot id={containerId} index={dayTasks.length} /></li>
             </SortableContext>
           </ul>
-          <ReputationInlineList promises={reputationPromises} onUpdate={onUpdateReputation} />
 
           {completedVisible && completedTasks.length > 0 && (
             <div className="calendar-day__completed">
@@ -784,7 +806,7 @@ export function CalendarView({
   focusScale = false, focusColor = FOCUS_SEG_COLOR,
   dayHours = {}, setDayHours, resetDayHours,
   completedVisible = true, recentCompletedIds, getListCollapsed, setListCollapsed,
-  reputationByDate, onUpdateReputation,
+  reputationByDate, onUpdateReputation, onDeleteReputation,
   addTask, updateTask, deleteTask,
   onToggle, onAddTaskAt, onAddSubtask, onTaskContextMenu,
   editingTaskId, onEditingTaskConsumed,
@@ -853,6 +875,7 @@ export function CalendarView({
               setListCollapsed={setListCollapsed}
               reputationPromises={reputationByDate?.get(dateStr)}
               onUpdateReputation={onUpdateReputation}
+              onDeleteReputation={onDeleteReputation}
               onUpdateTiming={updateTiming}
               onOpenModal={setEditingEvent}
               onAddTaskAt={onAddTaskAt}

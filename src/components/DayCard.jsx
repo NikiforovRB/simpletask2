@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
-import { ReputationInlineList } from './ReputationInlineList';
+import { SortableReputationRow } from './ReputationTaskRow';
 import { getContainerId } from '../lib/dnd';
+import { mergeDayItems } from '../lib/dayItems';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DEFAULT_TASK_COLOR, formatDayLabel, toLocalDateString } from '../constants';
 import plusIcon from '../assets/plus.svg';
@@ -33,6 +34,7 @@ export function DayCard({
   allowListCollapse = false,
   reputationPromises,
   onUpdateReputation,
+  onDeleteReputation,
 }) {
   const dateStr = toLocalDateString(date);
   const dayKey = `day_${dateStr}`;
@@ -66,6 +68,12 @@ export function DayCard({
       return ca === cb ? (a.position ?? 0) - (b.position ?? 0) : (ca < cb ? -1 : 1);
     }),
     [tasks, dateStr]
+  );
+
+  // Tasks with the day's reputation promises interleaved at their anchors.
+  const dayItems = useMemo(
+    () => mergeDayItems(mainTasks, reputationPromises),
+    [mainTasks, reputationPromises],
   );
 
   const getSubtasks = (parentId) => (byParent.get(parentId) || []).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
@@ -102,32 +110,42 @@ export function DayCard({
         <>
       <div className="day-card__section">
             <ul className="day-card__list">
-              <SortableContext items={mainTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                {mainTasks.map((task, i) => (
-                  <li key={task.id}>
-                    <DropSlot id={getContainerId(dateStr, null, false)} index={i} />
-                    <SortableTask
-                      task={task}
-                      containerId={getContainerId(dateStr, null, false)}
-                      subtasks={getSubtasks(task.id)}
-                      getSubtasks={getSubtasks}
-                      onToggle={onToggle}
-                      onUpdate={onUpdate}
-                      onDelete={onDelete}
-                      onAddSubtask={onAddSubtask}
-                      onTaskContextMenu={onTaskContextMenu}
-                      editingTaskId={editingTaskId}
-                      onEditingTaskConsumed={onEditingTaskConsumed}
-                      onCreateSiblingTask={onCreateSiblingTask}
-                      onCreateSiblingSubtask={onCreateSiblingSubtask}
-                      onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
-                    />
+              <SortableContext items={dayItems.map((it) => it.dndId)} strategy={verticalListSortingStrategy}>
+                {dayItems.map((item) => (
+                  <li key={item.dndId}>
+                    {item.kind === 'promise' ? (
+                      <SortableReputationRow
+                        promise={item.promise}
+                        containerId={getContainerId(dateStr, null, false)}
+                        onUpdate={onUpdateReputation}
+                        onDelete={onDeleteReputation}
+                      />
+                    ) : (
+                      <>
+                        <DropSlot id={getContainerId(dateStr, null, false)} index={item.anchor} />
+                        <SortableTask
+                          task={item.task}
+                          containerId={getContainerId(dateStr, null, false)}
+                          subtasks={getSubtasks(item.task.id)}
+                          getSubtasks={getSubtasks}
+                          onToggle={onToggle}
+                          onUpdate={onUpdate}
+                          onDelete={onDelete}
+                          onAddSubtask={onAddSubtask}
+                          onTaskContextMenu={onTaskContextMenu}
+                          editingTaskId={editingTaskId}
+                          onEditingTaskConsumed={onEditingTaskConsumed}
+                          onCreateSiblingTask={onCreateSiblingTask}
+                          onCreateSiblingSubtask={onCreateSiblingSubtask}
+                          onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
+                        />
+                      </>
+                    )}
                   </li>
                 ))}
               </SortableContext>
               <li><DropSlot id={getContainerId(dateStr, null, false)} index={mainTasks.length} /></li>
             </ul>
-            <ReputationInlineList promises={reputationPromises} onUpdate={onUpdateReputation} />
       </div>
 
       {completedVisible && completedTasks.length > 0 && (

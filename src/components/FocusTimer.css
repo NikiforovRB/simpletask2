@@ -352,6 +352,18 @@
   margin-top: 0.35rem;
 }
 
+/* Fade the digits back while the pause/stop buttons sit on top of them. Half
+   opacity darkens them on the dark theme and lightens them on the light one. */
+.focus-pill--digits .focus-pill__time {
+  transition: opacity 0.16s ease;
+}
+
+@media (hover: hover) {
+  .focus-pill--digits:hover .focus-pill__time {
+    opacity: 0.5;
+  }
+}
+
 .focus-pill__row {
   display: inline-flex;
   align-items: center;

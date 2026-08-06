@@ -1,0 +1,162 @@
+/* The tint covers the whole promise, checkbox included. */
+.rep-task {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.5rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(243, 55, 55, 0.12);
+}
+
+.rep-task--overlay {
+  cursor: grabbing;
+}
+
+.rep-task__check {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 4px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--border);
+  color: #fff;
+  transition: background 0.12s ease, transform 0.1s ease;
+}
+
+button.rep-task__check {
+  cursor: pointer;
+}
+
+button.rep-task__check:hover {
+  background: var(--border-strong);
+}
+
+button.rep-task__check:active {
+  transform: scale(0.92);
+}
+
+.rep-task__check--done,
+button.rep-task__check--done:hover {
+  background: var(--success);
+}
+
+.rep-task__check--failed,
+button.rep-task__check--failed:hover {
+  background: var(--danger);
+}
+
+.rep-task__title {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Gilroy Task', 'Gilroy', system-ui, sans-serif;
+  font-weight: var(--task-font-weight, 500);
+  font-size: calc(0.9375rem * var(--task-font-scale, 1));
+  line-height: calc(1.5rem * var(--task-font-scale, 1));
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.rep-task--done .rep-task__title {
+  color: var(--text-dim);
+}
+
+.rep-task__metrics {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Delete + drag handle, revealed on hover like on a task. The backdrop repeats
+   the row tint over the app background so it covers the text underneath. */
+.rep-task__actions {
+  position: absolute;
+  right: 0.4rem;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 0.5rem;
+  background-color: var(--bg-app);
+  background-image: linear-gradient(rgba(243, 55, 55, 0.12), rgba(243, 55, 55, 0.12));
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+@media (hover: hover) {
+  .rep-task:hover .rep-task__actions {
+    opacity: 1;
+  }
+}
+
+/* Without hover the buttons stay visible, so they take part in the row layout
+   instead of covering the end of the title. */
+@media (hover: none) {
+  .rep-task__actions {
+    position: static;
+    opacity: 1;
+    background: none;
+    padding-left: 0;
+  }
+}
+
+.rep-task__action-btn {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rep-task__action-btn img,
+.rep-task__drag-handle img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.rep-task__drag-handle {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: var(--text-dim);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+
+.rep-task__drag-handle:active {
+  cursor: grabbing;
+}
+
+@media (max-width: 500px) {
+  .rep-task__drag-handle {
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0.2rem;
+    margin: -0.2rem;
+  }
+
+  .rep-task__drag-handle img {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+}
