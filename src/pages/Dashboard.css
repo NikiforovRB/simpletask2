@@ -342,6 +342,10 @@
   margin-bottom: 0.75rem;
 }
 
+.dashboard__settings-title--section {
+  margin-top: 1.1rem;
+}
+
 .dashboard__confirm-text {
   color: var(--text-primary);
   font-size: 0.9375rem;

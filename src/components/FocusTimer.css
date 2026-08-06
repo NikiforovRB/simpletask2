@@ -330,6 +330,28 @@
   padding: 0.7rem 1.1rem 0.9rem;
 }
 
+/* Digits-only mode: the time itself is the whole pill. */
+.focus-pill--digits {
+  border-radius: 24px;
+  padding: 0.35rem 1.25rem 0.5rem;
+}
+
+.focus-pill--digits .focus-pill__time {
+  font-size: clamp(3rem, 13vw, 5rem);
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.focus-pill--digits .focus-pill__row {
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.focus-pill--digits .focus-pill__toggle {
+  margin-top: 0.35rem;
+}
+
 .focus-pill__row {
   display: inline-flex;
   align-items: center;

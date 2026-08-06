@@ -96,6 +96,8 @@ export function useFocusSessions() {
       const clean = {};
       if (patch.duration_seconds != null) clean.duration_seconds = Math.max(0, Math.round(patch.duration_seconds));
       if (patch.task_title != null) clean.task_title = patch.task_title;
+      if (patch.started_at != null) clean.started_at = patch.started_at;
+      if (patch.ended_at != null) clean.ended_at = patch.ended_at;
       if (!Object.keys(clean).length) return;
       setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...clean } : s)));
       await supabase.from('focus_sessions').update(clean).eq('id', id).eq('user_id', user.id);

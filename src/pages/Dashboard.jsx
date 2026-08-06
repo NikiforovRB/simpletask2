@@ -319,6 +319,7 @@ export default function Dashboard() {
     setCalendarTwoColumns,
     setCalendarFocusScale,
     setCalendarFocusColor,
+    setFocusTimerShowTotal,
   } = useSettings();
   const { dayHours, setDayHours, resetDayHours } = useCalendarDayHours();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
@@ -2055,6 +2056,21 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
+            <div className="dashboard__settings-title dashboard__settings-title--section">Свёрнутый таймер фокуса</div>
+            <button
+              type="button"
+              className={`dashboard__settings-option ${!settings.focus_timer_show_total ? 'dashboard__settings-option--active' : ''}`}
+              onClick={() => setFocusTimerShowTotal(false)}
+            >
+              Время текущей сессии
+            </button>
+            <button
+              type="button"
+              className={`dashboard__settings-option ${settings.focus_timer_show_total ? 'dashboard__settings-option--active' : ''}`}
+              onClick={() => setFocusTimerShowTotal(true)}
+            >
+              Всего за сегодня
+            </button>
           </div>
         </div>
       )}
@@ -2450,7 +2466,7 @@ export default function Dashboard() {
         />
       )}
 
-      <FocusTimer />
+      <FocusTimer showTodayTotal={settings.focus_timer_show_total} />
 
       <DragOverlay
         dropAnimation={{

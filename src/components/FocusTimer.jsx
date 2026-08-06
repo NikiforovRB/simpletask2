@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useFocus } from '../contexts/FocusContext';
+import { toLocalDateString } from '../constants';
 import upIcon from '../assets/up.svg';
 import downIcon from '../assets/down.svg';
 import './FocusTimer.css';
@@ -21,17 +22,23 @@ const CIRC = 2 * Math.PI * RADIUS;
 // stroke-width = the full radius), so the dash offset sweeps a filled sector.
 const DIAL_R = 23.5;
 const DIAL_CIRC = 2 * Math.PI * DIAL_R;
-const PILL_MODE_KEY = 'focus_pill_expanded';
+// Minimized shapes, cycled by the small toggle: a compact pill, a card with
+// the hour dial, and oversized digits only.
+const PILL_MODES = ['compact', 'dial', 'digits'];
+const PILL_MODE_KEY = 'focus_pill_mode';
+const LEGACY_PILL_MODE_KEY = 'focus_pill_expanded';
 const DIAL_PLATE_COLOR = '#2e2e32';
 // One shade per hour of the session: the sweeping sector uses the current
 // hour's colour, while the already completed hour stays behind it as the plate.
 const DIAL_HOUR_COLORS = ['#5a86ee', '#3e65c2', '#264794', '#17306b'];
 
-function readPillExpanded() {
+function readPillMode() {
   try {
-    return localStorage.getItem(PILL_MODE_KEY) === '1';
+    const stored = localStorage.getItem(PILL_MODE_KEY);
+    if (PILL_MODES.includes(stored)) return stored;
+    return localStorage.getItem(LEGACY_PILL_MODE_KEY) === '1' ? 'dial' : 'compact';
   } catch {
-    return false;
+    return 'compact';
   }
 }
 
@@ -59,13 +66,14 @@ function StopIcon() {
   );
 }
 
-export function FocusTimer() {
+export function FocusTimer({ showTodayTotal = false }) {
   const focus = useFocus();
-  const [pillExpanded, setPillExpandedState] = useState(readPillExpanded);
-  const setPillExpanded = (v) => {
-    setPillExpandedState(v);
+  const [pillMode, setPillModeState] = useState(readPillMode);
+  const cyclePillMode = () => {
+    const next = PILL_MODES[(PILL_MODES.indexOf(pillMode) + 1) % PILL_MODES.length];
+    setPillModeState(next);
     try {
-      localStorage.setItem(PILL_MODE_KEY, v ? '1' : '0');
+      localStorage.setItem(PILL_MODE_KEY, next);
     } catch {
       /* storage unavailable — the mode just won't persist */
     }
@@ -73,31 +81,56 @@ export function FocusTimer() {
   const {
     open, active, target, mode, phase, running,
     phaseElapsed, phaseTarget, phaseRemaining, workSeconds, cycles,
-    pomoWork, pomoBreak,
+    pomoWork, pomoBreak, sessions,
     minimize, start, pause, stopAndClose, setMode, setPomoConfig, skipPhase, openFocus,
   } = focus;
 
   const isPomo = mode === 'pomodoro';
 
+  // Focus time already logged today, for the "today's total" display mode.
+  const loggedTodaySeconds = useMemo(() => {
+    if (!showTodayTotal) return 0;
+    const today = toLocalDateString(new Date());
+    let total = 0;
+    for (const s of sessions || []) {
+      const d = new Date(s.started_at);
+      if (Number.isNaN(d.getTime())) continue;
+      if (toLocalDateString(d) === today) total += s.duration_seconds || 0;
+    }
+    return total;
+  }, [showTodayTotal, sessions]);
+
   // Minimized floating pill — shown when a session is active but the overlay
-  // is closed, so the user can keep working and re-open it. Two shapes:
-  // a compact pill and an expanded card with an hour dial under the timer.
+  // is closed, so the user can keep working and re-open it. Three shapes:
+  // a compact pill, a card with the hour dial, and oversized digits.
   if (!open) {
     if (!active) return null;
+    const isDial = pillMode === 'dial';
+    const isDigits = pillMode === 'digits';
+    // Either the running session, or everything focused on today so far.
+    const totalSeconds = loggedTodaySeconds + workSeconds;
+    const shownSeconds = showTodayTotal
+      ? totalSeconds
+      : (isPomo ? (phaseRemaining ?? 0) : phaseElapsed);
     // The dial advances once a minute; CSS eases between the steps.
-    const dialMinutes = isPomo && phaseTarget !== Infinity
-      ? Math.min(Math.floor(phaseElapsed / 60), Math.round(phaseTarget / 60))
-      : Math.floor((phaseElapsed % 3600) / 60);
-    const dialTotal = isPomo && phaseTarget !== Infinity ? Math.max(1, Math.round(phaseTarget / 60)) : 60;
+    const dialSource = showTodayTotal ? totalSeconds : phaseElapsed;
+    const dialByPhase = isPomo && phaseTarget !== Infinity && !showTodayTotal;
+    const dialMinutes = dialByPhase
+      ? Math.min(Math.floor(dialSource / 60), Math.round(phaseTarget / 60))
+      : Math.floor((dialSource % 3600) / 60);
+    const dialTotal = dialByPhase ? Math.max(1, Math.round(phaseTarget / 60)) : 60;
     const dialFraction = Math.min(1, dialMinutes / dialTotal);
     // Pomodoro phases never run past an hour, so they always use the first shade.
-    const dialHour = isPomo && phaseTarget !== Infinity ? 0 : Math.floor(phaseElapsed / 3600);
+    const dialHour = dialByPhase ? 0 : Math.floor(dialSource / 3600);
     const lastShade = DIAL_HOUR_COLORS.length - 1;
     const dialFillColor = DIAL_HOUR_COLORS[Math.min(dialHour, lastShade)];
     const dialPlateColor = dialHour > 0 ? DIAL_HOUR_COLORS[Math.min(dialHour - 1, lastShade)] : DIAL_PLATE_COLOR;
+    const pillLabel = showTodayTotal
+      ? 'сегодня'
+      : (isPomo && phase === 'break' ? 'перерыв' : 'фокус');
     return (
       <div
-        className={`focus-pill ${running ? 'focus-pill--running' : 'focus-pill--paused'}${pillExpanded ? ' focus-pill--expanded' : ''}`}
+        className={`focus-pill ${running ? 'focus-pill--running' : 'focus-pill--paused'}${isDial ? ' focus-pill--expanded' : ''}${isDigits ? ' focus-pill--digits' : ''}`}
       >
         <div className="focus-pill__row">
           <button
@@ -105,25 +138,24 @@ export function FocusTimer() {
             className="focus-pill__main"
             onClick={() => openFocus(target, mode)}
             aria-label="Открыть таймер фокуса"
+            title={showTodayTotal ? 'Всего за сегодня' : undefined}
           >
-            <span className="focus-pill__dot" />
-            <span className="focus-pill__time">
-              {isPomo ? fmt(phaseRemaining ?? 0) : fmt(phaseElapsed)}
-            </span>
-            <span className="focus-pill__label">{isPomo && phase === 'break' ? 'перерыв' : 'фокус'}</span>
+            {!isDigits && <span className="focus-pill__dot" />}
+            <span className="focus-pill__time">{fmt(shownSeconds)}</span>
+            {!isDigits && <span className="focus-pill__label">{pillLabel}</span>}
           </button>
           <button
             type="button"
             className="focus-pill__toggle"
-            onClick={() => setPillExpanded(!pillExpanded)}
-            aria-label={pillExpanded ? 'Компактный вид' : 'Развернуть циферблат'}
-            title={pillExpanded ? 'Компактный вид' : 'Развернуть циферблат'}
+            onClick={cyclePillMode}
+            aria-label="Другой вид таймера"
+            title="Другой вид таймера"
           >
-            <img src={pillExpanded ? downIcon : upIcon} alt="" />
+            <img src={isDigits ? downIcon : upIcon} alt="" />
           </button>
         </div>
 
-        {pillExpanded && (
+        {isDial && (
           <div className="focus-pill__dial-wrap">
             <svg className="focus-pill__dial" viewBox="0 0 100 100" width="104" height="104" aria-hidden>
               <circle className="focus-pill__dial-plate" cx="50" cy="50" r="47" fill={dialPlateColor} />

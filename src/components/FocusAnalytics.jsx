@@ -65,10 +65,39 @@ function localDayOf(iso) {
   return toLocalDateString(d);
 }
 
+function hhmmOf(date) {
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
 function localTimeOf(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return hhmmOf(d);
+}
+
+/** End of a session: its stored end, or start + duration for older rows. */
+function sessionEnd(s) {
+  if (s.ended_at) {
+    const d = new Date(s.ended_at);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  const st = new Date(s.started_at);
+  if (Number.isNaN(st.getTime())) return null;
+  return new Date(st.getTime() + (s.duration_seconds || 0) * 1000);
+}
+
+function timeToMinutes(str) {
+  const [h, m] = String(str || '').split(':').map(Number);
+  if (!Number.isFinite(h)) return null;
+  return h * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+/** Seconds between two "HH:MM" marks; an earlier end means it ran past midnight. */
+function spanSeconds(startStr, endStr) {
+  const s = timeToMinutes(startStr);
+  const e = timeToMinutes(endStr);
+  if (s == null || e == null) return 0;
+  return ((e >= s ? e - s : e + 24 * 60 - s)) * 60;
 }
 
 const TASK_BAR_COLOR = '#15c466';
@@ -79,14 +108,13 @@ export function FocusAnalytics() {
   const [mounted, setMounted] = useState(false);
   const [selectedDay, setSelectedDay] = useState(toLocalDateString(new Date()));
   const [editingId, setEditingId] = useState(null);
-  const [editHours, setEditHours] = useState('');
-  const [editMinutes, setEditMinutes] = useState('');
+  const [editStart, setEditStart] = useState('12:00');
+  const [editEnd, setEditEnd] = useState('12:25');
   const [editTitle, setEditTitle] = useState('');
   const [adding, setAdding] = useState(false);
   const [addTitle, setAddTitle] = useState('');
-  const [addTime, setAddTime] = useState('12:00');
-  const [addHours, setAddHours] = useState('0');
-  const [addMinutes, setAddMinutes] = useState('25');
+  const [addStart, setAddStart] = useState('12:00');
+  const [addEnd, setAddEnd] = useState('12:25');
   // Day timeline: how many days, which hour window, and how far back we paged.
   const [tlDays, setTlDays] = useState(() => readStored(TL_KEYS.days, 7, 1, 7));
   const [tlStart, setTlStart] = useState(() => readStored(TL_KEYS.start, 6, 0, 23));
@@ -239,43 +267,52 @@ export function FocusAnalytics() {
     return { total: entry.total, tasks, sessions: orderedSessions };
   }, [byDay, selectedDay]);
 
+  // Both forms edit a start and an end mark; the duration follows from them.
+  const dayStartDate = (dayStr, timeStr) => {
+    const d = new Date(`${dayStr}T00:00:00`);
+    const mins = timeToMinutes(timeStr) ?? 12 * 60;
+    d.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+    return d;
+  };
+
   const startEdit = (s) => {
     setEditingId(s.id);
-    const secs = s.duration_seconds || 0;
-    setEditHours(String(Math.floor(secs / 3600)));
-    setEditMinutes(String(Math.round((secs % 3600) / 60)));
+    const st = new Date(s.started_at);
+    const en = sessionEnd(s);
+    setEditStart(Number.isNaN(st.getTime()) ? '12:00' : hhmmOf(st));
+    setEditEnd(en ? hhmmOf(en) : '12:25');
     setEditTitle(s.task_title || '');
   };
 
   const saveEdit = (id) => {
-    const h = parseInt(editHours, 10);
-    const m = parseInt(editMinutes, 10);
-    const totalSec = (Number.isFinite(h) ? Math.max(0, h) : 0) * 3600 + (Number.isFinite(m) ? Math.max(0, m) : 0) * 60;
-    updateSession(id, { duration_seconds: totalSec, task_title: editTitle });
+    const totalSec = spanSeconds(editStart, editEnd);
+    const start = dayStartDate(selectedDay, editStart);
+    const end = new Date(start.getTime() + totalSec * 1000);
+    updateSession(id, {
+      duration_seconds: totalSec,
+      task_title: editTitle,
+      started_at: start.toISOString(),
+      ended_at: end.toISOString(),
+    });
     setEditingId(null);
   };
 
   const openAdd = () => {
     const now = new Date();
     setAddTitle('');
-    setAddTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
-    setAddHours('0');
-    setAddMinutes('25');
+    setAddStart(hhmmOf(now));
+    setAddEnd(hhmmOf(new Date(now.getTime() + 25 * 60 * 1000)));
     setEditingId(null);
     setAdding(true);
   };
 
   const saveAdd = () => {
-    const h = parseInt(addHours, 10);
-    const m = parseInt(addMinutes, 10);
-    const totalSec = (Number.isFinite(h) ? Math.max(0, h) : 0) * 3600 + (Number.isFinite(m) ? Math.max(0, m) : 0) * 60;
+    const totalSec = spanSeconds(addStart, addEnd);
     if (totalSec < 1) {
       setAdding(false);
       return;
     }
-    const [hh, mm] = (addTime || '12:00').split(':').map((x) => parseInt(x, 10));
-    const start = new Date(`${selectedDay}T00:00:00`);
-    start.setHours(Number.isFinite(hh) ? hh : 12, Number.isFinite(mm) ? mm : 0, 0, 0);
+    const start = dayStartDate(selectedDay, addStart);
     const end = new Date(start.getTime() + totalSec * 1000);
     logSession({
       taskTitle: addTitle.trim() || 'Фокус',
@@ -497,35 +534,26 @@ export function FocusAnalytics() {
                     className="focus-analytics__session-input focus-analytics__session-input--time"
                     type="time"
                     step="300"
-                    value={addTime}
-                    onChange={(e) => setAddTime(e.target.value)}
+                    value={addStart}
+                    onChange={(e) => setAddStart(e.target.value)}
                     aria-label="Время начала"
                   />
+                  <span className="focus-analytics__session-unit">–</span>
+                  <input
+                    className="focus-analytics__session-input focus-analytics__session-input--time"
+                    type="time"
+                    step="300"
+                    value={addEnd}
+                    onChange={(e) => setAddEnd(e.target.value)}
+                    aria-label="Время завершения"
+                  />
+                  <span className="focus-analytics__session-unit">{fmtDuration(spanSeconds(addStart, addEnd))}</span>
                   <input
                     className="focus-analytics__session-input focus-analytics__session-input--title"
                     value={addTitle}
                     onChange={(e) => setAddTitle(e.target.value)}
                     placeholder="Название"
                   />
-                  <input
-                    className="focus-analytics__session-input focus-analytics__session-input--num"
-                    type="number"
-                    min="0"
-                    value={addHours}
-                    onChange={(e) => setAddHours(e.target.value)}
-                    aria-label="Часы"
-                  />
-                  <span className="focus-analytics__session-unit">ч</span>
-                  <input
-                    className="focus-analytics__session-input focus-analytics__session-input--num"
-                    type="number"
-                    min="0"
-                    max="59"
-                    value={addMinutes}
-                    onChange={(e) => setAddMinutes(e.target.value)}
-                    aria-label="Минуты"
-                  />
-                  <span className="focus-analytics__session-unit">мин</span>
                   <button type="button" className="focus-analytics__session-btn focus-analytics__session-btn--save" onClick={saveAdd}>
                     Добавить
                   </button>
@@ -545,30 +573,29 @@ export function FocusAnalytics() {
                   {editingId === s.id ? (
                     <div className="focus-analytics__session-edit">
                       <input
+                        className="focus-analytics__session-input focus-analytics__session-input--time"
+                        type="time"
+                        step="300"
+                        value={editStart}
+                        onChange={(e) => setEditStart(e.target.value)}
+                        aria-label="Время начала"
+                      />
+                      <span className="focus-analytics__session-unit">–</span>
+                      <input
+                        className="focus-analytics__session-input focus-analytics__session-input--time"
+                        type="time"
+                        step="300"
+                        value={editEnd}
+                        onChange={(e) => setEditEnd(e.target.value)}
+                        aria-label="Время завершения"
+                      />
+                      <span className="focus-analytics__session-unit">{fmtDuration(spanSeconds(editStart, editEnd))}</span>
+                      <input
                         className="focus-analytics__session-input focus-analytics__session-input--title"
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
                         placeholder="Название"
                       />
-                      <input
-                        className="focus-analytics__session-input focus-analytics__session-input--num"
-                        type="number"
-                        min="0"
-                        value={editHours}
-                        onChange={(e) => setEditHours(e.target.value)}
-                        aria-label="Часы"
-                      />
-                      <span className="focus-analytics__session-unit">ч</span>
-                      <input
-                        className="focus-analytics__session-input focus-analytics__session-input--num"
-                        type="number"
-                        min="0"
-                        max="59"
-                        value={editMinutes}
-                        onChange={(e) => setEditMinutes(e.target.value)}
-                        aria-label="Минуты"
-                      />
-                      <span className="focus-analytics__session-unit">мин</span>
                       <button type="button" className="focus-analytics__session-btn focus-analytics__session-btn--save" onClick={() => saveEdit(s.id)}>
                         Сохранить
                       </button>
@@ -578,7 +605,9 @@ export function FocusAnalytics() {
                     </div>
                   ) : (
                     <>
-                      <span className="focus-analytics__session-time">{localTimeOf(s.started_at)}</span>
+                      <span className="focus-analytics__session-time">
+                        {localTimeOf(s.started_at)}–{s.live ? hhmmOf(nowTick) : localTimeOf(sessionEnd(s)?.toISOString())}
+                      </span>
                       <span className="focus-analytics__session-name">{s.task_title || 'Без названия'}</span>
                       {s.live ? (
                         <span className="focus-analytics__session-live">идёт · {fmtDuration(s.duration_seconds)}</span>

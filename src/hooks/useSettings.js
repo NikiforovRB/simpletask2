@@ -60,6 +60,7 @@ export function useSettings() {
     calendar_two_columns: false,
     calendar_focus_scale: false,
     calendar_focus_color: FOCUS_SCALE_COLORS[0],
+    focus_timer_show_total: false,
   });
   const [loading, setLoading] = useState(true);
 
@@ -94,6 +95,7 @@ export function useSettings() {
           calendar_two_columns: data.calendar_two_columns === true,
           calendar_focus_scale: data.calendar_focus_scale === true,
           calendar_focus_color: normalizeFocusColor(data.calendar_focus_color),
+          focus_timer_show_total: data.focus_timer_show_total === true,
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -127,6 +129,7 @@ export function useSettings() {
           calendar_two_columns: false,
           calendar_focus_scale: false,
           calendar_focus_color: FOCUS_SCALE_COLORS[0],
+          focus_timer_show_total: false,
         });
       }
       setLoading(false);
@@ -244,6 +247,13 @@ export function useSettings() {
     await supabase.from('user_settings').update({ calendar_focus_color: val }).eq('user_id', user.id);
   };
 
+  const setFocusTimerShowTotal = async (v) => {
+    if (!user) return;
+    const val = !!v;
+    setSettings((s) => ({ ...s, focus_timer_show_total: val }));
+    await supabase.from('user_settings').update({ focus_timer_show_total: val }).eq('user_id', user.id);
+  };
+
   return {
     settings,
     setDaysCount,
@@ -262,6 +272,7 @@ export function useSettings() {
     setCalendarTwoColumns,
     setCalendarFocusScale,
     setCalendarFocusColor,
+    setFocusTimerShowTotal,
     loading,
   };
 }

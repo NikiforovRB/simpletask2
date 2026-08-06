@@ -16,7 +16,14 @@ const HEARTBEAT_MS = 30 * 1000;
 // heartbeat instead of silently swallowing the whole gap.
 const STALE_MS = 30 * 60 * 1000;
 
+const newSessionId = () => (
+  globalThis.crypto?.randomUUID
+    ? globalThis.crypto.randomUUID()
+    : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`
+);
+
 const initialEngine = {
+  sessionId: null, // identifies this run across devices
   mode: 'stopwatch', // 'stopwatch' | 'pomodoro'
   phase: 'work', // 'work' | 'break' (pomodoro only)
   running: false,
@@ -64,6 +71,9 @@ export function FocusProvider({ children }) {
 
   // Writes to the active-session row are queued so that a delete issued on stop
   // can never be overtaken by an in-flight upsert (which would resurrect it).
+  // `updated_at` stamps we have written ourselves, so the realtime echo of our
+  // own upserts can be told apart from a change made on another device.
+  const ownWritesRef = useRef([]);
   const writeChainRef = useRef(Promise.resolve());
   const enqueueWrite = useCallback((fn) => {
     const run = () => Promise.resolve().then(fn).catch(() => {});
@@ -71,39 +81,99 @@ export function FocusProvider({ children }) {
     return writeChainRef.current;
   }, []);
 
+  // Drop the local session without logging it: whoever removed the row has
+  // already written the finished session.
+  const dropLocalSession = useCallback(() => {
+    if (!engineRef.current.sessionStartedAt) return;
+    const eng = engineRef.current;
+    engineRef.current = {
+      ...initialEngine,
+      mode: eng.mode,
+      pomoWork: eng.pomoWork,
+      pomoBreak: eng.pomoBreak,
+    };
+    setOpen(false);
+    setTarget(null);
+    forceRender();
+  }, [forceRender]);
+
   // Mirror the live session into the database so a page reload can pick it up.
   // `targetOverride` lets a caller persist a target it has just set, before the
   // corresponding state update has been applied.
+  const persistedIdRef = useRef(null);
   const persistActive = useCallback((targetOverride) => {
     const eng = engineRef.current;
     if (!user?.id || !eng.sessionStartedAt) return Promise.resolve();
     const t = targetOverride === undefined ? target : targetOverride;
-    return enqueueWrite(() => supabase.from('focus_active_sessions').upsert(
-      {
-        user_id: user.id,
-        mode: eng.mode,
-        phase: eng.phase,
-        running: eng.running,
-        phase_base_seconds: eng.phaseBaseSeconds,
-        phase_start_at: eng.running && eng.phaseStartTs ? new Date(eng.phaseStartTs).toISOString() : null,
-        work_logged_seconds: eng.workLoggedSeconds,
-        cycles: eng.cycles,
-        pomo_work: eng.pomoWork,
-        pomo_break: eng.pomoBreak,
-        session_started_at: eng.sessionStartedAt,
-        target_ref: t?.ref ?? null,
-        target_title: t?.title ?? null,
-        target_source: t?.source ?? null,
-        last_seen_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' },
-    ));
-  }, [user?.id, target, enqueueWrite]);
+    const stamp = new Date().toISOString();
+    // Compared as epoch ms: the database echoes the timestamp back in its own
+    // textual format, so the strings themselves don't match.
+    ownWritesRef.current.push(Date.parse(stamp));
+    if (ownWritesRef.current.length > 10) ownWritesRef.current.shift();
+    const row = {
+      user_id: user.id,
+      session_id: eng.sessionId,
+      mode: eng.mode,
+      phase: eng.phase,
+      running: eng.running,
+      phase_base_seconds: eng.phaseBaseSeconds,
+      phase_start_at: eng.running && eng.phaseStartTs ? new Date(eng.phaseStartTs).toISOString() : null,
+      work_logged_seconds: eng.workLoggedSeconds,
+      cycles: eng.cycles,
+      pomo_work: eng.pomoWork,
+      pomo_break: eng.pomoBreak,
+      session_started_at: eng.sessionStartedAt,
+      target_ref: t?.ref ?? null,
+      target_title: t?.title ?? null,
+      target_source: t?.source ?? null,
+      last_seen_at: stamp,
+      updated_at: stamp,
+    };
+    // Only the first write of a session may create the row. Later writes patch
+    // it by id, so a device that missed the stop can't resurrect the session —
+    // it finds nothing to update and lets go of it instead.
+    const isFirst = persistedIdRef.current !== eng.sessionId;
+    persistedIdRef.current = eng.sessionId;
+    const upsert = () => supabase.from('focus_active_sessions').upsert(row, { onConflict: 'user_id' });
+    return enqueueWrite(async () => {
+      if (isFirst || !eng.sessionId) return upsert();
+      const { data, error } = await supabase
+        .from('focus_active_sessions')
+        .update(row)
+        .eq('user_id', user.id)
+        .eq('session_id', eng.sessionId)
+        .select('user_id');
+      if (error) return upsert(); // session_id column not migrated yet
+      // Nothing to patch: the session was finished elsewhere. Only let go if we
+      // are still on that same session.
+      if (!data?.length && engineRef.current.sessionId === eng.sessionId) dropLocalSession();
+      return undefined;
+    });
+  }, [user?.id, target, enqueueWrite, dropLocalSession]);
 
-  const clearActive = useCallback(() => {
-    if (!user?.id) return Promise.resolve();
-    return enqueueWrite(() => supabase.from('focus_active_sessions').delete().eq('user_id', user.id));
+  /**
+   * Removes the active-session row, but only while it still describes the run
+   * we are stopping. Resolves to false when another device had already stopped
+   * (and logged) it, so we must not write a second, overlapping entry.
+   */
+  const claimStop = useCallback((sessionId) => {
+    if (!user?.id) return Promise.resolve(true);
+    return enqueueWrite(async () => {
+      try {
+        let q = supabase.from('focus_active_sessions').delete().eq('user_id', user.id);
+        if (sessionId) q = q.eq('session_id', sessionId);
+        const { data, error } = await q.select('user_id');
+        // Before the session_id migration is applied the filter errors out; fall
+        // back to an unconditional delete so stopping still works.
+        if (error) {
+          await supabase.from('focus_active_sessions').delete().eq('user_id', user.id);
+          return true;
+        }
+        return (data?.length ?? 0) > 0;
+      } catch {
+        return true; // network trouble: better to log the work than to lose it
+      }
+    });
   }, [user?.id, enqueueWrite]);
 
   // Advance pomodoro phases when the running phase reaches its target. Phases
@@ -164,6 +234,54 @@ export function FocusProvider({ children }) {
     return () => clearInterval(id);
   }, [persistActive]);
 
+  // Adopt the session described by an active-session row (page load, or a
+  // session started/paused on another device).
+  const applyRemoteRow = useCallback((row) => {
+    engineRef.current = {
+      sessionId: row.session_id || null,
+      mode: row.mode,
+      phase: row.phase,
+      running: row.running,
+      phaseBaseSeconds: row.phase_base_seconds || 0,
+      phaseStartTs: row.running && row.phase_start_at ? new Date(row.phase_start_at).getTime() : 0,
+      workLoggedSeconds: row.work_logged_seconds || 0,
+      cycles: row.cycles || 0,
+      pomoWork: row.pomo_work || DEFAULT_POMODORO_WORK,
+      pomoBreak: row.pomo_break || DEFAULT_POMODORO_BREAK,
+      sessionStartedAt: row.session_started_at,
+    };
+    setTarget(row.target_ref || row.target_title
+      ? { ref: row.target_ref, title: row.target_title, source: row.target_source }
+      : null);
+    forceRender();
+  }, [forceRender]);
+
+  // Keep every open device on the same session.
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const ch = supabase
+      .channel(`focus_active_${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'focus_active_sessions', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const oldId = payload.old?.session_id;
+            const mine = engineRef.current.sessionId;
+            if (oldId && mine && oldId !== mine) return;
+            dropLocalSession();
+            return;
+          }
+          const row = payload.new;
+          if (!row) return;
+          if (ownWritesRef.current.includes(Date.parse(row.updated_at))) return; // our own write
+          applyRemoteRow(row);
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id, applyRemoteRow, dropLocalSession]);
+
   // Restore a session that was running when the page was last closed.
   const hydratedForRef = useRef(null);
   useEffect(() => {
@@ -199,22 +317,7 @@ export function FocusProvider({ children }) {
         return;
       }
 
-      engineRef.current = {
-        mode: data.mode,
-        phase: data.phase,
-        running: data.running,
-        phaseBaseSeconds: data.phase_base_seconds || 0,
-        phaseStartTs: data.running && data.phase_start_at ? new Date(data.phase_start_at).getTime() : 0,
-        workLoggedSeconds: data.work_logged_seconds || 0,
-        cycles: data.cycles || 0,
-        pomoWork: data.pomo_work || DEFAULT_POMODORO_WORK,
-        pomoBreak: data.pomo_break || DEFAULT_POMODORO_BREAK,
-        sessionStartedAt: data.session_started_at,
-      };
-      setTarget(data.target_ref || data.target_title
-        ? { ref: data.target_ref, title: data.target_title, source: data.target_source }
-        : null);
-      forceRender();
+      applyRemoteRow(data);
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,7 +328,10 @@ export function FocusProvider({ children }) {
     if (eng.running) return;
     eng.running = true;
     eng.phaseStartTs = Date.now();
-    if (!eng.sessionStartedAt) eng.sessionStartedAt = new Date().toISOString();
+    if (!eng.sessionStartedAt) {
+      eng.sessionStartedAt = new Date().toISOString();
+      eng.sessionId = newSessionId();
+    }
     forceRender();
     persistActive();
   }, [forceRender, persistActive]);
@@ -249,11 +355,13 @@ export function FocusProvider({ children }) {
     return Math.round(eng.workLoggedSeconds + partial);
   }, [liveElapsed]);
 
-  // Stop the session: log accrued work time, then reset the engine.
+  // Stop the session: log accrued work time, then reset the engine. The log is
+  // skipped when another device got there first, so the entry is never doubled.
   const stopAndLog = useCallback(async () => {
     const eng = engineRef.current;
     const workSeconds = computeWorkSeconds();
     const startedAt = eng.sessionStartedAt;
+    const sessionId = eng.sessionId;
     const mode = eng.mode;
     engineRef.current = {
       ...initialEngine,
@@ -262,8 +370,10 @@ export function FocusProvider({ children }) {
       pomoBreak: eng.pomoBreak,
     };
     forceRender();
-    await clearActive();
-    if (workSeconds >= 1 && startedAt) {
+    if (!startedAt) return 0;
+    const claimed = await claimStop(sessionId);
+    if (!claimed) return 0;
+    if (workSeconds >= 1) {
       await logSession({
         taskRef: target?.ref ?? null,
         taskTitle: target?.title ?? 'Фокус без задачи',
@@ -275,7 +385,7 @@ export function FocusProvider({ children }) {
       });
     }
     return workSeconds;
-  }, [computeWorkSeconds, forceRender, logSession, target, clearActive]);
+  }, [computeWorkSeconds, forceRender, logSession, target, claimStop]);
 
   const stopAndClose = useCallback(async () => {
     await stopAndLog();
@@ -318,6 +428,7 @@ export function FocusProvider({ children }) {
       running: true,
       phaseStartTs: Date.now(),
       sessionStartedAt: new Date().toISOString(),
+      sessionId: newSessionId(),
     };
     setTarget(nextTarget);
     forceRender();
