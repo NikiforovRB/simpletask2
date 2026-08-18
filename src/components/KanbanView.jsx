@@ -12,7 +12,7 @@ import {
   SortableContext,
   useSortable,
   arrayMove,
-  horizontalListSortingStrategy,
+  rectSortingStrategy,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -23,6 +23,10 @@ import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav.svg';
 import dragIcon from '../assets/drag.svg';
+import leftIcon from '../assets/left.svg';
+import leftNavIcon from '../assets/left-nav.svg';
+import rightIcon from '../assets/right.svg';
+import rightNavIcon from '../assets/right-nav.svg';
 import settingsIcon from '../assets/settings.svg';
 import settingsNavIcon from '../assets/settings-nav.svg';
 import './KanbanView.css';
@@ -30,6 +34,7 @@ import './KanbanView.css';
 const DEFAULT_COLUMN_COLOR = '#5a86ee';
 const MIN_COLUMN_WIDTH = 180;
 const MAX_COLUMN_WIDTH = 640;
+const COLUMN_WIDTH_STEP = 20;
 
 const slotId = (columnId, index) => `kslot::${columnId}::${index}`;
 
@@ -48,10 +53,11 @@ function parseKanbanSlotId(id) {
  * it. The anchor takes no space of its own so the gaps don't stretch a column;
  * the hit area is a band reaching into the cards above and below it.
  */
-function CardDropSlot({ columnId, index, tall = false }) {
+function CardDropSlot({ columnId, index, tall = false, fill = false }) {
   const { isOver, setNodeRef } = useDroppable({ id: slotId(columnId, index) });
+  const variant = fill ? 'kanban-slot--fill' : tall ? 'kanban-slot--tall' : '';
   return (
-    <div className={`kanban-slot ${tall ? 'kanban-slot--tall' : ''}`}>
+    <div className={`kanban-slot ${variant}`}>
       <div ref={setNodeRef} className={`kanban-slot__hit ${isOver ? 'kanban-slot__hit--over' : ''}`}>
         <div className="kanban-slot__line" aria-hidden />
       </div>
@@ -59,8 +65,8 @@ function CardDropSlot({ columnId, index, tall = false }) {
   );
 }
 
-/** The 13 task colours, offered for a column strip or a card outline. */
-export function ColorPalette({ value, onPick, allowNone = false, onClose }) {
+/** The 13 task colours, offered for a column strip, a card outline or a title. */
+export function ColorPalette({ value, onPick, allowNone = false, noneLabel = 'Без цвета', onClose }) {
   const ref = useRef(null);
   useEffect(() => {
     const onDown = (e) => {
@@ -77,7 +83,7 @@ export function ColorPalette({ value, onPick, allowNone = false, onClose }) {
           className={`kanban-palette__none ${!value ? 'kanban-palette__none--active' : ''}`}
           onClick={() => onPick(null)}
         >
-          Без обводки
+          {noneLabel}
         </button>
       )}
       <div className="kanban-palette__grid">
@@ -106,6 +112,7 @@ export function ColorPalette({ value, onPick, allowNone = false, onClose }) {
 
 /** A task line as it is previewed on a card (read-only apart from the tick). */
 function CardTaskLine({ task, subtasks, showSubtasks, onToggle, depth = 0 }) {
+  const children = subtasks(task.id);
   return (
     <>
       <li className={`kanban-card__task kanban-card__task--depth-${depth}`}>
@@ -119,11 +126,18 @@ function CardTaskLine({ task, subtasks, showSubtasks, onToggle, depth = 0 }) {
           }}
           aria-label={task.completed_at ? 'Вернуть в список' : 'Выполнено'}
         >
-          {task.completed_at && (
-            <svg width="8" height="8" viewBox="0 0 16 16" aria-hidden>
+          {task.completed_at ? (
+            <svg width="9" height="9" viewBox="0 0 16 16" aria-hidden>
               <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          )}
+          ) : children.length > 0 ? (
+            // Two stripes: the same hint as in the plans, telling that the task
+            // holds subtasks even when they are not drawn on the card.
+            <span className="kanban-card__task-hint" aria-hidden>
+              <span />
+              <span />
+            </span>
+          ) : null}
         </button>
         <span
           className="kanban-card__task-title"
@@ -132,7 +146,7 @@ function CardTaskLine({ task, subtasks, showSubtasks, onToggle, depth = 0 }) {
           {task.title || 'Без названия'}
         </span>
       </li>
-      {showSubtasks && subtasks(task.id).map((st) => (
+      {showSubtasks && children.map((st) => (
         <CardTaskLine
           key={st.id}
           task={st}
@@ -175,7 +189,9 @@ function KanbanCard({ card, settings, tasks, getSubtasks, onToggleTask, onOpen, 
         onOpen?.(card.id);
       }}
     >
-      <div className="kanban-card__title">{card.title || 'Без названия'}</div>
+      <div className="kanban-card__title" style={card.title_color ? { color: card.title_color } : undefined}>
+        {card.title || 'Без названия'}
+      </div>
       {settings.showDescription && card.description?.trim() && (
         <p className="kanban-card__desc">{card.description}</p>
       )}
@@ -227,9 +243,12 @@ function KanbanColumn({
   const [titleDraft, setTitleDraft] = useState(null);
   const editingTitle = titleDraft !== null;
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [foldHover, setFoldHover] = useState(false);
   const [plusHover, setPlusHover] = useState(false);
   const [delHover, setDelHover] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const collapsed = !!column.collapsed;
+  const accent = column.accent_color || DEFAULT_COLUMN_COLOR;
 
   const commitTitle = () => {
     if (titleDraft === null) return;
@@ -239,18 +258,51 @@ function KanbanColumn({
   };
 
   const style = {
-    width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.35 : 1,
   };
+  const grip = (
+    <span className="kanban-column__grip" {...attributes} {...listeners} aria-label="Перетащить столбец">
+      <img src={dragIcon} alt="" />
+    </span>
+  );
+
+  // Folded away: a narrow strip with the title turned on its side. Cards can
+  // still be dropped on it — they join the end of its list — so a column can be
+  // used as a parking place without unfolding it first.
+  if (collapsed) {
+    return (
+      <section ref={setNodeRef} style={style} className="kanban-column kanban-column--collapsed">
+        <div className="kanban-column__strip" style={{ background: accent }} />
+        <button
+          type="button"
+          className="kanban-column__fold"
+          onMouseEnter={() => hasHover && setFoldHover(true)}
+          onMouseLeave={() => hasHover && setFoldHover(false)}
+          onClick={() => onUpdateColumn(column.id, { collapsed: false })}
+          aria-label="Развернуть столбец"
+          title="Развернуть столбец"
+        >
+          <img src={hasHover && foldHover ? rightNavIcon : rightIcon} alt="" />
+        </button>
+        <button
+          type="button"
+          className="kanban-column__collapsed-title"
+          onClick={() => onUpdateColumn(column.id, { collapsed: false })}
+        >
+          {column.title || 'Без названия'}
+        </button>
+        <span className="kanban-column__count">{cards.length}</span>
+        {grip}
+        <CardDropSlot columnId={column.id} index={cards.length} fill />
+      </section>
+    );
+  }
 
   return (
-    <section ref={setNodeRef} style={style} className="kanban-column">
-      <header className="kanban-column__head">
-        <span className="kanban-column__grip" {...attributes} {...listeners} aria-label="Перетащить столбец">
-          <img src={dragIcon} alt="" />
-        </span>
+    <section ref={setNodeRef} style={{ ...style, width: `${width}px` }} className="kanban-column">
+      <header className={`kanban-column__head ${paletteOpen ? 'kanban-column__head--pinned' : ''}`}>
         {editingTitle ? (
           <input
             className="kanban-column__title-input"
@@ -268,48 +320,66 @@ function KanbanColumn({
             {column.title || 'Без названия'}
           </button>
         )}
-        <span className="kanban-column__count">{cards.length}</span>
-        <span className="kanban-column__color-wrap">
+        {/* The tools sit over the end of the title instead of squeezing it. */}
+        <span className="kanban-column__tools">
+          <span className="kanban-column__count">{cards.length}</span>
+          <span className="kanban-column__color-wrap">
+            <button
+              type="button"
+              className="kanban-column__color"
+              style={{ background: accent }}
+              onClick={() => setPaletteOpen((v) => !v)}
+              aria-label="Цвет полоски"
+              title="Цвет полоски"
+            />
+            {paletteOpen && (
+              <ColorPalette
+                value={column.accent_color}
+                onPick={(c) => {
+                  onUpdateColumn(column.id, { accent_color: c });
+                  setPaletteOpen(false);
+                }}
+                onClose={() => setPaletteOpen(false)}
+              />
+            )}
+          </span>
           <button
             type="button"
-            className="kanban-column__color"
-            style={{ background: column.accent_color || DEFAULT_COLUMN_COLOR }}
-            onClick={() => setPaletteOpen((v) => !v)}
-            aria-label="Цвет полоски"
-          />
-          {paletteOpen && (
-            <ColorPalette
-              value={column.accent_color}
-              onPick={(c) => {
-                onUpdateColumn(column.id, { accent_color: c });
-                setPaletteOpen(false);
-              }}
-              onClose={() => setPaletteOpen(false)}
-            />
-          )}
+            className="kanban-column__icon-btn"
+            onMouseEnter={() => hasHover && setFoldHover(true)}
+            onMouseLeave={() => hasHover && setFoldHover(false)}
+            onClick={() => onUpdateColumn(column.id, { collapsed: true })}
+            aria-label="Свернуть столбец"
+            title="Свернуть столбец"
+          >
+            <img src={hasHover && foldHover ? leftNavIcon : leftIcon} alt="" />
+          </button>
+          <button
+            type="button"
+            className="kanban-column__icon-btn"
+            onMouseEnter={() => hasHover && setPlusHover(true)}
+            onMouseLeave={() => hasHover && setPlusHover(false)}
+            onClick={() => onAddCard(column.id)}
+            aria-label="Добавить плашку"
+            title="Добавить плашку"
+          >
+            <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
+          </button>
+          <button
+            type="button"
+            className="kanban-column__icon-btn"
+            onMouseEnter={() => hasHover && setDelHover(true)}
+            onMouseLeave={() => hasHover && setDelHover(false)}
+            onClick={() => setConfirmDelete(true)}
+            aria-label="Удалить столбец"
+            title="Удалить столбец"
+          >
+            <img src={hasHover && delHover ? deleteNavIcon : deleteIcon} alt="" />
+          </button>
+          {grip}
         </span>
-        <button
-          type="button"
-          className="kanban-column__icon-btn"
-          onMouseEnter={() => hasHover && setPlusHover(true)}
-          onMouseLeave={() => hasHover && setPlusHover(false)}
-          onClick={() => onAddCard(column.id)}
-          aria-label="Добавить плашку"
-        >
-          <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
-        </button>
-        <button
-          type="button"
-          className="kanban-column__icon-btn"
-          onMouseEnter={() => hasHover && setDelHover(true)}
-          onMouseLeave={() => hasHover && setDelHover(false)}
-          onClick={() => setConfirmDelete(true)}
-          aria-label="Удалить столбец"
-        >
-          <img src={hasHover && delHover ? deleteNavIcon : deleteIcon} alt="" />
-        </button>
       </header>
-      <div className="kanban-column__strip" style={{ background: column.accent_color || DEFAULT_COLUMN_COLOR }} />
+      <div className="kanban-column__strip" style={{ background: accent }} />
 
       <div className="kanban-column__cards">
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
@@ -328,9 +398,6 @@ function KanbanColumn({
           ))}
         </SortableContext>
         <CardDropSlot columnId={column.id} index={cards.length} tall={cards.length === 0} />
-        <button type="button" className="kanban-column__add" onClick={() => onAddCard(column.id)}>
-          + Плашка
-        </button>
       </div>
 
       {confirmDelete && (
@@ -361,19 +428,21 @@ function KanbanColumn({
 }
 
 function BoardSettingsModal({ board, onChange, onClose }) {
-  // The slider fires on every pixel, so the width is only saved once it has
+  // A held-down step button repeats, so the width is only saved once it has
   // stood still for a moment; the board behind the modal still follows along.
   const [widthDraft, setWidthDraft] = useState(null);
   const saveTimer = useRef(null);
   useEffect(() => () => clearTimeout(saveTimer.current), []);
   const width = widthDraft ?? board.kanban_column_width ?? 280;
-  const setWidth = (next) => {
+  const stepWidth = (delta) => {
+    const next = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, width + delta));
+    if (next === width) return;
     setWidthDraft(next);
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       setWidthDraft(null);
       onChange({ kanban_column_width: next });
-    }, 250);
+    }, 400);
   };
   return (
     <div className="dashboard__settings-overlay" onClick={onClose}>
@@ -389,17 +458,26 @@ function BoardSettingsModal({ board, onChange, onClose }) {
 
         <div className="dashboard__settings-group">
           <div className="dashboard__settings-title">Ширина столбцов</div>
-          <div className="dashboard__settings-row">
-            <input
-              type="range"
-              className="kanban-settings__range"
-              min={MIN_COLUMN_WIDTH}
-              max={MAX_COLUMN_WIDTH}
-              step={10}
-              value={width}
-              onChange={(e) => setWidth(Number(e.target.value))}
-            />
-            <span className="dashboard__settings-row-label">{width} px</span>
+          <div className="dashboard__settings-row kanban-settings__stepper">
+            <button
+              type="button"
+              className="kanban-settings__step"
+              onClick={() => stepWidth(-COLUMN_WIDTH_STEP)}
+              disabled={width <= MIN_COLUMN_WIDTH}
+              aria-label="Уже"
+            >
+              −
+            </button>
+            <span className="kanban-settings__value">{width} px</span>
+            <button
+              type="button"
+              className="kanban-settings__step"
+              onClick={() => stepWidth(COLUMN_WIDTH_STEP)}
+              disabled={width >= MAX_COLUMN_WIDTH}
+              aria-label="Шире"
+            >
+              +
+            </button>
           </div>
         </div>
 
@@ -511,6 +589,13 @@ export function KanbanView({
       return;
     }
 
+    // Dropped on a column itself (its head, or a folded one): join the end.
+    if (boardColumns.some((c) => c.id === over.id)) {
+      const list = (cardsByColumn.get(over.id) || []).filter((c) => c.id !== moved.id);
+      moveCard(moved.id, over.id, list.length);
+      return;
+    }
+
     const overCard = cards.find((c) => c.id === over.id);
     if (!overCard || overCard.id === moved.id) return;
     const list = (cardsByColumn.get(overCard.column_id) || []).filter((c) => c.id !== moved.id);
@@ -525,6 +610,7 @@ export function KanbanView({
     <section className="kanban">
       <div className="kanban__header">
         <span className="kanban__title">{board.title}</span>
+        <span className="kanban__header-gap" />
         <button
           type="button"
           className="kanban__icon-btn"
@@ -558,7 +644,9 @@ export function KanbanView({
         onDragEnd={handleDragEnd}
       >
         <div className="kanban__board">
-          <SortableContext items={boardColumns.map((c) => c.id)} strategy={horizontalListSortingStrategy}>
+          {/* Columns differ in width once some of them are folded, so the plain
+              rect strategy previews the shuffling better than the list one. */}
+          <SortableContext items={boardColumns.map((c) => c.id)} strategy={rectSortingStrategy}>
             {boardColumns.map((column) => (
               <KanbanColumn
                 key={column.id}
@@ -577,14 +665,6 @@ export function KanbanView({
               />
             ))}
           </SortableContext>
-          <button
-            type="button"
-            className="kanban__add-column"
-            style={{ width: `${width}px` }}
-            onClick={() => addColumn(board.id)}
-          >
-            + Столбец
-          </button>
         </div>
 
         <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }}>

@@ -44,7 +44,9 @@ export function KanbanCardPanel({
   const [closing, setClosing] = useState(false);
   const [title, setTitle] = useState(card.title || '');
   const [description, setDescription] = useState(card.description || '');
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Which of the two colour pickers of the header is open: 'title', 'border'
+  // or none of them.
+  const [openPalette, setOpenPalette] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [plusHover, setPlusHover] = useState(false);
   const [delHover, setDelHover] = useState(false);
@@ -132,21 +134,44 @@ export function KanbanCardPanel({
           <span className="kanban-panel__color-wrap">
             <button
               type="button"
+              className="kanban-panel__title-color"
+              style={{ background: card.title_color || 'var(--text-strong)' }}
+              onClick={() => setOpenPalette((v) => (v === 'title' ? null : 'title'))}
+              aria-label="Цвет заголовка плашки"
+              title="Цвет заголовка плашки"
+            />
+            {openPalette === 'title' && (
+              <ColorPalette
+                value={card.title_color}
+                allowNone
+                noneLabel="Обычный цвет"
+                onPick={(c) => {
+                  onUpdateCard(cardId, { title_color: c });
+                  setOpenPalette(null);
+                }}
+                onClose={() => setOpenPalette(null)}
+              />
+            )}
+          </span>
+          <span className="kanban-panel__color-wrap">
+            <button
+              type="button"
               className={`kanban-panel__color ${card.border_color ? '' : 'kanban-panel__color--none'}`}
               style={card.border_color ? { borderColor: card.border_color } : undefined}
-              onClick={() => setPaletteOpen((v) => !v)}
+              onClick={() => setOpenPalette((v) => (v === 'border' ? null : 'border'))}
               aria-label="Цвет обводки плашки"
               title="Цвет обводки плашки"
             />
-            {paletteOpen && (
+            {openPalette === 'border' && (
               <ColorPalette
                 value={card.border_color}
                 allowNone
+                noneLabel="Без обводки"
                 onPick={(c) => {
                   onUpdateCard(cardId, { border_color: c });
-                  setPaletteOpen(false);
+                  setOpenPalette(null);
                 }}
-                onClose={() => setPaletteOpen(false)}
+                onClose={() => setOpenPalette(null)}
               />
             )}
           </span>
@@ -177,6 +202,7 @@ export function KanbanCardPanel({
           <textarea
             ref={titleRef}
             className="kanban-panel__title"
+            style={card.title_color ? { color: card.title_color } : undefined}
             value={title}
             rows={1}
             placeholder="Название плашки"
