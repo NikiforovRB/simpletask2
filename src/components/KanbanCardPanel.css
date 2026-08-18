@@ -4,8 +4,14 @@
   position: fixed;
   inset: 0;
   z-index: 120;
-  background: var(--overlay);
+  /* The panel takes the whole height of the window, so the board behind it is
+     dimmed harder than under an ordinary modal. */
+  background: rgba(0, 0, 0, 0.7);
   animation: kanban-panel-fade-in 0.18s ease;
+}
+
+[data-theme="light"] .kanban-panel-overlay {
+  background: var(--overlay);
 }
 
 .kanban-panel-overlay--closing {
@@ -27,7 +33,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(440px, 100vw);
+  width: min(560px, 100vw);
   display: flex;
   flex-direction: column;
   background: var(--bg-app);
@@ -131,11 +137,20 @@
   color: var(--text-primary);
 }
 
+/* Scrolls without a bar of its own: the panel is narrow and the bar would sit
+   right on top of the task actions. */
 .kanban-panel__body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
   padding: 0.25rem 1rem 3rem;
+}
+
+.kanban-panel__body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .kanban-panel__title {

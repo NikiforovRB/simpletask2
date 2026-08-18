@@ -71,6 +71,7 @@
 
 .kanban-column__head {
   position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -246,10 +247,13 @@
 }
 
 /* Where a dragged card will land: an anchor without height, so the gaps
-   between cards stay the same, and a blue line inside a wider hit band. */
+   between cards stay the same, and a blue line inside a wider hit band. The
+   anchor takes no clicks — a drop is found by measuring, not by hit testing —
+   so an empty column doesn't swallow presses aimed at what is under it. */
 .kanban-slot {
   position: relative;
   height: 0;
+  pointer-events: none;
 }
 
 .kanban-slot--tall {
@@ -445,12 +449,15 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Colour picker shared by the column strip, the card outline and its title. */
+/* Colour picker shared by the column strip, the card outline and its title.
+   It lives at the end of the page and is placed under its button by script,
+   so nothing on the board can cover it. */
 .kanban-palette {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  right: 0;
-  z-index: 30;
+  position: fixed;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  z-index: 200;
   background: var(--bg-surface-2);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -514,7 +521,7 @@
   color: var(--accent);
 }
 
-/* Column width, stepped by 20px at a time. */
+/* Column width: stepped, or typed straight into the number. */
 .kanban-settings__stepper {
   gap: 0.5rem;
 }
@@ -548,10 +555,29 @@
 }
 
 .kanban-settings__value {
+  font-family: inherit;
   font-size: 0.9375rem;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   min-width: 4.5rem;
+  width: 4.5rem;
+  box-sizing: border-box;
+  text-align: center;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.2rem 0.3rem;
+  cursor: text;
+}
+
+.kanban-settings__value:hover {
+  border-color: var(--border);
+}
+
+.kanban-settings__value--input {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  outline: none;
 }
 
 @media (max-width: 640px) {

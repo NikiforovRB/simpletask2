@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragOverlay,
@@ -34,7 +35,7 @@ import './KanbanView.css';
 const DEFAULT_COLUMN_COLOR = '#5a86ee';
 const MIN_COLUMN_WIDTH = 180;
 const MAX_COLUMN_WIDTH = 640;
-const COLUMN_WIDTH_STEP = 20;
+const COLUMN_WIDTH_STEP = 10;
 
 const slotId = (columnId, index) => `kslot::${columnId}::${index}`;
 
@@ -65,17 +66,48 @@ function CardDropSlot({ columnId, index, tall = false, fill = false }) {
   );
 }
 
-/** The 13 task colours, offered for a column strip, a card outline or a title. */
-export function ColorPalette({ value, onPick, allowNone = false, noneLabel = 'Без цвета', onClose }) {
+/**
+ * The 13 task colours, offered for a column strip, a card outline or a title.
+ * It is drawn in a portal and placed under its `anchor` by hand: inside the
+ * board it would otherwise be covered by the scrolling card lists and the drop
+ * targets that come after the column header.
+ */
+export function ColorPalette({ anchor, value, onPick, allowNone = false, noneLabel = 'Без цвета', onClose }) {
   const ref = useRef(null);
+
+  useLayoutEffect(() => {
+    const box = ref.current;
+    const at = anchor?.current;
+    if (!box || !at) return undefined;
+    const place = () => {
+      const a = at.getBoundingClientRect();
+      const { offsetWidth: w, offsetHeight: h } = box;
+      box.style.left = `${Math.max(8, Math.min(a.right - w, window.innerWidth - w - 8))}px`;
+      const below = a.bottom + 6;
+      box.style.top = `${below + h > window.innerHeight - 8 ? Math.max(8, a.top - h - 6) : below}px`;
+      box.style.visibility = 'visible';
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [anchor]);
+
   useEffect(() => {
     const onDown = (e) => {
-      if (!ref.current?.contains(e.target)) onClose?.();
+      // A press on the button that opened it is left to the button, which
+      // closes the palette by toggling.
+      if (ref.current?.contains(e.target) || anchor?.current?.contains(e.target)) return;
+      onClose?.();
     };
     document.addEventListener('pointerdown', onDown);
     return () => document.removeEventListener('pointerdown', onDown);
-  }, [onClose]);
-  return (
+  }, [onClose, anchor]);
+
+  return createPortal(
     <div className="kanban-palette" ref={ref} onPointerDown={(e) => e.stopPropagation()}>
       {allowNone && (
         <button
@@ -106,7 +138,8 @@ export function ColorPalette({ value, onPick, allowNone = false, noneLabel = 'Б
           );
         })}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -247,6 +280,7 @@ function KanbanColumn({
   const [plusHover, setPlusHover] = useState(false);
   const [delHover, setDelHover] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const colorBtnRef = useRef(null);
   const collapsed = !!column.collapsed;
   const accent = column.accent_color || DEFAULT_COLUMN_COLOR;
 
@@ -326,6 +360,7 @@ function KanbanColumn({
           <span className="kanban-column__color-wrap">
             <button
               type="button"
+              ref={colorBtnRef}
               className="kanban-column__color"
               style={{ background: accent }}
               onClick={() => setPaletteOpen((v) => !v)}
@@ -334,6 +369,7 @@ function KanbanColumn({
             />
             {paletteOpen && (
               <ColorPalette
+                anchor={colorBtnRef}
                 value={column.accent_color}
                 onPick={(c) => {
                   onUpdateColumn(column.id, { accent_color: c });
@@ -427,15 +463,24 @@ function KanbanColumn({
   );
 }
 
+/** The nearest width the board can actually take. */
+function snapColumnWidth(value) {
+  const clamped = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, value));
+  return Math.round(clamped / COLUMN_WIDTH_STEP) * COLUMN_WIDTH_STEP;
+}
+
 function BoardSettingsModal({ board, onChange, onClose }) {
-  // A held-down step button repeats, so the width is only saved once it has
-  // stood still for a moment; the board behind the modal still follows along.
+  // Steps come in bursts, so the width is only saved once it has stood still
+  // for a moment; the board behind the modal still follows along.
   const [widthDraft, setWidthDraft] = useState(null);
+  // Not null while the number is being typed over.
+  const [typed, setTyped] = useState(null);
   const saveTimer = useRef(null);
   useEffect(() => () => clearTimeout(saveTimer.current), []);
   const width = widthDraft ?? board.kanban_column_width ?? 280;
-  const stepWidth = (delta) => {
-    const next = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, width + delta));
+
+  const applyWidth = (value) => {
+    const next = snapColumnWidth(value);
     if (next === width) return;
     setWidthDraft(next);
     clearTimeout(saveTimer.current);
@@ -444,6 +489,13 @@ function BoardSettingsModal({ board, onChange, onClose }) {
       onChange({ kanban_column_width: next });
     }, 400);
   };
+
+  const commitTyped = () => {
+    const value = parseInt((typed ?? '').replace(/[^\d]/g, ''), 10);
+    setTyped(null);
+    if (Number.isFinite(value)) applyWidth(value);
+  };
+
   return (
     <div className="dashboard__settings-overlay" onClick={onClose}>
       <div className="dashboard__settings-popup dashboard__settings-popup--main" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
@@ -462,17 +514,40 @@ function BoardSettingsModal({ board, onChange, onClose }) {
             <button
               type="button"
               className="kanban-settings__step"
-              onClick={() => stepWidth(-COLUMN_WIDTH_STEP)}
+              onClick={() => applyWidth(width - COLUMN_WIDTH_STEP)}
               disabled={width <= MIN_COLUMN_WIDTH}
               aria-label="Уже"
             >
               −
             </button>
-            <span className="kanban-settings__value">{width} px</span>
+            {typed !== null ? (
+              <input
+                className="kanban-settings__value kanban-settings__value--input"
+                value={typed}
+                autoFocus
+                inputMode="numeric"
+                onChange={(e) => setTyped(e.target.value)}
+                onFocus={(e) => e.currentTarget.select()}
+                onBlur={commitTyped}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                  if (e.key === 'Escape') setTyped(null);
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="kanban-settings__value"
+                onClick={() => setTyped(String(width))}
+                title={`От ${MIN_COLUMN_WIDTH} до ${MAX_COLUMN_WIDTH} px`}
+              >
+                {width} px
+              </button>
+            )}
             <button
               type="button"
               className="kanban-settings__step"
-              onClick={() => stepWidth(COLUMN_WIDTH_STEP)}
+              onClick={() => applyWidth(width + COLUMN_WIDTH_STEP)}
               disabled={width >= MAX_COLUMN_WIDTH}
               aria-label="Шире"
             >

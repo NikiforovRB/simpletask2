@@ -52,6 +52,8 @@ export function KanbanCardPanel({
   const [delHover, setDelHover] = useState(false);
   const titleRef = useAutoGrow(title);
   const descRef = useAutoGrow(description);
+  const titleColorRef = useRef(null);
+  const borderColorRef = useRef(null);
 
   const requestClose = useRef(null);
   requestClose.current = () => {
@@ -134,6 +136,7 @@ export function KanbanCardPanel({
           <span className="kanban-panel__color-wrap">
             <button
               type="button"
+              ref={titleColorRef}
               className="kanban-panel__title-color"
               style={{ background: card.title_color || 'var(--text-strong)' }}
               onClick={() => setOpenPalette((v) => (v === 'title' ? null : 'title'))}
@@ -142,6 +145,7 @@ export function KanbanCardPanel({
             />
             {openPalette === 'title' && (
               <ColorPalette
+                anchor={titleColorRef}
                 value={card.title_color}
                 allowNone
                 noneLabel="Обычный цвет"
@@ -156,6 +160,7 @@ export function KanbanCardPanel({
           <span className="kanban-panel__color-wrap">
             <button
               type="button"
+              ref={borderColorRef}
               className={`kanban-panel__color ${card.border_color ? '' : 'kanban-panel__color--none'}`}
               style={card.border_color ? { borderColor: card.border_color } : undefined}
               onClick={() => setOpenPalette((v) => (v === 'border' ? null : 'border'))}
@@ -164,6 +169,7 @@ export function KanbanCardPanel({
             />
             {openPalette === 'border' && (
               <ColorPalette
+                anchor={borderColorRef}
                 value={card.border_color}
                 allowNone
                 noneLabel="Без обводки"
