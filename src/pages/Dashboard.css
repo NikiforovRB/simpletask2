@@ -22,6 +22,21 @@
   min-height: 100vh;
 }
 
+/* The kanban columns scroll inside the page, so the board takes the height
+   that is left under the header instead of growing the page. */
+.dashboard--kanban {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100vh;
+  padding-bottom: 1rem;
+  overflow: hidden;
+}
+
+.dashboard--kanban .dashboard__header {
+  flex-shrink: 0;
+}
+
 .dashboard__header {
   margin-bottom: 1.25rem;
 }
@@ -520,10 +535,10 @@
   color: var(--text-dim);
 }
 
-/* Segmented "Список задач / Доска" toggle. A single rounded container holds
-   both options on top of a shared background; an absolutely-positioned pill
-   slides between halves to animate the selection. The buttons are kept fully
-   transparent and stacked on top of the indicator via `z-index`, so the
+/* Segmented "Список задач / Доска / Канбан" toggle. A single rounded container
+   holds the options on top of a shared background; an absolutely-positioned
+   pill slides between the thirds to animate the selection. The buttons are kept
+   fully transparent and stacked on top of the indicator via `z-index`, so the
    sliding pill is what visually conveys the active state. */
 .dashboard__kind-toggle {
   position: relative;
@@ -541,7 +556,7 @@
   top: 3px;
   bottom: 3px;
   left: 3px;
-  width: calc(50% - 3px);
+  width: calc(33.333% - 2px);
   background: var(--accent-soft);
   border: 1px solid var(--accent);
   border-radius: 6px;
@@ -555,6 +570,10 @@
   transform: translateX(100%);
 }
 
+.dashboard__kind-toggle--kanban .dashboard__kind-toggle-indicator {
+  transform: translateX(200%);
+}
+
 .dashboard__kind-toggle-option {
   flex: 1 1 0;
   position: relative;
@@ -566,13 +585,21 @@
   background: transparent;
   color: var(--text-muted);
   border: none;
-  padding: 0.45rem 0.75rem;
-  font-size: 0.9375rem;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.875rem;
   border-radius: 6px;
   cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: color 0.2s ease;
+}
+
+.dashboard__kind-toggle-option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dashboard__kind-toggle-option:hover {

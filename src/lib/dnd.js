@@ -4,6 +4,7 @@
  * - sub-{parent_id} — subtasks
  * - bucket-someday-main | bucket-someday-completed — someday list
  * - bucket-project-{uuid}-main | bucket-project-{uuid}-completed — project list
+ * - kcard-{uuid} | kcarddone-{uuid} — the task list of a kanban card
  */
 export function parseContainerId(containerId) {
   if (!containerId || typeof containerId !== 'string') return null;
@@ -31,6 +32,17 @@ export function parseContainerId(containerId) {
   if (type === 'sub') {
     return { scheduled_date: undefined, parent_id: value, list_type: undefined, project_id: undefined, completed: false };
   }
+  // The board of a card is not in the id: the caller looks it up from the card,
+  // which it has to have at hand anyway to show the list.
+  if (type === 'kcard' || type === 'kcarddone') {
+    return {
+      scheduled_date: null,
+      parent_id: null,
+      list_type: 'kanban',
+      card_id: value,
+      completed: type === 'kcarddone',
+    };
+  }
   return null;
 }
 
@@ -52,12 +64,19 @@ export function getContainerIdForBucket(list_type, project_id, completed) {
   return null;
 }
 
+/** For the task list of a kanban card. */
+export function getContainerIdForCard(card_id, completed) {
+  if (!card_id) return null;
+  return completed ? `kcarddone-${card_id}` : `kcard-${card_id}`;
+}
+
 /** Get container id for a task (used as source in drag end). */
 export function getContainerIdFromTask(task) {
   if (!task) return null;
   if (task.parent_id) return `sub-${task.parent_id}`;
   const list_type = task.list_type || 'inbox';
   const completed = !!task.completed_at;
+  if (list_type === 'kanban' && task.card_id) return getContainerIdForCard(task.card_id, completed);
   if (list_type === 'someday') return getContainerIdForBucket('someday', null, completed);
   if (list_type === 'project' && task.project_id) return getContainerIdForBucket('project', task.project_id, completed);
   return getContainerId(task.scheduled_date ?? null, null, completed);

@@ -27,6 +27,7 @@ function inheritBucketFromTask(task, tasks) {
     scheduled_date: task.scheduled_date ?? root?.scheduled_date ?? null,
     list_type: task.list_type || root?.list_type || 'inbox',
     project_id: task.project_id ?? root?.project_id ?? null,
+    card_id: task.card_id ?? root?.card_id ?? null,
   };
 }
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
@@ -43,10 +44,13 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useProjects } from '../hooks/useProjects';
 import { useHabits } from '../hooks/useHabits';
 import { useBoardItems } from '../hooks/useBoardItems';
+import { useKanban } from '../hooks/useKanban';
 import { useGoalPlan } from '../hooks/useGoalPlan';
 import { DayCard } from '../components/DayCard';
 import { HabitsView } from '../components/HabitsView';
 import { BoardView } from '../components/BoardView';
+import { KanbanView } from '../components/KanbanView';
+import { KanbanCardPanel } from '../components/KanbanCardPanel';
 import { GoalPlanView } from '../components/GoalPlanView';
 import { CalendarView } from '../components/CalendarView';
 import { TodayFocusTotal, FocusQuickStart } from '../components/TodayFocusTotal';
@@ -123,6 +127,8 @@ import moonIcon from '../assets/moon.svg';
 import moonNavIcon from '../assets/moon-nav.svg';
 import doskaIcon from '../assets/doska.svg';
 import doskaNavIcon from '../assets/doska-nav.svg';
+import kanbanIcon from '../assets/align.svg';
+import kanbanNavIcon from '../assets/align-nav.svg';
 import pdfIcon from '../assets/pdf.svg';
 import pdfNavIcon from '../assets/pdf-nav.svg';
 import { BoardPdfExportModal } from '../components/BoardPdfExportModal';
@@ -151,6 +157,11 @@ function getTasksInContainer(tasks, containerId) {
   if (c.parent_id) {
     return tasks
       .filter((t) => t.parent_id === c.parent_id)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  }
+  if (c.card_id) {
+    return tasks
+      .filter((t) => !t.parent_id && t.card_id === c.card_id && (c.completed ? !!t.completed_at : !t.completed_at))
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   }
   if (c.list_type === 'someday') {
@@ -189,6 +200,52 @@ const BUILTIN_MENU_ITEMS = [
   { key: 'habits', label: 'Привычки' },
   { key: 'focus_analytics', label: 'Фокус' },
 ];
+
+// Icon pair (default, hover/active) of a user-made section, by its kind.
+const PROJECT_KIND_ICONS = {
+  project: [folderIcon, folderNavIcon],
+  board: [doskaIcon, doskaNavIcon],
+  kanban: [kanbanIcon, kanbanNavIcon],
+};
+
+const projectIcons = (kind) => PROJECT_KIND_ICONS[kind] || PROJECT_KIND_ICONS.project;
+
+// What each kind of user-made section is called in the modals that create,
+// rename and delete it.
+const PROJECT_KIND_WORDS = {
+  project: {
+    tab: 'Список задач',
+    createTitle: 'Новый проект',
+    createButton: 'Добавить проект',
+    namePlaceholder: 'Название проекта',
+    editTitle: 'Редактировать проект',
+    deleteButton: 'Удалить проект',
+    deleteTitle: 'Удалить проект?',
+    deleteText: 'Все задачи в этом проекте также будут удалены.',
+  },
+  board: {
+    tab: 'Доска',
+    createTitle: 'Новая доска',
+    createButton: 'Добавить доску',
+    namePlaceholder: 'Название доски',
+    editTitle: 'Редактировать доску',
+    deleteButton: 'Удалить доску',
+    deleteTitle: 'Удалить доску?',
+    deleteText: 'Все текстовые блоки на этой доске также будут удалены.',
+  },
+  kanban: {
+    tab: 'Канбан',
+    createTitle: 'Новая канбан-доска',
+    createButton: 'Добавить канбан-доску',
+    namePlaceholder: 'Название канбан-доски',
+    editTitle: 'Редактировать канбан-доску',
+    deleteButton: 'Удалить канбан-доску',
+    deleteTitle: 'Удалить канбан-доску?',
+    deleteText: 'Все столбцы, плашки и их задачи также будут удалены.',
+  },
+};
+
+const kindWords = (kind) => PROJECT_KIND_WORDS[kind] || PROJECT_KIND_WORDS.project;
 
 const menuHiddenKey = (kind, id) =>
   kind === 'builtin' ? `menu_hidden::${id}` : `menu_hidden::project::${id}`;
@@ -243,8 +300,7 @@ function BuiltinMenuOrderRow({ item, hidden, onToggleHidden, icon }) {
 
 function SortableMenuOrderRow({ project, hidden, onToggleHidden }) {
   const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: project.id });
-  const isBoard = (project.kind || 'project') === 'board';
-  const icon = isBoard ? doskaIcon : folderIcon;
+  const [icon] = projectIcons(project.kind || 'project');
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -333,7 +389,20 @@ export default function Dashboard() {
     updatePromise: updateReputationPromise,
     deletePromise: deleteReputationPromise,
   } = useReputation();
-  const { projects, loading: projectsLoading, addProject, updateProject, deleteProject, reorderProjects } = useProjects();
+  const { projects, loading: projectsLoading, addProject, updateProject, updateProjectSettings, deleteProject, reorderProjects } = useProjects();
+  const kanbanBoardIds = useMemo(() => projects.filter((p) => p.kind === 'kanban').map((p) => p.id), [projects]);
+  const {
+    columns: kanbanColumns,
+    cards: kanbanCards,
+    addColumn: addKanbanColumn,
+    updateColumn: updateKanbanColumn,
+    deleteColumn: deleteKanbanColumn,
+    reorderColumns: reorderKanbanColumns,
+    addCard: addKanbanCard,
+    updateCard: updateKanbanCard,
+    deleteCard: deleteKanbanCard,
+    moveCard: moveKanbanCard,
+  } = useKanban(kanbanBoardIds);
   const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
   const {
     items: boardItems,
@@ -385,7 +454,7 @@ export default function Dashboard() {
       if (!raw) return 'plans';
       const parsed = JSON.parse(raw);
       const v = parsed?.viewMode;
-      return ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'focus_analytics', 'board', 'project'].includes(v) ? v : 'plans';
+      return ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'focus_analytics', 'board', 'kanban', 'project'].includes(v) ? v : 'plans';
     } catch {
       return 'plans';
     }
@@ -424,6 +493,17 @@ export default function Dashboard() {
       return null;
     }
   });
+  const [activeKanbanId, setActiveKanbanId] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dashboard_view_state');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.activeKanbanId ?? null;
+    } catch {
+      return null;
+    }
+  });
+  const [openCardId, setOpenCardId] = useState(null);
   const [completedVisibleByList, setCompletedVisibleByList] = useState(loadCompletedVisibleByList);
   const completedVisibleListKey = useMemo(() => {
     if (viewMode === 'today') return 'today';
@@ -600,10 +680,10 @@ export default function Dashboard() {
     try {
       localStorage.setItem(
         'dashboard_view_state',
-        JSON.stringify({ viewMode, activeProjectId, activeBoardId, menuOpen })
+        JSON.stringify({ viewMode, activeProjectId, activeBoardId, activeKanbanId, menuOpen })
       );
     } catch {}
-  }, [viewMode, activeProjectId, activeBoardId, menuOpen]);
+  }, [viewMode, activeProjectId, activeBoardId, activeKanbanId, menuOpen]);
 
   useEffect(() => {
     if (viewMode === 'project') {
@@ -634,8 +714,16 @@ export default function Dashboard() {
       if (projects.length && !projects.some((p) => p.id === activeBoardId && p.kind === 'board')) {
         setActiveBoardId(null);
       }
+      return;
     }
-  }, [viewMode, activeProjectId, activeBoardId, projects, projectsLoading, boardItems, boardItemsLoading]);
+    if (viewMode === 'kanban') {
+      if (projectsLoading) return;
+      if (projects.some((p) => p.id === activeKanbanId && p.kind === 'kanban')) return;
+      const firstKanban = projects.find((p) => p.kind === 'kanban');
+      if (firstKanban) setActiveKanbanId(firstKanban.id);
+      else setViewMode('plans');
+    }
+  }, [viewMode, activeProjectId, activeBoardId, activeKanbanId, projects, projectsLoading, boardItems, boardItemsLoading]);
 
   const handleMenuSelect = useCallback((target) => {
     const isBuiltinView = ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'focus_analytics'].includes(target);
@@ -647,6 +735,10 @@ export default function Dashboard() {
       if (project && project.kind === 'board') {
         setViewMode('board');
         setActiveBoardId(target);
+        setActiveProjectId(null);
+      } else if (project && project.kind === 'kanban') {
+        setViewMode('kanban');
+        setActiveKanbanId(target);
         setActiveProjectId(null);
       } else {
         setViewMode('project');
@@ -667,6 +759,10 @@ export default function Dashboard() {
       if (addProjectKind === 'board') {
         setViewMode('board');
         setActiveBoardId(created.id);
+        setActiveProjectId(null);
+      } else if (addProjectKind === 'kanban') {
+        setViewMode('kanban');
+        setActiveKanbanId(created.id);
         setActiveProjectId(null);
       } else {
         setViewMode('project');
@@ -897,6 +993,32 @@ export default function Dashboard() {
 
   const inboxTasks = useMemo(() => tasks.filter((t) => (t.list_type || 'inbox') === 'inbox'), [tasks]);
 
+  // Subtasks by parent, for the views that are rendered here rather than by a
+  // list component of their own (the kanban board and its card panel).
+  const subtasksByParent = useMemo(() => {
+    const map = new Map();
+    for (const t of tasks) {
+      if (!t.parent_id) continue;
+      const list = map.get(t.parent_id);
+      if (list) list.push(t);
+      else map.set(t.parent_id, [t]);
+    }
+    for (const list of map.values()) list.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    return map;
+  }, [tasks]);
+  const getSubtasksOf = useCallback((parentId) => subtasksByParent.get(parentId) || [], [subtasksByParent]);
+
+  const activeKanbanBoard = useMemo(
+    () => (viewMode === 'kanban' ? projects.find((p) => p.id === activeKanbanId && p.kind === 'kanban') ?? null : null),
+    [viewMode, projects, activeKanbanId],
+  );
+  // The card panel closes by itself when its card is gone (deleted here or by
+  // someone else on a shared board).
+  const openCard = useMemo(
+    () => (openCardId ? kanbanCards.find((c) => c.id === openCardId) ?? null : null),
+    [openCardId, kanbanCards],
+  );
+
   // Promises grouped by their day, for the optional reputation rows in the
   // Plans and Calendar day lists.
   const reputationByDate = useMemo(() => {
@@ -940,7 +1062,9 @@ export default function Dashboard() {
   const handleAddTaskAt = useCallback(
     (payload) => {
       let sameBucket;
-      if (payload.list_type === 'someday') {
+      if (payload.card_id) {
+        sameBucket = tasks.filter((t) => !t.parent_id && t.card_id === payload.card_id);
+      } else if (payload.list_type === 'someday') {
         sameBucket = tasks.filter((t) => !t.parent_id && (t.list_type || '') === 'someday');
       } else if (payload.list_type === 'project' && payload.project_id) {
         sameBucket = tasks.filter((t) => !t.parent_id && (t.list_type || '') === 'project' && t.project_id === payload.project_id);
@@ -970,6 +1094,7 @@ export default function Dashboard() {
         scheduled_date: parent.scheduled_date,
         list_type: parent.list_type || 'inbox',
         project_id: parent.project_id ?? null,
+        card_id: parent.card_id ?? null,
         text_color: '#ffffff',
         position: maxPos + 1,
       });
@@ -989,6 +1114,7 @@ export default function Dashboard() {
         scheduled_date: bucket.scheduled_date,
         list_type: bucket.list_type,
         project_id: bucket.project_id,
+        card_id: bucket.card_id,
         text_color: task.text_color || '#ffffff',
         completed_at: null,
         position: maxPos + 1,
@@ -1002,7 +1128,7 @@ export default function Dashboard() {
     async (task) => {
       if (!task) return;
       const siblings = tasks
-        .filter((t) => !t.parent_id && (t.list_type || 'inbox') === (task.list_type || 'inbox') && (t.project_id ?? null) === (task.project_id ?? null) && normDate(t.scheduled_date) === normDate(task.scheduled_date))
+        .filter((t) => !t.parent_id && (t.list_type || 'inbox') === (task.list_type || 'inbox') && (t.project_id ?? null) === (task.project_id ?? null) && (t.card_id ?? null) === (task.card_id ?? null) && normDate(t.scheduled_date) === normDate(task.scheduled_date))
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
       const insertPosition = (task.position ?? 0) + 1;
       siblings
@@ -1013,6 +1139,7 @@ export default function Dashboard() {
         scheduled_date: task.scheduled_date ?? null,
         list_type: task.list_type || 'inbox',
         project_id: task.project_id ?? null,
+        card_id: task.card_id ?? null,
         parent_id: null,
         text_color: task.text_color || '#ffffff',
         completed_at: null,
@@ -1039,6 +1166,7 @@ export default function Dashboard() {
         scheduled_date: parent.scheduled_date ?? null,
         list_type: parent.list_type || 'inbox',
         project_id: parent.project_id ?? null,
+        card_id: parent.card_id ?? null,
         text_color: task.text_color || parent.text_color || '#ffffff',
         completed_at: null,
         position: insertPosition,
@@ -1161,11 +1289,18 @@ export default function Dashboard() {
       let parent_id = targetConfig.parent_id ?? null;
       let list_type = targetConfig.list_type ?? 'inbox';
       let project_id = targetConfig.project_id ?? null;
+      let card_id = targetConfig.card_id ?? null;
       if (targetConfig.parent_id) {
         const parentTask = tasks.find((t) => t.id === targetConfig.parent_id);
         scheduled_date = parentTask?.scheduled_date ?? null;
         list_type = parentTask?.list_type ?? 'inbox';
         project_id = parentTask?.project_id ?? null;
+        card_id = parentTask?.card_id ?? null;
+      } else if (card_id) {
+        // The board of a card is not part of the container id, so the task
+        // takes it from the card itself: that is what shares it with everyone
+        // the board is shared with.
+        project_id = kanbanCards.find((c) => c.id === card_id)?.board_id ?? null;
       }
       const completed_at = targetConfig.completed ? new Date().toISOString() : null;
 
@@ -1176,7 +1311,7 @@ export default function Dashboard() {
       const newOrderedIds = targetIds;
 
       const updates = [];
-      updates.push({ id: movedTask.id, payload: { scheduled_date, parent_id, completed_at, position: index, list_type, project_id } });
+      updates.push({ id: movedTask.id, payload: { scheduled_date, parent_id, completed_at, position: index, list_type, project_id, card_id } });
       for (let i = 0; i < newOrderedIds.length; i++) {
         if (newOrderedIds[i] !== movedTask.id) {
           updates.push({ id: newOrderedIds[i], payload: { position: i } });
@@ -1196,7 +1331,7 @@ export default function Dashboard() {
         }
       });
     },
-    [tasks, projects, habits, moveTask, updateTask, reorderProjects, reorderHabits, reputationPromises, updateReputationPromise, getDayItems]
+    [tasks, projects, habits, moveTask, updateTask, reorderProjects, reorderHabits, reputationPromises, updateReputationPromise, getDayItems, kanbanCards]
   );
 
   const sensors = useSensors(
@@ -1382,7 +1517,7 @@ export default function Dashboard() {
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
     <div
-      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''} ${viewMode === 'board' ? 'dashboard--board' : ''} ${viewMode === 'board' && !activeBoardId ? 'dashboard--board-pdf-only' : ''} ${viewMode === 'goal_plan' ? 'dashboard--goal-plan' : ''}`}
+      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''} ${viewMode === 'board' ? 'dashboard--board' : ''} ${viewMode === 'board' && !activeBoardId ? 'dashboard--board-pdf-only' : ''} ${viewMode === 'kanban' ? 'dashboard--kanban' : ''} ${viewMode === 'goal_plan' ? 'dashboard--goal-plan' : ''}`}
       style={{
         '--sidebar-width': `${liveMenuWidth}px`,
         '--task-font-weight': String(taskFontWeightToCssNumber(normalizeTaskFontWeight(liveTaskFontWeight))),
@@ -1488,7 +1623,7 @@ export default function Dashboard() {
                 className="dashboard__board-header-slot dashboard__board-header-slot--right"
               />
             )}
-            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'reputation' && (
+            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'reputation' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
@@ -1630,22 +1765,25 @@ export default function Dashboard() {
               )}
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                 {projects.filter((p) => !isProjectHidden(p.id)).map((p) => {
-                  const isBoard = p.kind === 'board';
-                  const isActive = isBoard
+                  const kind = p.kind || 'project';
+                  const [iconDefault, iconHover] = projectIcons(kind);
+                  const isActive = kind === 'board'
                     ? viewMode === 'board' && activeBoardId === p.id
-                    : viewMode === 'project' && activeProjectId === p.id;
+                    : kind === 'kanban'
+                      ? viewMode === 'kanban' && activeKanbanId === p.id
+                      : viewMode === 'project' && activeProjectId === p.id;
                   return (
                     <SortableProjectItem
                       key={p.id}
                       project={p}
                       isActive={isActive}
                       isHover={hasHover && projectHoverId === p.id}
-                      iconDefault={isBoard ? doskaIcon : folderIcon}
-                      iconHover={isBoard ? doskaNavIcon : folderNavIcon}
+                      iconDefault={iconDefault}
+                      iconHover={iconHover}
                       onClick={() => handleMenuSelect(p.id)}
                       onMouseEnter={() => setProjectHoverId(p.id)}
                       onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
-                      dirty={isBoard && boardDirtyIds.has(p.id)}
+                      dirty={kind === 'board' && boardDirtyIds.has(p.id)}
                     />
                   );
                 })}
@@ -1820,22 +1958,25 @@ export default function Dashboard() {
               )}
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                 {projects.filter((p) => !isProjectHidden(p.id)).map((p) => {
-                  const isBoard = p.kind === 'board';
-                  const isActive = isBoard
+                  const kind = p.kind || 'project';
+                  const [iconDefault, iconHover] = projectIcons(kind);
+                  const isActive = kind === 'board'
                     ? viewMode === 'board' && activeBoardId === p.id
-                    : viewMode === 'project' && activeProjectId === p.id;
+                    : kind === 'kanban'
+                      ? viewMode === 'kanban' && activeKanbanId === p.id
+                      : viewMode === 'project' && activeProjectId === p.id;
                   return (
                     <SortableProjectItem
                       key={p.id}
                       project={p}
                       isActive={isActive}
                       isHover={hasHover && projectHoverId === p.id}
-                      iconDefault={isBoard ? doskaIcon : folderIcon}
-                      iconHover={isBoard ? doskaNavIcon : folderNavIcon}
+                      iconDefault={iconDefault}
+                      iconHover={iconHover}
                       onClick={() => handleMenuSelect(p.id)}
                       onMouseEnter={() => setProjectHoverId(p.id)}
                       onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
-                      dirty={isBoard && boardDirtyIds.has(p.id)}
+                      dirty={kind === 'board' && boardDirtyIds.has(p.id)}
                     />
                   );
                 })}
@@ -1888,45 +2029,38 @@ export default function Dashboard() {
       {addProjectModalOpen && (
         <div className="dashboard__settings-overlay" onClick={() => { setAddProjectModalOpen(false); setAddProjectKind('project'); }}>
           <div className="dashboard__settings-popup dashboard__settings-popup--new-project" onClick={(e) => e.stopPropagation()}>
-            <div className="dashboard__settings-title">{addProjectKind === 'board' ? 'Новая доска' : 'Новый проект'}</div>
+            <div className="dashboard__settings-title">{kindWords(addProjectKind).createTitle}</div>
             <div
-              className={`dashboard__kind-toggle dashboard__kind-toggle--${addProjectKind === 'board' ? 'board' : 'project'}`}
+              className={`dashboard__kind-toggle dashboard__kind-toggle--${addProjectKind}`}
               role="tablist"
               aria-label="Тип нового элемента"
             >
               <span className="dashboard__kind-toggle-indicator" aria-hidden="true" />
-              <button
-                type="button"
-                role="tab"
-                aria-selected={addProjectKind === 'project'}
-                className={`dashboard__kind-toggle-option ${addProjectKind === 'project' ? 'dashboard__kind-toggle-option--active' : ''}`}
-                onClick={() => setAddProjectKind('project')}
-              >
-                <img src={folderIcon} alt="" className="dashboard__kind-toggle-icon" />
-                <span>Список задач</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={addProjectKind === 'board'}
-                className={`dashboard__kind-toggle-option ${addProjectKind === 'board' ? 'dashboard__kind-toggle-option--active' : ''}`}
-                onClick={() => setAddProjectKind('board')}
-              >
-                <img src={doskaIcon} alt="" className="dashboard__kind-toggle-icon" />
-                <span>Доска</span>
-              </button>
+              {['project', 'board', 'kanban'].map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  role="tab"
+                  aria-selected={addProjectKind === kind}
+                  className={`dashboard__kind-toggle-option ${addProjectKind === kind ? 'dashboard__kind-toggle-option--active' : ''}`}
+                  onClick={() => setAddProjectKind(kind)}
+                >
+                  <img src={projectIcons(kind)[0]} alt="" className="dashboard__kind-toggle-icon" />
+                  <span>{kindWords(kind).tab}</span>
+                </button>
+              ))}
             </div>
             <input
               type="text"
               className="dashboard__settings-input"
               value={addProjectTitle}
               onChange={(e) => setAddProjectTitle(e.target.value)}
-              placeholder={addProjectKind === 'board' ? 'Название доски' : 'Название проекта'}
+              placeholder={kindWords(addProjectKind).namePlaceholder}
               autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter') handleAddProjectSubmit(); }}
             />
             <button type="button" className="dashboard__settings-submit" onClick={handleAddProjectSubmit}>
-              {addProjectKind === 'board' ? 'Добавить доску' : 'Добавить проект'}
+              {kindWords(addProjectKind).createButton}
             </button>
           </div>
         </div>
@@ -1935,13 +2069,13 @@ export default function Dashboard() {
       {editProjectOpen && (
         <div className="dashboard__settings-overlay" onClick={() => { setEditProjectOpen(false); setEditProjectId(null); setEditProjectTitle(''); }}>
           <div className="dashboard__settings-popup dashboard__settings-popup--edit-project" onClick={(e) => e.stopPropagation()}>
-            <div className="dashboard__settings-title">{editProjectKind === 'board' ? 'Редактировать доску' : 'Редактировать проект'}</div>
+            <div className="dashboard__settings-title">{kindWords(editProjectKind).editTitle}</div>
             <input
               type="text"
               className="dashboard__settings-input"
               value={editProjectTitle}
               onChange={(e) => setEditProjectTitle(e.target.value)}
-              placeholder={editProjectKind === 'board' ? 'Название доски' : 'Название проекта'}
+              placeholder={kindWords(editProjectKind).namePlaceholder}
               autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter') handleEditProjectSave(); }}
             />
@@ -1995,7 +2129,7 @@ export default function Dashboard() {
               </button>
               {editProjectIsOwner && (
                 <button type="button" className="dashboard__settings-delete" onClick={handleEditProjectDeleteClick}>
-                  {editProjectKind === 'board' ? 'Удалить доску' : 'Удалить проект'}
+                  {kindWords(editProjectKind).deleteButton}
                 </button>
               )}
             </div>
@@ -2006,8 +2140,8 @@ export default function Dashboard() {
       {deleteProjectConfirmOpen && (
         <div className="dashboard__settings-overlay" onClick={handleCancelDeleteProject}>
           <div className="dashboard__settings-popup" onClick={(e) => e.stopPropagation()}>
-            <div className="dashboard__settings-title">{editProjectKind === 'board' ? 'Удалить доску?' : 'Удалить проект?'}</div>
-            <p className="dashboard__confirm-text">{editProjectKind === 'board' ? 'Все текстовые блоки на этой доске также будут удалены.' : 'Все задачи в этом проекте также будут удалены.'}</p>
+            <div className="dashboard__settings-title">{kindWords(editProjectKind).deleteTitle}</div>
+            <p className="dashboard__confirm-text">{kindWords(editProjectKind).deleteText}</p>
             <div className="dashboard__settings-edit-actions">
               <button type="button" className="dashboard__settings-submit" onClick={handleCancelDeleteProject}>
                 Отмена
@@ -2288,7 +2422,7 @@ export default function Dashboard() {
                   {activeMenuOrderProject ? (
                     <div className="dashboard-menu__order-row dashboard-menu__order-row--overlay">
                       <img
-                        src={(activeMenuOrderProject.kind || 'project') === 'board' ? doskaIcon : folderIcon}
+                        src={projectIcons(activeMenuOrderProject.kind || 'project')[0]}
                         alt=""
                         className="dashboard-menu__order-icon"
                       />
@@ -2543,6 +2677,50 @@ export default function Dashboard() {
         />
       )}
 
+      {viewMode === 'kanban' && activeKanbanBoard && (
+        <KanbanView
+          key={activeKanbanBoard.id}
+          board={activeKanbanBoard}
+          columns={kanbanColumns}
+          cards={kanbanCards}
+          tasks={tasks}
+          getSubtasks={getSubtasksOf}
+          addColumn={addKanbanColumn}
+          updateColumn={updateKanbanColumn}
+          deleteColumn={deleteKanbanColumn}
+          reorderColumns={reorderKanbanColumns}
+          addCard={addKanbanCard}
+          moveCard={moveKanbanCard}
+          onToggleTask={handleToggle}
+          onOpenCard={setOpenCardId}
+          onUpdateBoard={updateProjectSettings}
+        />
+      )}
+
+      {openCard && (
+        <KanbanCardPanel
+          key={openCard.id}
+          card={openCard}
+          tasks={tasks}
+          getSubtasks={getSubtasksOf}
+          completedVisible={completedVisible}
+          onUpdateCard={updateKanbanCard}
+          onDeleteCard={deleteKanbanCard}
+          onClose={() => setOpenCardId(null)}
+          onToggle={handleToggle}
+          onUpdate={updateTask}
+          onDelete={deleteTask}
+          onAddSubtask={handleAddSubtask}
+          onAddTask={handleAddTaskAt}
+          onTaskContextMenu={handleTaskContextMenu}
+          editingTaskId={editingTaskId}
+          onEditingTaskConsumed={() => setEditingTaskId(null)}
+          onCreateSiblingTask={handleCreateSiblingTask}
+          onCreateSiblingSubtask={handleCreateSiblingSubtask}
+          onCreateSubtaskAndEdit={handleCreateSubtaskAndEdit}
+        />
+      )}
+
       {viewMode === 'project' && activeProjectId && (
         <ProjectList
           projectId={activeProjectId}
@@ -2578,18 +2756,18 @@ export default function Dashboard() {
         </button>
       )}
 
-      {((viewMode === 'project' && activeProjectId) || (viewMode === 'board' && activeBoardId)) && (
+      {((viewMode === 'project' && activeProjectId) || (viewMode === 'board' && activeBoardId) || (viewMode === 'kanban' && activeKanbanId)) && (
         <button
           type="button"
           className="dashboard__edit-project-fab"
           onMouseEnter={() => hasHover && setEditProjectFabHover(true)}
           onMouseLeave={() => hasHover && setEditProjectFabHover(false)}
           onClick={() => {
-            const id = viewMode === 'board' ? activeBoardId : activeProjectId;
+            const id = viewMode === 'board' ? activeBoardId : viewMode === 'kanban' ? activeKanbanId : activeProjectId;
             const entry = projects.find((p) => p.id === id);
-            handleOpenEditProject(id, entry?.title ?? '', entry?.kind ?? (viewMode === 'board' ? 'board' : 'project'));
+            handleOpenEditProject(id, entry?.title ?? '', entry?.kind ?? 'project');
           }}
-          aria-label={viewMode === 'board' ? 'Редактировать доску' : 'Редактировать проект'}
+          aria-label={kindWords(viewMode === 'board' ? 'board' : viewMode === 'kanban' ? 'kanban' : 'project').editTitle}
         >
           <img src={hasHover && editProjectFabHover ? editNavIcon : editIcon} alt="" />
         </button>
@@ -2644,7 +2822,7 @@ export default function Dashboard() {
           </div>
         ) : activeProjectDrag ? (
           <div className="dashboard-menu__project-drag-overlay" style={{ cursor: 'grabbing', pointerEvents: 'none' }}>
-            <img src={activeProjectDrag.kind === 'board' ? doskaIcon : folderIcon} alt="" />
+            <img src={projectIcons(activeProjectDrag.kind || 'project')[0]} alt="" />
             <span>{activeProjectDrag.title}</span>
           </div>
         ) : activeHabitDrag ? (

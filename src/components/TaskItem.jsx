@@ -472,9 +472,12 @@ export function TaskItem({
                     value={task.scheduled_date}
                     onChange={(dateStr) => {
                       const next = { scheduled_date: dateStr };
-                      if ((task.list_type || 'inbox') !== 'inbox' || task.project_id) {
+                      // A dated task belongs to the day, so it leaves whatever
+                      // section (project, someday, kanban card) it came from.
+                      if ((task.list_type || 'inbox') !== 'inbox' || task.project_id || task.card_id) {
                         next.list_type = 'inbox';
                         next.project_id = null;
+                        next.card_id = null;
                       }
                       onUpdate(task.id, next);
                       setCalendarOpen(false);

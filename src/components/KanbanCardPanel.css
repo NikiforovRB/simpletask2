@@ -1,0 +1,211 @@
+/* Backdrop + the panel itself, anchored to the right edge for the full height
+   of the window. */
+.kanban-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: var(--overlay);
+  animation: kanban-panel-fade-in 0.18s ease;
+}
+
+.kanban-panel-overlay--closing {
+  animation: kanban-panel-fade-out 0.22s ease forwards;
+}
+
+@keyframes kanban-panel-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes kanban-panel-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.kanban-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-app);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-elev);
+  box-sizing: border-box;
+  animation: kanban-panel-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.kanban-panel--closing {
+  animation: kanban-panel-out 0.22s ease forwards;
+}
+
+@keyframes kanban-panel-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes kanban-panel-out {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+.kanban-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 0.25rem;
+}
+
+.kanban-panel__color-wrap {
+  position: relative;
+  display: inline-flex;
+  margin-right: auto;
+}
+
+.kanban-panel__color {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.kanban-panel__color--none {
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+
+.kanban-panel__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.kanban-panel__icon-btn img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+}
+
+.kanban-panel__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-elev);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.kanban-panel__close:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+.kanban-panel__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.25rem 1rem 3rem;
+}
+
+.kanban-panel__title {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  resize: none;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-strong);
+  box-sizing: border-box;
+}
+
+.kanban-panel__title:focus,
+.kanban-panel__desc:focus {
+  outline: none;
+}
+
+.kanban-panel__section-title {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 0.35rem;
+}
+
+.kanban-panel__section-title--done {
+  margin-top: 1.25rem;
+}
+
+.kanban-panel__desc {
+  width: 100%;
+  min-height: 3rem;
+  background: var(--bg-surface);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  margin-bottom: 1.25rem;
+  resize: none;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.kanban-panel__desc:focus {
+  border-color: var(--accent);
+}
+
+.kanban-panel__tasks-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.kanban-panel__tasks-head .kanban-panel__section-title {
+  margin-bottom: 0;
+}
+
+.kanban-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kanban-panel__list > li + li {
+  margin-top: 10px;
+}
+
+.kanban-panel__list--completed .task-item__title {
+  color: var(--text-dim);
+}
+
+/* The action buttons of a task mask the title with the page background; inside
+   the panel that background is the panel's own. */
+.kanban-panel .task-item__actions {
+  background: var(--bg-app);
+}

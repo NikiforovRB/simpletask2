@@ -119,6 +119,14 @@ export function useProjects() {
     }
   };
 
+  /** Display settings that belong to the section itself (kanban layout). */
+  const updateProjectSettings = async (projectId, patch) => {
+    if (!user || !patch) return;
+    setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, ...patch } : p)));
+    const { error } = await supabase.from('task_projects').update(patch).eq('id', projectId);
+    if (error) fetchProjects();
+  };
+
   const deleteProject = async (projectId) => {
     if (!user) return;
     // Only the owner can delete (enforced here and by RLS).
@@ -134,5 +142,5 @@ export function useProjects() {
     }
   };
 
-  return { projects, loading, addProject, updateProject, deleteProject, reorderProjects, refetch: fetchProjects };
+  return { projects, loading, addProject, updateProject, updateProjectSettings, deleteProject, reorderProjects, refetch: fetchProjects };
 }
