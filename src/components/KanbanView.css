@@ -390,6 +390,7 @@
 }
 
 .kanban-card {
+  position: relative;
   background: var(--bg-elev);
   border-radius: 10px;
   padding: 0.55rem 0.65rem;
@@ -397,6 +398,43 @@
   box-sizing: border-box;
   touch-action: none;
   transition: background 0.15s ease;
+}
+
+/* Folds the description and the task list away, leaving the title. It waits
+   in the corner until the pointer is on the card, and stays out while the
+   card is folded, as the only sign that something is hidden. */
+.kanban-card__fold {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+.kanban-card__fold img {
+  width: 0.9rem;
+  height: 0.9rem;
+  object-fit: contain;
+}
+
+@media (hover: hover) {
+  .kanban-card__fold {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .kanban-card:hover .kanban-card__fold,
+  .kanban-card__fold--shown {
+    opacity: 1;
+  }
 }
 
 .kanban-card:hover {
@@ -423,6 +461,12 @@
   background: color-mix(in srgb, var(--danger) 20%, var(--bg-elev));
 }
 
+/* Room for the fold button in the corner. */
+.kanban-card--foldable .kanban-card__tags,
+.kanban-card--foldable .kanban-card__title {
+  padding-right: 1.1rem;
+}
+
 /* Labels and the due date, above the title. */
 .kanban-card__tags {
   display: flex;
@@ -446,21 +490,13 @@
 .kanban-card__due {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.05rem 0.4rem 0.05rem 0.25rem;
+  padding: 0.05rem 0.4rem;
   border-radius: 999px;
   background: var(--bg-surface-2);
   color: var(--text-muted);
   font-size: 0.6875rem;
   line-height: 1.5;
   white-space: nowrap;
-}
-
-.kanban-card__due img {
-  width: 0.7rem;
-  height: 0.7rem;
-  object-fit: contain;
-  opacity: 0.75;
 }
 
 .kanban-card__due--overdue {

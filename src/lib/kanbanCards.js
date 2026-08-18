@@ -1,17 +1,12 @@
-import { toLocalDateString } from '../constants';
+import { MONTH_GENITIVE_RU, WEEKDAY_SHORT_RU, toLocalDateString } from '../constants';
 
-const MONTHS_SHORT_RU = [
-  'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
-  'июл', 'авг', 'сен', 'окт', 'ноя', 'дек',
-];
-
-/** "12 мая", with the year added once it is not the current one. */
+/** "20 августа, чт", with the year added once it is not the current one. */
 export function formatDueDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(`${dateStr}T12:00:00`);
   if (Number.isNaN(d.getTime())) return dateStr;
-  const label = `${d.getDate()} ${MONTHS_SHORT_RU[d.getMonth()]}`;
-  return d.getFullYear() === new Date().getFullYear() ? label : `${label} ${d.getFullYear()}`;
+  const year = d.getFullYear() === new Date().getFullYear() ? '' : ` ${d.getFullYear()}`;
+  return `${d.getDate()} ${MONTH_GENITIVE_RU[d.getMonth()]}${year}, ${WEEKDAY_SHORT_RU[d.getDay()]}`;
 }
 
 /** True once the due day has passed; the card is highlighted from then on. */

@@ -2,10 +2,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
-import { ColorPalette, LabelPicker } from './KanbanView';
+import { ColorPalette, LabelPicker, Popover } from './KanbanView';
+import { CalendarPopover } from './CalendarPopover';
 import { getContainerIdForCard } from '../lib/dnd';
-import { cardLabels, isOverdue, labelTextColor } from '../lib/kanbanCards';
-import { DEFAULT_TASK_COLOR } from '../constants';
+import { cardLabels, formatDueDate, isOverdue, labelTextColor } from '../lib/kanbanCards';
+import { DEFAULT_TASK_COLOR, toLocalDateString } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
@@ -55,11 +56,13 @@ export function KanbanCardPanel({
   const [plusHover, setPlusHover] = useState(false);
   const [delHover, setDelHover] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
+  const [dueOpen, setDueOpen] = useState(false);
   const titleRef = useAutoGrow(title);
   const descRef = useAutoGrow(description);
   const titleColorRef = useRef(null);
   const borderColorRef = useRef(null);
   const labelsBtnRef = useRef(null);
+  const dueBtnRef = useRef(null);
 
   const requestClose = useRef(null);
   requestClose.current = () => {
@@ -223,16 +226,15 @@ export function KanbanCardPanel({
           />
 
           <div className="kanban-panel__meta">
-            <label className="kanban-panel__due">
+            <button
+              type="button"
+              ref={dueBtnRef}
+              className={`kanban-panel__due ${isOverdue(card.due_date) ? 'kanban-panel__due--overdue' : ''}`}
+              onClick={() => setDueOpen((v) => !v)}
+            >
               <img src={calIcon} alt="" />
-              <input
-                type="date"
-                className={`kanban-panel__date ${isOverdue(card.due_date) ? 'kanban-panel__date--overdue' : ''}`}
-                value={card.due_date || ''}
-                onChange={(e) => onUpdateCard(cardId, { due_date: e.target.value || null })}
-                aria-label="Срок"
-              />
-            </label>
+              {card.due_date ? formatDueDate(card.due_date) : 'Без срока'}
+            </button>
             {card.due_date && (
               <button
                 type="button"
@@ -241,6 +243,37 @@ export function KanbanCardPanel({
               >
                 Убрать срок
               </button>
+            )}
+            {dueOpen && (
+              <Popover anchor={dueBtnRef} align="left" onClose={() => setDueOpen(false)} className="kanban-due-pop">
+                <CalendarPopover
+                  value={card.due_date || null}
+                  onChange={(dateStr) => onUpdateCard(cardId, { due_date: dateStr })}
+                  onClose={() => setDueOpen(false)}
+                />
+                <div className="kanban-due-pop__actions">
+                  <button
+                    type="button"
+                    className="kanban-due-pop__action"
+                    onClick={() => {
+                      onUpdateCard(cardId, { due_date: toLocalDateString(new Date()) });
+                      setDueOpen(false);
+                    }}
+                  >
+                    Сегодня
+                  </button>
+                  <button
+                    type="button"
+                    className="kanban-due-pop__action kanban-due-pop__action--clear"
+                    onClick={() => {
+                      onUpdateCard(cardId, { due_date: null });
+                      setDueOpen(false);
+                    }}
+                  >
+                    Без срока
+                  </button>
+                </div>
+              </Popover>
             )}
           </div>
 

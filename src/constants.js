@@ -24,11 +24,11 @@ export function toLocalDateString(date) {
   return `${y}-${m}-${d}`;
 }
 
-const MONTH_GENITIVE_RU = [
+export const MONTH_GENITIVE_RU = [
   'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
   'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
 ];
-const WEEKDAY_SHORT_RU = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+export const WEEKDAY_SHORT_RU = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 
 export function formatDayLabel(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');

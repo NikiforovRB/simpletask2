@@ -186,9 +186,18 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.25rem 0.5rem;
+  border: none;
   border-radius: 8px;
   background: var(--bg-elev);
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
   cursor: pointer;
+}
+
+.kanban-panel__due:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
 }
 
 .kanban-panel__due img {
@@ -198,27 +207,44 @@
   opacity: 0.8;
 }
 
-.kanban-panel__date {
-  border: none;
+.kanban-panel__due--overdue {
+  color: var(--danger);
+}
+
+/* The month grid brings its own padding and backdrop; inside a popover of the
+   board it only needs the grid itself. */
+.kanban-due-pop .calendar-popover {
   background: none;
   padding: 0;
+}
+
+.kanban-due-pop__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--divider);
+}
+
+.kanban-due-pop__action {
+  border: none;
+  background: none;
+  padding: 0.25rem 0.3rem;
+  border-radius: 6px;
   font-family: inherit;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  color-scheme: dark;
+  font-size: 0.8125rem;
+  color: var(--accent);
   cursor: pointer;
 }
 
-[data-theme="light"] .kanban-panel__date {
-  color-scheme: light;
+.kanban-due-pop__action--clear {
+  color: var(--text-muted);
 }
 
-.kanban-panel__date:focus {
-  outline: none;
-}
-
-.kanban-panel__date--overdue {
-  color: var(--danger);
+.kanban-due-pop__action:hover {
+  background: var(--bg-hover);
 }
 
 .kanban-panel__chip-clear {

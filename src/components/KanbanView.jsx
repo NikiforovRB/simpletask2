@@ -26,6 +26,10 @@ import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav.svg';
 import dragIcon from '../assets/drag.svg';
 import editIcon from '../assets/edit.svg';
+import upIcon from '../assets/up.svg';
+import upNavIcon from '../assets/up-nav.svg';
+import downIcon from '../assets/down.svg';
+import downNavIcon from '../assets/down-nav.svg';
 import calIcon from '../assets/cal.svg';
 import tagIcon from '../assets/tag.svg';
 import tagNavIcon from '../assets/tag-nav.svg';
@@ -76,7 +80,7 @@ function parseKanbanSlotId(id) {
  * by the drop targets that come after a column header, so nothing that has to
  * be clicked is left in the flow of the board.
  */
-function Popover({ anchor, onClose, className = '', align = 'right', children }) {
+export function Popover({ anchor, onClose, className = '', align = 'right', children }) {
   const ref = useRef(null);
 
   useLayoutEffect(() => {
@@ -339,12 +343,13 @@ function CardTaskLine({ task, subtasks, showSubtasks, onToggle, depth = 0 }) {
 }
 
 function KanbanCard({
-  card, settings, tasks, getSubtasks, boardLabels = [],
-  onToggleTask, onOpen, onContextMenu, dragHandleProps, overlay = false,
+  card, settings, tasks, getSubtasks, boardLabels = [], hasHover = false,
+  onToggleTask, onOpen, onContextMenu, onToggleFold, dragHandleProps, overlay = false,
 }) {
   // A card is dragged by its whole body, so a click only counts as a click
   // while the pointer stayed put.
   const downAt = useRef(null);
+  const [foldHover, setFoldHover] = useState(false);
   const cardTasks = useMemo(
     () => tasks.filter((t) => t.card_id === card.id && !t.parent_id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
     [tasks, card.id],
@@ -352,13 +357,18 @@ function KanbanCard({
   const doneCount = cardTasks.filter((t) => t.completed_at).length;
   const marks = cardLabels(card, boardLabels);
   const overdue = isOverdue(card.due_date);
+  const folded = !!card.collapsed;
+  // There is something to fold away only if the board is set to show it and
+  // the card actually has it.
+  const hasBody = (settings.showDescription && !!card.description?.trim())
+    || (settings.showTasks && cardTasks.length > 0);
   const style = card.border_color
     ? { border: `1px solid ${card.border_color}` }
     : undefined;
 
   return (
     <article
-      className={`kanban-card ${overdue ? 'kanban-card--overdue' : ''} ${overlay ? 'kanban-card--overlay' : ''}`}
+      className={`kanban-card ${overdue ? 'kanban-card--overdue' : ''} ${!overlay && hasBody && onToggleFold ? 'kanban-card--foldable' : ''} ${overlay ? 'kanban-card--overlay' : ''}`}
       style={style}
       {...(dragHandleProps?.attributes || {})}
       {...(dragHandleProps?.listeners || {})}
@@ -377,6 +387,28 @@ function KanbanCard({
         onContextMenu(e, card);
       }}
     >
+      {!overlay && hasBody && onToggleFold && (
+        <button
+          type="button"
+          className={`kanban-card__fold ${folded ? 'kanban-card__fold--shown' : ''}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseEnter={() => hasHover && setFoldHover(true)}
+          onMouseLeave={() => hasHover && setFoldHover(false)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFold(card.id, !folded);
+          }}
+          aria-label={folded ? 'Развернуть плашку' : 'Свернуть плашку'}
+          title={folded ? 'Развернуть плашку' : 'Свернуть плашку'}
+        >
+          <img
+            src={folded
+              ? (hasHover && foldHover ? downNavIcon : downIcon)
+              : (hasHover && foldHover ? upNavIcon : upIcon)}
+            alt=""
+          />
+        </button>
+      )}
       {(marks.length > 0 || card.due_date) && (
         <div className="kanban-card__tags">
           {marks.map((l) => (
@@ -390,7 +422,6 @@ function KanbanCard({
           ))}
           {card.due_date && (
             <span className={`kanban-card__due ${overdue ? 'kanban-card__due--overdue' : ''}`}>
-              <img src={calIcon} alt="" />
               {formatDueDate(card.due_date)}
             </span>
           )}
@@ -399,10 +430,10 @@ function KanbanCard({
       <div className="kanban-card__title" style={card.title_color ? { color: card.title_color } : undefined}>
         {card.title || 'Без названия'}
       </div>
-      {settings.showDescription && card.description?.trim() && (
+      {!folded && settings.showDescription && card.description?.trim() && (
         <p className="kanban-card__desc">{card.description}</p>
       )}
-      {settings.showTasks && cardTasks.length > 0 && (
+      {!folded && settings.showTasks && cardTasks.length > 0 && (
         <ul className="kanban-card__tasks">
           {cardTasks.map((t) => (
             <CardTaskLine
@@ -415,7 +446,8 @@ function KanbanCard({
           ))}
         </ul>
       )}
-      {!settings.showTasks && cardTasks.length > 0 && (
+      {/* Folded, or with the task list turned off: how far along it is. */}
+      {(folded || !settings.showTasks) && cardTasks.length > 0 && (
         <div className="kanban-card__meta">{`${doneCount} из ${cardTasks.length}`}</div>
       )}
     </article>
@@ -506,7 +538,7 @@ function CardComposer({ onSubmit, onClose }) {
 
 function KanbanColumn({
   column, cards, width, settings, tasks, getSubtasks, boardLabels, onToggleTask,
-  onOpenCard, onAddCard, onUpdateColumn, onDeleteColumn, onCardMenu, hasHover,
+  onOpenCard, onAddCard, onUpdateColumn, onDeleteColumn, onCardMenu, onToggleFold, hasHover,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: column.id,
@@ -678,7 +710,7 @@ function KanbanColumn({
         className="kanban-column__cards"
         ref={cardsElRef}
         onClick={(e) => {
-          if (e.target === e.currentTarget) openComposer();
+          if (settings.quickAdd && e.target === e.currentTarget) openComposer();
         }}
       >
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
@@ -691,9 +723,11 @@ function KanbanColumn({
                 tasks={tasks}
                 getSubtasks={getSubtasks}
                 boardLabels={boardLabels}
+                hasHover={hasHover}
                 onToggleTask={onToggleTask}
                 onOpen={onOpenCard}
                 onContextMenu={onCardMenu}
+                onToggleFold={onToggleFold}
               />
             </div>
           ))}
@@ -1020,6 +1054,18 @@ function BoardSettingsModal({ board, onChange, onClose }) {
             </label>
           )}
         </div>
+
+        <div className="dashboard__settings-group">
+          <div className="dashboard__settings-title">Создание плашек</div>
+          <label className="dashboard__settings-check">
+            <input
+              type="checkbox"
+              checked={board.kanban_quick_add !== false}
+              onChange={(e) => onChange({ kanban_quick_add: e.target.checked })}
+            />
+            <span>Поле для новой плашки по клику на пустое место</span>
+          </label>
+        </div>
       </div>
     </div>
   );
@@ -1084,6 +1130,7 @@ export function KanbanView({
     showDescription: board.kanban_show_description !== false,
     showTasks: board.kanban_show_tasks !== false,
     showSubtasks: !!board.kanban_show_subtasks,
+    quickAdd: board.kanban_quick_add !== false,
   };
   const width = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, board.kanban_column_width ?? 280));
 
@@ -1305,6 +1352,7 @@ export function KanbanView({
                 onUpdateColumn={updateColumn}
                 onDeleteColumn={deleteColumn}
                 onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
+                onToggleFold={(cardId, collapsed) => updateCard(cardId, { collapsed })}
                 hasHover={hasHover}
               />
             ))}
