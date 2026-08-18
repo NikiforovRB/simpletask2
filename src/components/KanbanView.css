@@ -24,6 +24,7 @@
 }
 
 .kanban__icon-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -33,6 +34,24 @@
   border: none;
   background: none;
   cursor: pointer;
+}
+
+/* How many labels the board is filtered by right now. */
+.kanban__icon-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  min-width: 0.85rem;
+  height: 0.85rem;
+  padding: 0 0.15rem;
+  box-sizing: border-box;
+  border-radius: 0.85rem;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 0.625rem;
+  line-height: 0.85rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .kanban__icon-btn img {
@@ -47,7 +66,9 @@
   margin-bottom: 0.9rem;
 }
 
-/* The columns scroll sideways as a strip; each column scrolls its own cards. */
+/* The columns scroll sideways as a strip; each column scrolls its own cards.
+   Shift and the wheel walk it sideways, and it can be taken hold of by any
+   free spot and dragged. */
 .kanban__board {
   display: flex;
   align-items: flex-start;
@@ -57,6 +78,22 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 0.75rem;
+}
+
+.kanban__board--panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+/* Somewhere to grab the board past the last column. */
+.kanban__pan-space {
+  flex: 1 0 4rem;
+  align-self: stretch;
+  cursor: grab;
+}
+
+.kanban__board--panning .kanban__pan-space {
+  cursor: grabbing;
 }
 
 .kanban-column {
@@ -319,6 +356,39 @@
   margin-bottom: 0.5rem;
 }
 
+/* The field a new card is typed into, shaped like the card it will become. */
+.kanban-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--accent);
+  box-sizing: border-box;
+}
+
+.kanban-composer__input {
+  width: 100%;
+  resize: none;
+  border: none;
+  background: none;
+  padding: 0;
+  outline: none;
+  font-family: 'Gilroy Task', 'Gilroy', system-ui, sans-serif;
+  font-weight: var(--task-font-weight, 500);
+  font-size: calc(0.9375rem * var(--task-font-scale, 1));
+  line-height: 1.35;
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.kanban-composer__hint {
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+}
+
 .kanban-card {
   background: var(--bg-elev);
   border-radius: 10px;
@@ -340,6 +410,62 @@
 .kanban-card--overlay {
   cursor: grabbing;
   box-shadow: var(--shadow-elev);
+}
+
+/* Past its due day the card is tinted, so a stale column stands out from
+   across the board. */
+.kanban-card--overdue {
+  background: var(--danger-soft);
+  background: color-mix(in srgb, var(--danger) 14%, var(--bg-elev));
+}
+
+.kanban-card--overdue:hover {
+  background: color-mix(in srgb, var(--danger) 20%, var(--bg-elev));
+}
+
+/* Labels and the due date, above the title. */
+.kanban-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.3rem;
+}
+
+.kanban-card__label {
+  max-width: 100%;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kanban-card__due {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.05rem 0.4rem 0.05rem 0.25rem;
+  border-radius: 999px;
+  background: var(--bg-surface-2);
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.kanban-card__due img {
+  width: 0.7rem;
+  height: 0.7rem;
+  object-fit: contain;
+  opacity: 0.75;
+}
+
+.kanban-card__due--overdue {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 /* Title and task lines share one type size, as in the plans. */
@@ -449,10 +575,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Colour picker shared by the column strip, the card outline and its title.
-   It lives at the end of the page and is placed under its button by script,
-   so nothing on the board can cover it. */
-.kanban-palette {
+/* Popovers of the board (colour pickers, the label filter). They live at the
+   end of the page and are placed under their button by script, so nothing on
+   the board can cover them. */
+.kanban-pop {
   position: fixed;
   top: 0;
   left: 0;
@@ -463,6 +589,9 @@
   border-radius: 10px;
   box-shadow: var(--shadow-elev);
   padding: 0.5rem;
+}
+
+.kanban-palette {
   width: 12.5rem;
 }
 
@@ -519,6 +648,252 @@
 
 .kanban-palette__none--active {
   color: var(--accent);
+}
+
+/* Right-click menu of a card. It borrows the look of the task menu and adds
+   the rows that stand for a column or a label. */
+.kanban-menu {
+  visibility: hidden;
+  left: 0;
+  top: 0;
+  max-width: min(20rem, calc(100vw - 1rem));
+  max-height: calc(100vh - 1rem);
+  overflow-y: auto;
+}
+
+/* The label of a row (the dot and the tick carry classes of their own). */
+.kanban-menu .dashboard__context-menu-item > span:not([class]) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-menu .dashboard__context-menu-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.kanban-menu .dashboard__context-menu-item:disabled:hover {
+  background: none;
+}
+
+.kanban-menu__color--none {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-strong);
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.kanban-menu__color--none::after {
+  content: '';
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  top: 50%;
+  height: 1px;
+  background: var(--border-strong);
+  transform: rotate(-45deg);
+}
+
+.kanban-menu__dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  margin: 0 0.2rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kanban-menu__check {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 0.8125rem;
+}
+
+.kanban-menu__empty {
+  padding: 0.4rem 0.75rem 0.6rem;
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+}
+
+/* The label filter of the board header. */
+.kanban-filter {
+  width: 15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.kanban-filter__head {
+  padding: 0.15rem 0.4rem 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.kanban-filter__empty {
+  padding: 0.15rem 0.4rem 0.35rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.kanban-filter__item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.35rem 0.4rem;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kanban-filter__item:hover {
+  background: var(--bg-hover);
+}
+
+.kanban-filter__item--on {
+  background: var(--bg-hover);
+}
+
+.kanban-filter__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-filter__reset {
+  margin-top: 0.25rem;
+  padding: 0.35rem 0.4rem;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kanban-filter__reset:hover {
+  background: var(--bg-hover);
+}
+
+/* Labels of a card: the same rows as the filter, plus the pencil that turns a
+   row into its own little editor. */
+.kanban-labels {
+  width: 15.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.kanban-labels__row {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.kanban-labels__row .kanban-filter__item {
+  flex: 1;
+  min-width: 0;
+}
+
+.kanban-labels__pencil {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.kanban-labels__pencil:hover {
+  background: var(--bg-hover);
+  opacity: 1;
+}
+
+.kanban-labels__pencil img {
+  width: 0.9rem;
+  height: 0.9rem;
+  object-fit: contain;
+}
+
+.kanban-labels__edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-app);
+}
+
+.kanban-labels__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+.kanban-labels__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.kanban-labels__edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.kanban-labels__done,
+.kanban-labels__delete,
+.kanban-labels__add {
+  border: none;
+  background: none;
+  padding: 0.25rem 0.3rem;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.kanban-labels__done {
+  color: var(--accent);
+}
+
+.kanban-labels__delete {
+  color: var(--danger);
+}
+
+.kanban-labels__add {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.kanban-labels__done:hover,
+.kanban-labels__delete:hover,
+.kanban-labels__add:hover {
+  background: var(--bg-hover);
 }
 
 /* Column width: stepped, or typed straight into the number. */

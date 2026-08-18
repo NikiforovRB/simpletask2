@@ -18,12 +18,21 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { TASK_COLORS } from '../constants';
+import { cardLabels, dueInDays, formatDueDate, isOverdue, labelTextColor } from '../lib/kanbanCards';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav.svg';
 import dragIcon from '../assets/drag.svg';
+import editIcon from '../assets/edit.svg';
+import calIcon from '../assets/cal.svg';
+import tagIcon from '../assets/tag.svg';
+import tagNavIcon from '../assets/tag-nav.svg';
+import layersIcon from '../assets/layers.svg';
+import starIcon from '../assets/star.svg';
+import zavtraIcon from '../assets/zavtra.svg';
+import closeIcon from '../assets/close.svg';
 import leftIcon from '../assets/left.svg';
 import leftNavIcon from '../assets/left-nav.svg';
 import rightIcon from '../assets/right.svg';
@@ -36,8 +45,20 @@ const DEFAULT_COLUMN_COLOR = '#5a86ee';
 const MIN_COLUMN_WIDTH = 180;
 const MAX_COLUMN_WIDTH = 640;
 const COLUMN_WIDTH_STEP = 10;
+/** The outline colours offered straight from the context menu of a card. */
+const QUICK_COLORS = ['#f33737', '#f4ba04', '#15c466', '#5a86ee', '#613aaf'];
 
 const slotId = (columnId, index) => `kslot::${columnId}::${index}`;
+
+const groupByColumn = (list) => {
+  const map = new Map();
+  list.forEach((c) => {
+    const bucket = map.get(c.column_id);
+    if (bucket) bucket.push(c);
+    else map.set(c.column_id, [c]);
+  });
+  return map;
+};
 
 function parseKanbanSlotId(id) {
   if (typeof id !== 'string' || !id.startsWith('kslot::')) return null;
@@ -50,29 +71,12 @@ function parseKanbanSlotId(id) {
 }
 
 /**
- * The gap a card will drop into, drawn as a blue line once the pointer is over
- * it. The anchor takes no space of its own so the gaps don't stretch a column;
- * the hit area is a band reaching into the cards above and below it.
+ * A little panel drawn at the end of the page and placed under `anchor` by
+ * hand. Inside the board it would be covered by the scrolling card lists and
+ * by the drop targets that come after a column header, so nothing that has to
+ * be clicked is left in the flow of the board.
  */
-function CardDropSlot({ columnId, index, tall = false, fill = false }) {
-  const { isOver, setNodeRef } = useDroppable({ id: slotId(columnId, index) });
-  const variant = fill ? 'kanban-slot--fill' : tall ? 'kanban-slot--tall' : '';
-  return (
-    <div className={`kanban-slot ${variant}`}>
-      <div ref={setNodeRef} className={`kanban-slot__hit ${isOver ? 'kanban-slot__hit--over' : ''}`}>
-        <div className="kanban-slot__line" aria-hidden />
-      </div>
-    </div>
-  );
-}
-
-/**
- * The 13 task colours, offered for a column strip, a card outline or a title.
- * It is drawn in a portal and placed under its `anchor` by hand: inside the
- * board it would otherwise be covered by the scrolling card lists and the drop
- * targets that come after the column header.
- */
-export function ColorPalette({ anchor, value, onPick, allowNone = false, noneLabel = 'Без цвета', onClose }) {
+function Popover({ anchor, onClose, className = '', align = 'right', children }) {
   const ref = useRef(null);
 
   useLayoutEffect(() => {
@@ -82,7 +86,8 @@ export function ColorPalette({ anchor, value, onPick, allowNone = false, noneLab
     const place = () => {
       const a = at.getBoundingClientRect();
       const { offsetWidth: w, offsetHeight: h } = box;
-      box.style.left = `${Math.max(8, Math.min(a.right - w, window.innerWidth - w - 8))}px`;
+      const wanted = align === 'left' ? a.left : a.right - w;
+      box.style.left = `${Math.max(8, Math.min(wanted, window.innerWidth - w - 8))}px`;
       const below = a.bottom + 6;
       box.style.top = `${below + h > window.innerHeight - 8 ? Math.max(8, a.top - h - 6) : below}px`;
       box.style.visibility = 'visible';
@@ -94,21 +99,38 @@ export function ColorPalette({ anchor, value, onPick, allowNone = false, noneLab
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [anchor]);
+  });
 
   useEffect(() => {
     const onDown = (e) => {
       // A press on the button that opened it is left to the button, which
-      // closes the palette by toggling.
+      // closes the popover by toggling.
       if (ref.current?.contains(e.target) || anchor?.current?.contains(e.target)) return;
       onClose?.();
     };
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
     document.addEventListener('pointerdown', onDown);
-    return () => document.removeEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [onClose, anchor]);
 
   return createPortal(
-    <div className="kanban-palette" ref={ref} onPointerDown={(e) => e.stopPropagation()}>
+    <div className={`kanban-pop ${className}`} ref={ref} onPointerDown={(e) => e.stopPropagation()}>
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
+/** The 13 task colours, offered for a column strip, a card outline or a title. */
+export function ColorPalette({ anchor, value, onPick, allowNone = false, noneLabel = 'Без цвета', onClose }) {
+  return (
+    <Popover anchor={anchor} onClose={onClose} className="kanban-palette">
       {allowNone && (
         <button
           type="button"
@@ -138,8 +160,131 @@ export function ColorPalette({ anchor, value, onPick, allowNone = false, noneLab
           );
         })}
       </div>
-    </div>,
-    document.body,
+    </Popover>
+  );
+}
+
+/** One label being renamed and recoloured. The name is saved on the way out. */
+function LabelEditor({ label, onUpdate, onDelete, onDone }) {
+  const [title, setTitle] = useState(label.title || '');
+  const commit = () => {
+    if (title !== (label.title || '')) onUpdate(label.id, { title });
+    onDone();
+  };
+  return (
+    <div className="kanban-labels__edit">
+      <input
+        className="kanban-labels__input"
+        value={title}
+        autoFocus
+        placeholder="Название метки"
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') onDone();
+        }}
+      />
+      <div className="kanban-palette__grid">
+        {TASK_COLORS.map((c) => (
+          <span
+            key={c}
+            className={`kanban-palette__wrap ${(label.color || '').toLowerCase() === c ? 'kanban-palette__wrap--active' : ''}`}
+            style={{ '--swatch-color': c }}
+          >
+            <button
+              type="button"
+              className="kanban-palette__swatch"
+              style={{ background: c }}
+              onClick={() => onUpdate(label.id, { color: c })}
+              aria-label={c}
+            />
+          </span>
+        ))}
+      </div>
+      <div className="kanban-labels__edit-actions">
+        <button type="button" className="kanban-labels__done" onClick={commit}>
+          Готово
+        </button>
+        <button
+          type="button"
+          className="kanban-labels__delete"
+          onClick={() => {
+            onDone();
+            onDelete(label.id);
+          }}
+        >
+          Удалить метку
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The labels of a board, offered to a card. The same panel both puts a label
+ * on the card and looks after the label itself: a board rarely has more than a
+ * handful of them, and a separate settings screen for six words would be worse
+ * than the pencil next to each of them.
+ */
+export function LabelPicker({
+  anchor, boardId, labels, selected = [], onToggle, onAdd, onUpdate, onDelete, onClose,
+}) {
+  const [editingId, setEditingId] = useState(null);
+
+  const create = async () => {
+    const color = TASK_COLORS[(labels.length + 2) % TASK_COLORS.length];
+    const made = await onAdd(boardId, { title: '', color });
+    if (!made) return;
+    // A label made from a card is meant for that card.
+    onToggle(made.id);
+    setEditingId(made.id);
+  };
+
+  return (
+    <Popover anchor={anchor} onClose={onClose} className="kanban-labels">
+      {labels.length === 0 && (
+        <div className="kanban-filter__empty">Меток пока нет.</div>
+      )}
+      {labels.map((l) => {
+        const on = selected.includes(l.id);
+        if (editingId === l.id) {
+          return (
+            <LabelEditor
+              key={l.id}
+              label={l}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+              onDone={() => setEditingId(null)}
+            />
+          );
+        }
+        return (
+          <div key={l.id} className="kanban-labels__row">
+            <button
+              type="button"
+              className={`kanban-filter__item ${on ? 'kanban-filter__item--on' : ''}`}
+              onClick={() => onToggle(l.id)}
+            >
+              <span className="kanban-menu__dot" style={{ background: l.color }} aria-hidden />
+              <span className="kanban-filter__title">{l.title || 'Метка'}</span>
+              {on && <span className="kanban-menu__check" aria-hidden>✓</span>}
+            </button>
+            <button
+              type="button"
+              className="kanban-labels__pencil"
+              onClick={() => setEditingId(l.id)}
+              aria-label="Изменить метку"
+              title="Изменить метку"
+            >
+              <img src={editIcon} alt="" />
+            </button>
+          </div>
+        );
+      })}
+      <button type="button" className="kanban-labels__add" onClick={create}>
+        + Новая метка
+      </button>
+    </Popover>
   );
 }
 
@@ -193,7 +338,10 @@ function CardTaskLine({ task, subtasks, showSubtasks, onToggle, depth = 0 }) {
   );
 }
 
-function KanbanCard({ card, settings, tasks, getSubtasks, onToggleTask, onOpen, dragHandleProps, overlay = false }) {
+function KanbanCard({
+  card, settings, tasks, getSubtasks, boardLabels = [],
+  onToggleTask, onOpen, onContextMenu, dragHandleProps, overlay = false,
+}) {
   // A card is dragged by its whole body, so a click only counts as a click
   // while the pointer stayed put.
   const downAt = useRef(null);
@@ -202,13 +350,15 @@ function KanbanCard({ card, settings, tasks, getSubtasks, onToggleTask, onOpen, 
     [tasks, card.id],
   );
   const doneCount = cardTasks.filter((t) => t.completed_at).length;
+  const marks = cardLabels(card, boardLabels);
+  const overdue = isOverdue(card.due_date);
   const style = card.border_color
     ? { border: `1px solid ${card.border_color}` }
     : undefined;
 
   return (
     <article
-      className={`kanban-card ${overlay ? 'kanban-card--overlay' : ''}`}
+      className={`kanban-card ${overdue ? 'kanban-card--overdue' : ''} ${overlay ? 'kanban-card--overlay' : ''}`}
       style={style}
       {...(dragHandleProps?.attributes || {})}
       {...(dragHandleProps?.listeners || {})}
@@ -221,7 +371,31 @@ function KanbanCard({ card, settings, tasks, getSubtasks, onToggleTask, onOpen, 
         if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 6) return;
         onOpen?.(card.id);
       }}
+      onContextMenu={(e) => {
+        if (!onContextMenu) return;
+        e.preventDefault();
+        onContextMenu(e, card);
+      }}
     >
+      {(marks.length > 0 || card.due_date) && (
+        <div className="kanban-card__tags">
+          {marks.map((l) => (
+            <span
+              key={l.id}
+              className="kanban-card__label"
+              style={{ background: l.color, color: labelTextColor(l.color) }}
+            >
+              {l.title || 'Метка'}
+            </span>
+          ))}
+          {card.due_date && (
+            <span className={`kanban-card__due ${overdue ? 'kanban-card__due--overdue' : ''}`}>
+              <img src={calIcon} alt="" />
+              {formatDueDate(card.due_date)}
+            </span>
+          )}
+        </div>
+      )}
       <div className="kanban-card__title" style={card.title_color ? { color: card.title_color } : undefined}>
         {card.title || 'Без названия'}
       </div>
@@ -263,9 +437,76 @@ function SortableKanbanCard(props) {
   );
 }
 
+/**
+ * The gap a card will drop into, drawn as a blue line once the pointer is over
+ * it. The anchor takes no space of its own so the gaps don't stretch a column;
+ * the hit area is a band reaching into the cards above and below it.
+ */
+function CardDropSlot({ columnId, index, tall = false, fill = false }) {
+  const { isOver, setNodeRef } = useDroppable({ id: slotId(columnId, index) });
+  const variant = fill ? 'kanban-slot--fill' : tall ? 'kanban-slot--tall' : '';
+  return (
+    <div className={`kanban-slot ${variant}`}>
+      <div ref={setNodeRef} className={`kanban-slot__hit ${isOver ? 'kanban-slot__hit--over' : ''}`}>
+        <div className="kanban-slot__line" aria-hidden />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The field a new card is typed into, in the place the card will take. Enter
+ * files it away and leaves the field open, so a column can be filled with a
+ * dozen ideas without ever opening a card.
+ */
+function CardComposer({ onSubmit, onClose }) {
+  const [text, setText] = useState('');
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
+
+  const submit = () => {
+    const title = text.trim();
+    setText('');
+    if (title) onSubmit(title);
+  };
+
+  return (
+    <div className="kanban-composer">
+      <textarea
+        ref={ref}
+        className="kanban-composer__input"
+        rows={1}
+        autoFocus
+        value={text}
+        placeholder="Название плашки"
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            submit();
+          } else if (e.key === 'Escape') {
+            setText('');
+            onClose();
+          }
+        }}
+        onBlur={() => {
+          submit();
+          onClose();
+        }}
+      />
+      <span className="kanban-composer__hint">Enter — добавить, Esc — закрыть</span>
+    </div>
+  );
+}
+
 function KanbanColumn({
-  column, cards, width, settings, tasks, getSubtasks, onToggleTask,
-  onOpenCard, onAddCard, onUpdateColumn, onDeleteColumn, hasHover,
+  column, cards, width, settings, tasks, getSubtasks, boardLabels, onToggleTask,
+  onOpenCard, onAddCard, onUpdateColumn, onDeleteColumn, onCardMenu, hasHover,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: column.id,
@@ -280,7 +521,9 @@ function KanbanColumn({
   const [plusHover, setPlusHover] = useState(false);
   const [delHover, setDelHover] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [composing, setComposing] = useState(false);
   const colorBtnRef = useRef(null);
+  const cardsElRef = useRef(null);
   const collapsed = !!column.collapsed;
   const accent = column.accent_color || DEFAULT_COLUMN_COLOR;
 
@@ -289,6 +532,19 @@ function KanbanColumn({
     const next = titleDraft.trim();
     setTitleDraft(null);
     if (next !== (column.title || '')) onUpdateColumn(column.id, { title: next });
+  };
+
+  const scrollToEnd = () => {
+    requestAnimationFrame(() => {
+      const el = cardsElRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  };
+
+  const openComposer = () => {
+    if (collapsed) onUpdateColumn(column.id, { collapsed: false });
+    setComposing(true);
+    scrollToEnd();
   };
 
   const style = {
@@ -395,7 +651,7 @@ function KanbanColumn({
             className="kanban-column__icon-btn"
             onMouseEnter={() => hasHover && setPlusHover(true)}
             onMouseLeave={() => hasHover && setPlusHover(false)}
-            onClick={() => onAddCard(column.id)}
+            onClick={openComposer}
             aria-label="Добавить плашку"
             title="Добавить плашку"
           >
@@ -417,7 +673,14 @@ function KanbanColumn({
       </header>
       <div className="kanban-column__strip" style={{ background: accent }} />
 
-      <div className="kanban-column__cards">
+      {/* A press on the free part of a column starts a new card there. */}
+      <div
+        className="kanban-column__cards"
+        ref={cardsElRef}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) openComposer();
+        }}
+      >
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {cards.map((card, i) => (
             <div key={card.id}>
@@ -427,13 +690,24 @@ function KanbanColumn({
                 settings={settings}
                 tasks={tasks}
                 getSubtasks={getSubtasks}
+                boardLabels={boardLabels}
                 onToggleTask={onToggleTask}
                 onOpen={onOpenCard}
+                onContextMenu={onCardMenu}
               />
             </div>
           ))}
         </SortableContext>
-        <CardDropSlot columnId={column.id} index={cards.length} tall={cards.length === 0} />
+        <CardDropSlot columnId={column.id} index={cards.length} tall={cards.length === 0 && !composing} />
+        {composing && (
+          <CardComposer
+            onSubmit={(title) => {
+              onAddCard(column.id, title);
+              scrollToEnd();
+            }}
+            onClose={() => setComposing(false)}
+          />
+        )}
       </div>
 
       {confirmDelete && (
@@ -460,6 +734,167 @@ function KanbanColumn({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Right-click menu of a card. Everything that is done to a card often enough
+ * to not be worth opening it for: its outline colour, its due date, its
+ * labels, a copy of it, the column it lives in, and getting rid of it. The
+ * longer lists open as a second page rather than as a flyout, which keeps the
+ * menu inside the window and works the same under a finger.
+ */
+function CardContextMenu({
+  card, at, columns, cardsByColumn, boardLabels,
+  onUpdate, onDuplicate, onDelete, onMove, onOpen, onClose,
+}) {
+  const ref = useRef(null);
+  const [page, setPage] = useState('root');
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { offsetWidth: w, offsetHeight: h } = el;
+    el.style.left = `${Math.max(8, Math.min(at.x, window.innerWidth - w - 8))}px`;
+    el.style.top = `${Math.max(8, Math.min(at.y, window.innerHeight - h - 8))}px`;
+    el.style.visibility = 'visible';
+  }, [at, page]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const item = (icon, label, onClick, extra = '') => (
+    <button type="button" className={`dashboard__context-menu-item ${extra}`} onClick={onClick}>
+      <img src={icon} alt="" className="dashboard__context-menu-item-icon" />
+      <span>{label}</span>
+    </button>
+  );
+
+  const back = item(leftIcon, 'Назад', () => setPage('root'));
+  const labelIds = card.label_ids || [];
+
+  return createPortal(
+    <>
+      <div className="dashboard__context-menu-backdrop" aria-hidden onClick={onClose} />
+      <div
+        ref={ref}
+        className="dashboard__context-menu kanban-menu"
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        {page === 'root' && (
+          <>
+            <div className="dashboard__context-menu-colors">
+              <span
+                className={`dashboard__context-menu-color-wrap ${!card.border_color ? 'dashboard__context-menu-color-wrap--selected' : ''}`}
+                style={{ '--swatch-color': 'var(--border-strong)' }}
+              >
+                <button
+                  type="button"
+                  className="dashboard__context-menu-color kanban-menu__color--none"
+                  onClick={() => onUpdate(card.id, { border_color: null })}
+                  aria-label="Без обводки"
+                  title="Без обводки"
+                />
+              </span>
+              {QUICK_COLORS.map((c) => {
+                const selected = (card.border_color || '').toLowerCase() === c.toLowerCase();
+                return (
+                  <span
+                    key={c}
+                    className={`dashboard__context-menu-color-wrap ${selected ? 'dashboard__context-menu-color-wrap--selected' : ''}`}
+                    style={{ '--swatch-color': c }}
+                  >
+                    <button
+                      type="button"
+                      className="dashboard__context-menu-color"
+                      style={{ background: c }}
+                      onClick={() => onUpdate(card.id, { border_color: c })}
+                      aria-label={`Обводка ${c}`}
+                    />
+                  </span>
+                );
+              })}
+            </div>
+            {item(editIcon, 'Открыть', () => { onOpen(card.id); onClose(); })}
+            <div className="dashboard__context-menu-separator" aria-hidden />
+            {item(calIcon, card.due_date ? `Срок: ${formatDueDate(card.due_date)}` : 'Срок…', () => setPage('due'))}
+            {item(tagIcon, labelIds.length ? `Метки: ${labelIds.length}` : 'Метки…', () => setPage('labels'))}
+            <div className="dashboard__context-menu-separator" aria-hidden />
+            {item(layersIcon, 'Скопировать', () => { onDuplicate(card); onClose(); })}
+            {item(rightIcon, 'Переместить в столбец…', () => setPage('move'))}
+            {item(deleteNavIcon, 'Удалить', () => { onDelete(card.id); onClose(); }, 'dashboard__context-menu-item--danger')}
+          </>
+        )}
+
+        {page === 'due' && (
+          <>
+            {back}
+            <div className="dashboard__context-menu-separator" aria-hidden />
+            {item(starIcon, 'Сегодня', () => { onUpdate(card.id, { due_date: dueInDays(0) }); onClose(); })}
+            {item(zavtraIcon, 'Завтра', () => { onUpdate(card.id, { due_date: dueInDays(1) }); onClose(); })}
+            {item(calIcon, 'Через неделю', () => { onUpdate(card.id, { due_date: dueInDays(7) }); onClose(); })}
+            {card.due_date && item(closeIcon, 'Убрать срок', () => { onUpdate(card.id, { due_date: null }); onClose(); })}
+          </>
+        )}
+
+        {page === 'labels' && (
+          <>
+            {back}
+            <div className="dashboard__context-menu-separator" aria-hidden />
+            {boardLabels.length === 0 && (
+              <div className="kanban-menu__empty">Метки создаются в плашке</div>
+            )}
+            {boardLabels.map((l) => {
+              const on = labelIds.includes(l.id);
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  className="dashboard__context-menu-item"
+                  onClick={() => onUpdate(card.id, {
+                    label_ids: on ? labelIds.filter((x) => x !== l.id) : [...labelIds, l.id],
+                  })}
+                >
+                  <span className="kanban-menu__dot" style={{ background: l.color }} aria-hidden />
+                  <span>{l.title || 'Метка'}</span>
+                  {on && <span className="kanban-menu__check" aria-hidden>✓</span>}
+                </button>
+              );
+            })}
+          </>
+        )}
+
+        {page === 'move' && (
+          <>
+            {back}
+            <div className="dashboard__context-menu-separator" aria-hidden />
+            {columns.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className="dashboard__context-menu-item"
+                disabled={c.id === card.column_id}
+                onClick={() => {
+                  onMove(card.id, c.id, (cardsByColumn.get(c.id) || []).filter((x) => x.id !== card.id).length);
+                  onClose();
+                }}
+              >
+                <span className="kanban-menu__dot" style={{ background: c.accent_color || DEFAULT_COLUMN_COLOR }} aria-hidden />
+                <span>{c.title || 'Без названия'}</span>
+                {c.id === card.column_id && <span className="kanban-menu__check" aria-hidden>✓</span>}
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+    </>,
+    document.body,
   );
 }
 
@@ -593,18 +1028,28 @@ function BoardSettingsModal({ board, onChange, onClose }) {
 /**
  * A kanban board: columns of cards, each card a small window into its own
  * description and task list. Cards are dragged inside a column and between
- * columns; columns are dragged by the grip in their header.
+ * columns; columns are dragged by the grip in their header. The strip of
+ * columns is scrolled sideways with shift and the wheel, or by dragging the
+ * board itself by any free spot.
  */
 export function KanbanView({
-  board, columns, cards, tasks, getSubtasks,
+  board, columns, cards, labels, tasks, getSubtasks,
   addColumn, updateColumn, deleteColumn, reorderColumns,
-  addCard, moveCard, onToggleTask, onOpenCard, onUpdateBoard,
+  addCard, updateCard, deleteCard, duplicateCard, moveCard,
+  onToggleTask, onOpenCard, onUpdateBoard,
 }) {
   const hasHover = useMediaQuery('(hover: hover)');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
   const [plusHover, setPlusHover] = useState(false);
+  const [filterHover, setFilterHover] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterIds, setFilterIds] = useState([]);
   const [activeId, setActiveId] = useState(null);
+  const [cardMenu, setCardMenu] = useState(null); // { x, y, card }
+  const filterBtnRef = useRef(null);
+  const boardRef = useRef(null);
+  const pan = useRef(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -612,18 +1057,28 @@ export function KanbanView({
     () => columns.filter((c) => c.board_id === board.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
     [columns, board.id],
   );
-  const cardsByColumn = useMemo(() => {
-    const map = new Map();
-    cards
-      .filter((c) => c.board_id === board.id)
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-      .forEach((c) => {
-        const list = map.get(c.column_id);
-        if (list) list.push(c);
-        else map.set(c.column_id, [c]);
-      });
-    return map;
-  }, [cards, board.id]);
+  const boardLabels = useMemo(
+    () => (labels || []).filter((l) => l.board_id === board.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    [labels, board.id],
+  );
+  // Only the labels that still exist can be filtered by.
+  const activeFilter = useMemo(
+    () => filterIds.filter((id) => boardLabels.some((l) => l.id === id)),
+    [filterIds, boardLabels],
+  );
+
+  const boardCards = useMemo(
+    () => cards.filter((c) => c.board_id === board.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    [cards, board.id],
+  );
+  const cardsByColumn = useMemo(() => groupByColumn(boardCards), [boardCards]);
+  // What is drawn: every card, or only the ones wearing one of the labels the
+  // filter is set to.
+  const shownByColumn = useMemo(() => (
+    activeFilter.length === 0
+      ? cardsByColumn
+      : groupByColumn(boardCards.filter((c) => (c.label_ids || []).some((id) => activeFilter.includes(id))))
+  ), [activeFilter, boardCards, cardsByColumn]);
 
   const cardSettings = {
     showDescription: board.kanban_show_description !== false,
@@ -633,6 +1088,68 @@ export function KanbanView({
   const width = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, board.kanban_column_width ?? 280));
 
   const activeCard = activeId ? cards.find((c) => c.id === activeId) : null;
+
+  // Shift and the wheel walk the columns sideways; the plain wheel is left to
+  // the cards of a column.
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el) return undefined;
+    const onWheel = (e) => {
+      if (!e.shiftKey || e.deltaY === 0) return;
+      el.scrollLeft += e.deltaY;
+      e.preventDefault();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  const canPanFrom = (target) => (
+    target === boardRef.current || target?.classList?.contains('kanban__pan-space')
+  );
+
+  const startPan = (e) => {
+    if (e.button !== 0 || !canPanFrom(e.target)) return;
+    const el = boardRef.current;
+    if (!el) return;
+    pan.current = { pointerId: e.pointerId, x: e.clientX, left: el.scrollLeft, moved: false };
+    el.setPointerCapture?.(e.pointerId);
+  };
+
+  const movePan = (e) => {
+    const p = pan.current;
+    const el = boardRef.current;
+    if (!p || !el) return;
+    const dx = e.clientX - p.x;
+    if (!p.moved) {
+      if (Math.abs(dx) < 4) return;
+      p.moved = true;
+      el.classList.add('kanban__board--panning');
+    }
+    el.scrollLeft = p.left - dx;
+  };
+
+  const endPan = () => {
+    const p = pan.current;
+    const el = boardRef.current;
+    if (!p || !el) return;
+    el.releasePointerCapture?.(p.pointerId);
+    el.classList.remove('kanban__board--panning');
+    pan.current = null;
+  };
+
+  /**
+   * Where a card lands in the full list of a column, given the gap it was
+   * dropped into among the cards that are on screen. The two differ as soon as
+   * the board is filtered.
+   */
+  const dropIndex = (columnId, shownIndex, movedId) => {
+    const full = (cardsByColumn.get(columnId) || []).filter((c) => c.id !== movedId);
+    const shown = (shownByColumn.get(columnId) || []).filter((c) => c.id !== movedId);
+    const anchor = shown[shownIndex];
+    if (!anchor) return full.length;
+    const at = full.findIndex((c) => c.id === anchor.id);
+    return at < 0 ? full.length : at;
+  };
 
   const handleDragEnd = ({ active, over }) => {
     setActiveId(null);
@@ -657,10 +1174,10 @@ export function KanbanView({
     if (slot) {
       // The slot index counts the cards as they are drawn, so the dragged card
       // itself has to be discounted when it comes from above the gap.
-      const at = (cardsByColumn.get(slot.columnId) || [])
+      const shownAt = (shownByColumn.get(slot.columnId) || [])
         .slice(0, slot.index)
         .filter((c) => c.id !== moved.id).length;
-      moveCard(moved.id, slot.columnId, at);
+      moveCard(moved.id, slot.columnId, dropIndex(slot.columnId, shownAt, moved.id));
       return;
     }
 
@@ -688,6 +1205,19 @@ export function KanbanView({
         <span className="kanban__header-gap" />
         <button
           type="button"
+          ref={filterBtnRef}
+          className="kanban__icon-btn"
+          onMouseEnter={() => hasHover && setFilterHover(true)}
+          onMouseLeave={() => hasHover && setFilterHover(false)}
+          onClick={() => setFilterOpen((v) => !v)}
+          aria-label="Фильтр по меткам"
+          title="Фильтр по меткам"
+        >
+          <img src={(hasHover && filterHover) || activeFilter.length > 0 ? tagNavIcon : tagIcon} alt="" />
+          {activeFilter.length > 0 && <span className="kanban__icon-badge">{activeFilter.length}</span>}
+        </button>
+        <button
+          type="button"
           className="kanban__icon-btn"
           onMouseEnter={() => hasHover && setPlusHover(true)}
           onMouseLeave={() => hasHover && setPlusHover(false)}
@@ -708,6 +1238,36 @@ export function KanbanView({
         >
           <img src={hasHover && settingsHover ? settingsNavIcon : settingsIcon} alt="" />
         </button>
+        {filterOpen && (
+          <Popover anchor={filterBtnRef} onClose={() => setFilterOpen(false)} className="kanban-filter">
+            <div className="kanban-filter__head">Показывать плашки с метками</div>
+            {boardLabels.length === 0 && (
+              <div className="kanban-filter__empty">Меток пока нет. Их можно завести в любой плашке.</div>
+            )}
+            {boardLabels.map((l) => {
+              const on = activeFilter.includes(l.id);
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  className={`kanban-filter__item ${on ? 'kanban-filter__item--on' : ''}`}
+                  onClick={() => setFilterIds((prev) => (
+                    prev.includes(l.id) ? prev.filter((x) => x !== l.id) : [...prev, l.id]
+                  ))}
+                >
+                  <span className="kanban-menu__dot" style={{ background: l.color }} aria-hidden />
+                  <span className="kanban-filter__title">{l.title || 'Метка'}</span>
+                  {on && <span className="kanban-menu__check" aria-hidden>✓</span>}
+                </button>
+              );
+            })}
+            {activeFilter.length > 0 && (
+              <button type="button" className="kanban-filter__reset" onClick={() => setFilterIds([])}>
+                Показать все
+              </button>
+            )}
+          </Popover>
+        )}
       </div>
       <div className="kanban__header-line" />
 
@@ -718,7 +1278,14 @@ export function KanbanView({
         onDragCancel={() => setActiveId(null)}
         onDragEnd={handleDragEnd}
       >
-        <div className="kanban__board">
+        <div
+          className="kanban__board"
+          ref={boardRef}
+          onPointerDown={startPan}
+          onPointerMove={movePan}
+          onPointerUp={endPan}
+          onPointerCancel={endPan}
+        >
           {/* Columns differ in width once some of them are folded, so the plain
               rect strategy previews the shuffling better than the list one. */}
           <SortableContext items={boardColumns.map((c) => c.id)} strategy={rectSortingStrategy}>
@@ -726,20 +1293,24 @@ export function KanbanView({
               <KanbanColumn
                 key={column.id}
                 column={column}
-                cards={cardsByColumn.get(column.id) || []}
+                cards={shownByColumn.get(column.id) || []}
                 width={width}
                 settings={cardSettings}
                 tasks={tasks}
                 getSubtasks={getSubtasks}
+                boardLabels={boardLabels}
                 onToggleTask={onToggleTask}
                 onOpenCard={onOpenCard}
-                onAddCard={(columnId) => addCard(board.id, columnId)}
+                onAddCard={(columnId, title) => addCard(board.id, columnId, { title })}
                 onUpdateColumn={updateColumn}
                 onDeleteColumn={deleteColumn}
+                onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
                 hasHover={hasHover}
               />
             ))}
           </SortableContext>
+          {/* Free space to take hold of the board by, past the last column. */}
+          <div className="kanban__pan-space" />
         </div>
 
         <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
@@ -749,11 +1320,29 @@ export function KanbanView({
               settings={cardSettings}
               tasks={tasks}
               getSubtasks={getSubtasks}
+              boardLabels={boardLabels}
               overlay
             />
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {cardMenu && (
+        <CardContextMenu
+          key={cardMenu.card.id}
+          card={cards.find((c) => c.id === cardMenu.card.id) || cardMenu.card}
+          at={cardMenu}
+          columns={boardColumns}
+          cardsByColumn={cardsByColumn}
+          boardLabels={boardLabels}
+          onUpdate={updateCard}
+          onDuplicate={duplicateCard}
+          onDelete={deleteCard}
+          onMove={moveCard}
+          onOpen={onOpenCard}
+          onClose={() => setCardMenu(null)}
+        />
+      )}
 
       {settingsOpen && (
         <BoardSettingsModal

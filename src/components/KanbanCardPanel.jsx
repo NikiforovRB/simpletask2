@@ -2,14 +2,17 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
-import { ColorPalette } from './KanbanView';
+import { ColorPalette, LabelPicker } from './KanbanView';
 import { getContainerIdForCard } from '../lib/dnd';
+import { cardLabels, isOverdue, labelTextColor } from '../lib/kanbanCards';
 import { DEFAULT_TASK_COLOR } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav.svg';
+import calIcon from '../assets/cal.svg';
+import tagIcon from '../assets/tag.svg';
 import './KanbanCardPanel.css';
 
 const CLOSE_MS = 220;
@@ -35,6 +38,7 @@ function useAutoGrow(value) {
  */
 export function KanbanCardPanel({
   card, tasks, getSubtasks, completedVisible = true,
+  boardLabels = [], onAddLabel, onUpdateLabel, onDeleteLabel,
   onUpdateCard, onDeleteCard, onClose,
   onToggle, onUpdate, onDelete, onAddSubtask, onAddTask, onTaskContextMenu,
   editingTaskId, onEditingTaskConsumed,
@@ -50,10 +54,12 @@ export function KanbanCardPanel({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [plusHover, setPlusHover] = useState(false);
   const [delHover, setDelHover] = useState(false);
+  const [labelsOpen, setLabelsOpen] = useState(false);
   const titleRef = useAutoGrow(title);
   const descRef = useAutoGrow(description);
   const titleColorRef = useRef(null);
   const borderColorRef = useRef(null);
+  const labelsBtnRef = useRef(null);
 
   const requestClose = useRef(null);
   requestClose.current = () => {
@@ -215,6 +221,73 @@ export function KanbanCardPanel({
             onChange={(e) => setTitle(e.target.value)}
             onBlur={() => onUpdateCard(cardId, { title })}
           />
+
+          <div className="kanban-panel__meta">
+            <label className="kanban-panel__due">
+              <img src={calIcon} alt="" />
+              <input
+                type="date"
+                className={`kanban-panel__date ${isOverdue(card.due_date) ? 'kanban-panel__date--overdue' : ''}`}
+                value={card.due_date || ''}
+                onChange={(e) => onUpdateCard(cardId, { due_date: e.target.value || null })}
+                aria-label="Срок"
+              />
+            </label>
+            {card.due_date && (
+              <button
+                type="button"
+                className="kanban-panel__chip-clear"
+                onClick={() => onUpdateCard(cardId, { due_date: null })}
+              >
+                Убрать срок
+              </button>
+            )}
+          </div>
+
+          <div className="kanban-panel__labels">
+            {cardLabels(card, boardLabels).map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                className="kanban-panel__label"
+                style={{ background: l.color, color: labelTextColor(l.color) }}
+                onClick={() => onUpdateCard(cardId, {
+                  label_ids: (card.label_ids || []).filter((x) => x !== l.id),
+                })}
+                title="Снять метку"
+              >
+                {l.title || 'Метка'}
+                <span aria-hidden>×</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              ref={labelsBtnRef}
+              className="kanban-panel__label-add"
+              onClick={() => setLabelsOpen((v) => !v)}
+            >
+              <img src={tagIcon} alt="" />
+              Метки
+            </button>
+            {labelsOpen && (
+              <LabelPicker
+                anchor={labelsBtnRef}
+                boardId={card.board_id}
+                labels={boardLabels}
+                selected={card.label_ids || []}
+                onToggle={(id) => {
+                  const ids = card.label_ids || [];
+                  onUpdateCard(cardId, {
+                    label_ids: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
+                  });
+                }}
+                onAdd={onAddLabel}
+                onUpdate={onUpdateLabel}
+                onDelete={onDeleteLabel}
+                onClose={() => setLabelsOpen(false)}
+              />
+            )}
+          </div>
 
           <div className="kanban-panel__section-title">Описание</div>
           <textarea

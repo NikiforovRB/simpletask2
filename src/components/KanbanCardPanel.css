@@ -173,6 +173,119 @@
   outline: none;
 }
 
+/* Due date and labels, between the title and the description. */
+.kanban-panel__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.kanban-panel__due {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  background: var(--bg-elev);
+  cursor: pointer;
+}
+
+.kanban-panel__due img {
+  width: 0.9rem;
+  height: 0.9rem;
+  object-fit: contain;
+  opacity: 0.8;
+}
+
+.kanban-panel__date {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+[data-theme="light"] .kanban-panel__date {
+  color-scheme: light;
+}
+
+.kanban-panel__date:focus {
+  outline: none;
+}
+
+.kanban-panel__date--overdue {
+  color: var(--danger);
+}
+
+.kanban-panel__chip-clear {
+  border: none;
+  background: none;
+  padding: 0.25rem 0;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.kanban-panel__chip-clear:hover {
+  color: var(--text-primary);
+}
+
+.kanban-panel__labels {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
+}
+
+.kanban-panel__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 100%;
+  padding: 0.15rem 0.5rem;
+  border: none;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.kanban-panel__label span {
+  opacity: 0.7;
+}
+
+.kanban-panel__label-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  background: none;
+  font-family: inherit;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.kanban-panel__label-add:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.kanban-panel__label-add img {
+  width: 0.8rem;
+  height: 0.8rem;
+  object-fit: contain;
+}
+
 .kanban-panel__section-title {
   font-size: 0.75rem;
   letter-spacing: 0.04em;

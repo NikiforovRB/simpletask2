@@ -394,6 +394,7 @@ export default function Dashboard() {
   const {
     columns: kanbanColumns,
     cards: kanbanCards,
+    labels: kanbanLabels,
     addColumn: addKanbanColumn,
     updateColumn: updateKanbanColumn,
     deleteColumn: deleteKanbanColumn,
@@ -402,6 +403,9 @@ export default function Dashboard() {
     updateCard: updateKanbanCard,
     deleteCard: deleteKanbanCard,
     moveCard: moveKanbanCard,
+    addLabel: addKanbanLabel,
+    updateLabel: updateKanbanLabel,
+    deleteLabel: deleteKanbanLabel,
   } = useKanban(kanbanBoardIds);
   const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
   const {
@@ -1018,6 +1022,56 @@ export default function Dashboard() {
     () => (openCardId ? kanbanCards.find((c) => c.id === openCardId) ?? null : null),
     [openCardId, kanbanCards],
   );
+  const openCardLabels = useMemo(
+    () => (openCard
+      ? kanbanLabels.filter((l) => l.board_id === openCard.board_id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+      : []),
+    [openCard, kanbanLabels],
+  );
+
+  /**
+   * A copy of a card next to the original, with its task list copied too:
+   * the cards of a board are often variations of one another, and rebuilding
+   * a checklist by hand each time is the tedious part.
+   */
+  const handleDuplicateKanbanCard = useCallback(async (card) => {
+    const copy = await addKanbanCard(card.board_id, card.column_id, {
+      title: card.title,
+      description: card.description,
+      border_color: card.border_color,
+      title_color: card.title_color,
+      due_date: card.due_date ?? null,
+      label_ids: card.label_ids || [],
+    });
+    if (!copy) return;
+    const siblings = kanbanCards
+      .filter((c) => c.column_id === card.column_id && c.id !== copy.id)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const at = siblings.findIndex((c) => c.id === card.id);
+    if (at >= 0) await moveKanbanCard(copy.id, card.column_id, at + 1);
+
+    // Parents first, so a subtask can be hung on the copy of its own parent.
+    const copyBranch = async (source, parentId) => {
+      for (const t of source) {
+        const made = await addTask({
+          title: t.title,
+          list_type: 'kanban',
+          project_id: copy.board_id,
+          card_id: copy.id,
+          parent_id: parentId,
+          position: t.position ?? 0,
+          ...(t.text_color ? { text_color: t.text_color } : {}),
+          top_style: t.top_style ?? 0,
+          completed_at: t.completed_at ?? null,
+        });
+        if (made) await copyBranch(subtasksByParent.get(t.id) || [], made.id);
+      }
+    };
+    const roots = tasks
+      .filter((t) => t.card_id === card.id && !t.parent_id)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    await copyBranch(roots, null);
+  }, [addKanbanCard, moveKanbanCard, kanbanCards, tasks, subtasksByParent, addTask]);
 
   // Promises grouped by their day, for the optional reputation rows in the
   // Plans and Calendar day lists.
@@ -2683,6 +2737,7 @@ export default function Dashboard() {
           board={activeKanbanBoard}
           columns={kanbanColumns}
           cards={kanbanCards}
+          labels={kanbanLabels}
           tasks={tasks}
           getSubtasks={getSubtasksOf}
           addColumn={addKanbanColumn}
@@ -2690,6 +2745,9 @@ export default function Dashboard() {
           deleteColumn={deleteKanbanColumn}
           reorderColumns={reorderKanbanColumns}
           addCard={addKanbanCard}
+          updateCard={updateKanbanCard}
+          deleteCard={deleteKanbanCard}
+          duplicateCard={handleDuplicateKanbanCard}
           moveCard={moveKanbanCard}
           onToggleTask={handleToggle}
           onOpenCard={setOpenCardId}
@@ -2704,6 +2762,10 @@ export default function Dashboard() {
           tasks={tasks}
           getSubtasks={getSubtasksOf}
           completedVisible={completedVisible}
+          boardLabels={openCardLabels}
+          onAddLabel={addKanbanLabel}
+          onUpdateLabel={updateKanbanLabel}
+          onDeleteLabel={deleteKanbanLabel}
           onUpdateCard={updateKanbanCard}
           onDeleteCard={deleteKanbanCard}
           onClose={() => setOpenCardId(null)}
