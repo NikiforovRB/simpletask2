@@ -599,7 +599,6 @@ function KanbanColumn({
   if (collapsed) {
     return (
       <section ref={setNodeRef} style={style} className="kanban-column kanban-column--collapsed">
-        <div className="kanban-column__strip" style={{ background: accent }} />
         <button
           type="button"
           className="kanban-column__fold"

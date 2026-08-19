@@ -248,18 +248,15 @@
   padding-right: 2px;
 }
 
-/* A folded column: a narrow strip with the title on its side. */
+/* A folded column: a narrow strip with the title on its side. It carries no
+   colour bar — at this width it would read as a column of its own. */
 .kanban-column--collapsed {
   position: relative;
   width: 2.5rem;
   align-items: center;
   gap: 0.5rem;
+  padding-top: 0.2rem;
   padding-bottom: 0.5rem;
-}
-
-.kanban-column--collapsed .kanban-column__strip {
-  width: 100%;
-  margin: 0.4rem 0 0.1rem;
 }
 
 .kanban-column--collapsed .kanban-column__grip {
