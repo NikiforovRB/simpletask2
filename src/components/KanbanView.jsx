@@ -1343,7 +1343,8 @@ function ArchiveModal({ cards, columns, canRestore, onRestore, onPurge, onPurgeA
 export function KanbanView({
   board, columns, cards, archived = [], labels, tasks, getSubtasks,
   addColumn, updateColumn, deleteColumn, reorderColumns,
-  addCard, updateCard, deleteCard, restoreCard, purgeCard, purgeArchive, duplicateCard, moveCard,
+  addCard, updateCard, deleteCard, restoreCard, purgeCard, purgeArchive, duplicateCard,
+  moveCard, planDay,
   onToggleTask, onOpenCard, onUpdateBoard,
 }) {
   const hasHover = useMediaQuery('(hover: hover)');
@@ -1400,6 +1401,32 @@ export function KanbanView({
   ), [activeFilter, boardCards]);
 
   /**
+   * The order of a day: the places it was put in by hand first, and after them
+   * whatever has not been placed yet, in the order it stands on the board.
+   */
+  const byDay = useMemo(() => {
+    const rank = new Map(boardColumns.map((c, i) => [c.id, i]));
+    const placed = (c) => c.due_position ?? Number.MAX_SAFE_INTEGER;
+    return (a, b) => placed(a) - placed(b)
+      || (rank.get(a.column_id) ?? 0) - (rank.get(b.column_id) ?? 0)
+      || (a.position ?? 0) - (b.position ?? 0);
+  }, [boardColumns]);
+
+  // Every card of a day, filters aside: a card dropped into a day has to find
+  // its place among all of them, not only among the ones on screen.
+  const fullByDay = useMemo(() => {
+    const map = new Map();
+    boardCards.forEach((c) => {
+      if (!c.due_date) return;
+      const bucket = map.get(c.due_date);
+      if (bucket) bucket.push(c);
+      else map.set(c.due_date, [c]);
+    });
+    map.forEach((list) => list.sort(byDay));
+    return map;
+  }, [boardCards, byDay]);
+
+  /**
    * The day columns standing to the left of the board: everything overdue,
    * then one column per day that has cards, up to as far as the filter looks.
    * A day nobody planned anything for is not worth a column of its own.
@@ -1408,13 +1435,9 @@ export function KanbanView({
     if (!dateFilter) return [];
     const today = dueInDays(0);
     const last = dateFilterLimit(dateFilter);
-    const rank = new Map(boardColumns.map((c, i) => [c.id, i]));
     const groups = new Map();
     visibleCards
       .filter((c) => c.due_date && (!last || c.due_date <= last))
-      // Inside a day the cards keep the order of the board they came from.
-      .sort((a, b) => (rank.get(a.column_id) ?? 0) - (rank.get(b.column_id) ?? 0)
-        || (a.position ?? 0) - (b.position ?? 0))
       .forEach((c) => {
         const key = c.due_date < today ? OVERDUE_KEY : c.due_date;
         const bucket = groups.get(key);
@@ -1428,7 +1451,9 @@ export function KanbanView({
         key: OVERDUE_KEY,
         title: 'Просроченные',
         accent: OVERDUE_ACCENT,
-        cards: groups.get(OVERDUE_KEY),
+        // A column of several days at once has one sensible order: the oldest
+        // debt at the top.
+        cards: groups.get(OVERDUE_KEY).sort((a, b) => a.due_date.localeCompare(b.due_date) || byDay(a, b)),
       });
     }
     Array.from(groups.keys())
@@ -1438,10 +1463,10 @@ export function KanbanView({
         key: day,
         title: dateColumnTitle(day),
         accent: day === today ? TODAY_ACCENT : DAY_ACCENT,
-        cards: groups.get(day),
+        cards: groups.get(day).sort(byDay),
       }));
     return out;
-  }, [dateFilter, visibleCards, boardColumns]);
+  }, [dateFilter, visibleCards, byDay]);
 
   // Laid out by date, the columns of the board itself keep what has no date
   // yet; everything planned stands in its day on the left.
@@ -1556,14 +1581,40 @@ export function KanbanView({
 
     const slot = parseKanbanSlotId(over.id);
     const overCard = slot ? null : cards.find((c) => c.id === over.id);
+    if (overCard?.id === moved.id) return;
+
     // Anywhere among the day columns — a gap, the column, or a card standing
-    // in one — only the due date changes; the card keeps its place on the board.
+    // in one — the card takes that day and the place it was dropped at, while
+    // the column it belongs to on the board stays as it is.
     const day = dateColumnKey(slot ? slot.columnId : over.id)
       ?? (dateOn && overCard?.due_date ? overCard.due_date : null);
     if (day) {
-      if (day !== OVERDUE_KEY && !isOverdue(day) && moved.due_date !== day) {
-        updateCard(moved.id, { due_date: day });
+      if (day === OVERDUE_KEY || isOverdue(day)) return;
+      const shown = (dateColumns.find((g) => g.key === day)?.cards || []);
+      const before = fullByDay.get(day) || [];
+      const rest = before.filter((c) => c.id !== moved.id);
+      let at = rest.length;
+      if (slot) {
+        // The gaps are numbered over the cards as they are drawn, which is
+        // both fewer than all of them and one too many while the dragged card
+        // is still among them.
+        const above = shown.slice(0, slot.index).filter((c) => c.id !== moved.id).length;
+        const anchor = shown.filter((c) => c.id !== moved.id)[above];
+        const found = anchor ? rest.findIndex((c) => c.id === anchor.id) : -1;
+        at = found < 0 ? rest.length : found;
+      } else if (overCard) {
+        const translated = active.rect.current.translated;
+        const middle = over.rect.top + over.rect.height / 2;
+        const pointerY = translated ? translated.top + translated.height / 2 : middle;
+        const found = rest.findIndex((c) => c.id === overCard.id);
+        if (found >= 0) at = found + (pointerY > middle ? 1 : 0);
       }
+      const ordered = rest.map((c) => c.id);
+      ordered.splice(Math.max(0, Math.min(at, ordered.length)), 0, moved.id);
+      const unchanged = moved.due_date === day
+        && before.length === ordered.length
+        && before.every((c, i) => c.id === ordered[i]);
+      if (!unchanged) planDay(day, ordered, moved.id);
       return;
     }
 
@@ -1584,7 +1635,7 @@ export function KanbanView({
       return;
     }
 
-    if (!overCard || overCard.id === moved.id) return;
+    if (!overCard) return;
     const list = (cardsByColumn.get(overCard.column_id) || []).filter((c) => c.id !== moved.id);
     const at = list.findIndex((c) => c.id === overCard.id);
     const translated = active.rect.current.translated;

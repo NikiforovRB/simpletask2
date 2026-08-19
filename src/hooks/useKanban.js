@@ -193,12 +193,34 @@ export function useKanban(boardIds) {
   }, [userId, fetchAll, patchCards]);
 
   const updateCard = useCallback(async (id, patch) => {
-    patchCards((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    // A card given a new date has not been put anywhere in that day yet, so it
+    // gives up the place it held in the old one and joins the end of the new.
+    const full = 'due_date' in patch && !('due_position' in patch)
+      ? { ...patch, due_position: null }
+      : patch;
+    patchCards((prev) => prev.map((c) => (c.id === id ? { ...c, ...full } : c)));
     const { error } = await supabase
       .from('kanban_cards')
-      .update({ ...patch, updated_at: new Date().toISOString() })
+      .update({ ...full, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (error) await fetchAll();
+  }, [fetchAll, patchCards]);
+
+  /**
+   * Lay out one day: `orderedIds` is every card due that day in the order they
+   * are to stand in, and `movedId` — the one just dropped there — is given the
+   * date as well, in case it came from another day or from the board.
+   */
+  const planDay = useCallback(async (dueDate, orderedIds, movedId) => {
+    const writes = new Map();
+    orderedIds.forEach((id, i) => {
+      writes.set(id, id === movedId ? { due_position: i, due_date: dueDate } : { due_position: i });
+    });
+    patchCards((prev) => prev.map((c) => (writes.has(c.id) ? { ...c, ...writes.get(c.id) } : c)));
+    const results = await Promise.all(
+      Array.from(writes.entries()).map(([id, patch]) => supabase.from('kanban_cards').update(patch).eq('id', id)),
+    );
+    if (results.some((r) => r.error)) await fetchAll();
   }, [fetchAll, patchCards]);
 
   /** Off the board and into the archive, tasks and all. */
@@ -365,6 +387,7 @@ export function useKanban(boardIds) {
     purgeCard,
     purgeArchive,
     moveCard,
+    planDay,
     addLabel,
     updateLabel,
     deleteLabel,

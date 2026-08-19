@@ -407,6 +407,7 @@ export default function Dashboard() {
     purgeCard: purgeKanbanCard,
     purgeArchive: purgeKanbanArchive,
     moveCard: moveKanbanCard,
+    planDay: planKanbanDay,
     addLabel: addKanbanLabel,
     updateLabel: updateKanbanLabel,
     deleteLabel: deleteKanbanLabel,
@@ -2757,6 +2758,7 @@ export default function Dashboard() {
           purgeArchive={purgeKanbanArchive}
           duplicateCard={handleDuplicateKanbanCard}
           moveCard={moveKanbanCard}
+          planDay={planKanbanDay}
           onToggleTask={handleToggle}
           onOpenCard={setOpenCardId}
           onUpdateBoard={updateProjectSettings}
