@@ -397,13 +397,46 @@
   transition: background 0.15s ease;
 }
 
+/* The corner of a card: the fold button, and under a finger the grip that
+   drags it. */
+.kanban-card__corner {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+/* A card is dragged by its grip alone, so the board can be swiped sideways
+   across the cards without picking one up. */
+.kanban-card--handled {
+  touch-action: auto;
+  cursor: default;
+}
+
+.kanban-card__grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
+  touch-action: none;
+  cursor: grab;
+  opacity: 0.6;
+}
+
+.kanban-card__grip img {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+}
+
 /* Folds the description and the task list away, leaving the title. It waits
    in the corner until the pointer is on the card, and stays out while the
    card is folded, as the only sign that something is hidden. */
 .kanban-card__fold {
-  position: absolute;
-  top: 0.25rem;
-  right: 0.25rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -458,10 +491,20 @@
   background: color-mix(in srgb, var(--danger) 20%, var(--bg-elev));
 }
 
-/* Room for the fold button in the corner. */
+/* Room for whatever sits in the corner. */
 .kanban-card--foldable .kanban-card__tags,
 .kanban-card--foldable .kanban-card__title {
-  padding-right: 1.1rem;
+  padding-right: 1.15rem;
+}
+
+.kanban-card--handled .kanban-card__tags,
+.kanban-card--handled .kanban-card__title {
+  padding-right: 1.4rem;
+}
+
+.kanban-card--foldable.kanban-card--handled .kanban-card__tags,
+.kanban-card--foldable.kanban-card--handled .kanban-card__title {
+  padding-right: 2.6rem;
 }
 
 /* Labels and the due date, above the title. */

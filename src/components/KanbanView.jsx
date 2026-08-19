@@ -353,6 +353,11 @@ function KanbanCard({
   // while the pointer stayed put.
   const downAt = useRef(null);
   const [foldHover, setFoldHover] = useState(false);
+  // Under a finger the body of a card is not a drag handle: the board is
+  // swiped left and right across the cards, and every swipe would pick one up.
+  // There a grip in the corner does the dragging instead.
+  const byHandle = !hasHover && !overlay && !!dragHandleProps;
+  const bodyDrag = !!dragHandleProps && !byHandle;
   const cardTasks = useMemo(
     () => tasks.filter((t) => t.card_id === card.id && !t.parent_id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
     [tasks, card.id],
@@ -365,19 +370,20 @@ function KanbanCard({
   // the card actually has it.
   const hasBody = (settings.showDescription && !!card.description?.trim())
     || (settings.showTasks && cardTasks.length > 0);
+  const showFold = !overlay && hasBody && !!onToggleFold;
   const style = card.border_color
     ? { border: `1px solid ${card.border_color}` }
     : undefined;
 
   return (
     <article
-      className={`kanban-card ${overdue ? 'kanban-card--overdue' : ''} ${!overlay && hasBody && onToggleFold ? 'kanban-card--foldable' : ''} ${overlay ? 'kanban-card--overlay' : ''}`}
+      className={`kanban-card ${overdue ? 'kanban-card--overdue' : ''} ${showFold ? 'kanban-card--foldable' : ''} ${byHandle ? 'kanban-card--handled' : ''} ${overlay ? 'kanban-card--overlay' : ''}`}
       style={style}
-      {...(dragHandleProps?.attributes || {})}
-      {...(dragHandleProps?.listeners || {})}
+      {...(bodyDrag ? dragHandleProps.attributes : {})}
+      {...(bodyDrag ? dragHandleProps.listeners : {})}
       onPointerDown={(e) => {
         downAt.current = { x: e.clientX, y: e.clientY };
-        dragHandleProps?.listeners?.onPointerDown?.(e);
+        if (bodyDrag) dragHandleProps.listeners?.onPointerDown?.(e);
       }}
       onClick={(e) => {
         const from = downAt.current;
@@ -390,27 +396,42 @@ function KanbanCard({
         onContextMenu(e, card);
       }}
     >
-      {!overlay && hasBody && onToggleFold && (
-        <button
-          type="button"
-          className={`kanban-card__fold ${folded ? 'kanban-card__fold--shown' : ''}`}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseEnter={() => hasHover && setFoldHover(true)}
-          onMouseLeave={() => hasHover && setFoldHover(false)}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFold(card.id, !folded);
-          }}
-          aria-label={folded ? 'Развернуть плашку' : 'Свернуть плашку'}
-          title={folded ? 'Развернуть плашку' : 'Свернуть плашку'}
-        >
-          <img
-            src={folded
-              ? (hasHover && foldHover ? downNavIcon : downIcon)
-              : (hasHover && foldHover ? upNavIcon : upIcon)}
-            alt=""
-          />
-        </button>
+      {(showFold || byHandle) && (
+        <div className="kanban-card__corner">
+          {showFold && (
+            <button
+              type="button"
+              className={`kanban-card__fold ${folded ? 'kanban-card__fold--shown' : ''}`}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseEnter={() => hasHover && setFoldHover(true)}
+              onMouseLeave={() => hasHover && setFoldHover(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFold(card.id, !folded);
+              }}
+              aria-label={folded ? 'Развернуть плашку' : 'Свернуть плашку'}
+              title={folded ? 'Развернуть плашку' : 'Свернуть плашку'}
+            >
+              <img
+                src={folded
+                  ? (hasHover && foldHover ? downNavIcon : downIcon)
+                  : (hasHover && foldHover ? upNavIcon : upIcon)}
+                alt=""
+              />
+            </button>
+          )}
+          {byHandle && (
+            <span
+              className="kanban-card__grip"
+              {...dragHandleProps.attributes}
+              {...dragHandleProps.listeners}
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Перетащить плашку"
+            >
+              <img src={dragIcon} alt="" />
+            </span>
+          )}
+        </div>
       )}
       {(marks.length > 0 || card.due_date) && (
         <div className="kanban-card__tags">
