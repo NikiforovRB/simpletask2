@@ -36,3 +36,42 @@ export function cardLabels(card, boardLabels) {
   if (ids.length === 0) return [];
   return boardLabels.filter((l) => ids.includes(l.id));
 }
+
+/**
+ * How far ahead the board looks when it is laid out by date. Whatever is
+ * chosen, everything already late is always shown: a missed day is the one
+ * thing that must not fall out of sight.
+ */
+export const DATE_FILTERS = [
+  { id: 'today', title: 'Только сегодня', ahead: 0 },
+  { id: 'tomorrow', title: 'Сегодня и завтра', ahead: 1 },
+  { id: 'days3', title: 'Ближайшие 3 дня', ahead: 2 },
+  { id: 'days7', title: 'Ближайшие 7 дней', ahead: 6 },
+  { id: 'all', title: 'Все', ahead: null },
+];
+
+/** The last day a filter reaches, or null when it reaches everything. */
+export function dateFilterLimit(id) {
+  const found = DATE_FILTERS.find((f) => f.id === id);
+  return found && found.ahead !== null ? dueInDays(found.ahead) : null;
+}
+
+export const OVERDUE_KEY = 'overdue';
+export const OVERDUE_ACCENT = '#f33737';
+export const TODAY_ACCENT = '#5a86ee';
+export const DAY_ACCENT = '#666666';
+
+/** The id a date column is dropped on: `kdate::overdue` or `kdate::2026-08-20`. */
+export const dateColumnId = (key) => `kdate::${key}`;
+
+/** The day behind such an id, `overdue`, or null for anything else. */
+export function dateColumnKey(id) {
+  return typeof id === 'string' && id.startsWith('kdate::') ? id.slice(7) : null;
+}
+
+/** "Сегодня, 20 августа, чт" — the heading of one day column. */
+export function dateColumnTitle(dateStr) {
+  if (dateStr === dueInDays(0)) return `Сегодня, ${formatDueDate(dateStr)}`;
+  if (dateStr === dueInDays(1)) return `Завтра, ${formatDueDate(dateStr)}`;
+  return formatDueDate(dateStr);
+}

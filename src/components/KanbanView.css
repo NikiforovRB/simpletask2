@@ -85,6 +85,13 @@
   user-select: none;
 }
 
+/* Divides the days on the left from the columns of the board itself. */
+.kanban__split {
+  flex: 0 0 1px;
+  align-self: stretch;
+  background: var(--divider);
+}
+
 /* Somewhere to grab the board past the last column. */
 .kanban__pan-space {
   flex: 1 0 4rem;
@@ -154,6 +161,11 @@
 
 .kanban-column__title {
   cursor: text;
+}
+
+/* The heading of a day column: a date, not something to rename. */
+.kanban-column__title--static {
+  cursor: default;
 }
 
 .kanban-column__title-input:focus {

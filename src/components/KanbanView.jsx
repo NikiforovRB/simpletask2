@@ -18,12 +18,28 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { TASK_COLORS } from '../constants';
-import { cardLabels, dueInDays, formatDueDate, isOverdue, labelTextColor } from '../lib/kanbanCards';
+import {
+  DATE_FILTERS,
+  DAY_ACCENT,
+  OVERDUE_ACCENT,
+  OVERDUE_KEY,
+  TODAY_ACCENT,
+  cardLabels,
+  dateColumnId,
+  dateColumnKey,
+  dateColumnTitle,
+  dateFilterLimit,
+  dueInDays,
+  formatDueDate,
+  isOverdue,
+  labelTextColor,
+} from '../lib/kanbanCards';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav.svg';
+import deleteDangerIcon from '../assets/delete-danger.svg';
 import dragIcon from '../assets/drag.svg';
 import editIcon from '../assets/edit.svg';
 import upIcon from '../assets/up.svg';
@@ -31,6 +47,7 @@ import upNavIcon from '../assets/up-nav.svg';
 import downIcon from '../assets/down.svg';
 import downNavIcon from '../assets/down-nav.svg';
 import calIcon from '../assets/cal.svg';
+import calNavIcon from '../assets/cal-nav.svg';
 import tagIcon from '../assets/tag.svg';
 import tagNavIcon from '../assets/tag-nav.svg';
 import layersIcon from '../assets/layers.svg';
@@ -365,6 +382,8 @@ function KanbanCard({
   const doneCount = cardTasks.filter((t) => t.completed_at).length;
   const marks = cardLabels(card, boardLabels);
   const overdue = isOverdue(card.due_date);
+  // Laid out by date, the column a card stands in already says when it is due.
+  const showDue = !!card.due_date && !settings.hideDue;
   const folded = !!card.collapsed;
   // There is something to fold away only if the board is set to show it and
   // the card actually has it.
@@ -433,7 +452,7 @@ function KanbanCard({
           )}
         </div>
       )}
-      {(marks.length > 0 || card.due_date) && (
+      {(marks.length > 0 || showDue) && (
         <div className="kanban-card__tags">
           {marks.map((l) => (
             <span
@@ -444,7 +463,7 @@ function KanbanCard({
               {l.title || 'Метка'}
             </span>
           ))}
-          {card.due_date && (
+          {showDue && (
             <span className={`kanban-card__due ${overdue ? 'kanban-card__due--overdue' : ''}`}>
               {formatDueDate(card.due_date)}
             </span>
@@ -795,6 +814,55 @@ function KanbanColumn({
 }
 
 /**
+ * A column standing for one day rather than for a stage of work. It holds the
+ * cards due that day, wherever they live on the board, and dropping a card on
+ * it moves that day onto the card. Nothing can be dropped on the overdue one:
+ * a date in the past is not something to plan for.
+ */
+function DateColumn({
+  group, width, settings, tasks, getSubtasks, boardLabels,
+  onToggleTask, onOpenCard, onCardMenu, onToggleFold, hasHover,
+}) {
+  const id = dateColumnId(group.key);
+  const droppable = group.key !== OVERDUE_KEY;
+  const { setNodeRef } = useDroppable({ id, disabled: !droppable });
+
+  return (
+    <section ref={setNodeRef} style={{ width: `${width}px` }} className="kanban-column kanban-column--date">
+      <header className="kanban-column__head">
+        <span className="kanban-column__title kanban-column__title--static">{group.title}</span>
+        <span className="kanban-column__tools">
+          <span className="kanban-column__count">{group.cards.length}</span>
+        </span>
+      </header>
+      <div className="kanban-column__strip" style={{ background: group.accent }} />
+      <div className="kanban-column__cards">
+        <SortableContext items={group.cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+          {group.cards.map((card, i) => (
+            <div key={card.id}>
+              {droppable && <CardDropSlot columnId={id} index={i} />}
+              <SortableKanbanCard
+                card={card}
+                settings={settings}
+                tasks={tasks}
+                getSubtasks={getSubtasks}
+                boardLabels={boardLabels}
+                hasHover={hasHover}
+                onToggleTask={onToggleTask}
+                onOpen={onOpenCard}
+                onContextMenu={onCardMenu}
+                onToggleFold={onToggleFold}
+              />
+            </div>
+          ))}
+        </SortableContext>
+        {droppable && <CardDropSlot columnId={id} index={group.cards.length} />}
+      </div>
+    </section>
+  );
+}
+
+/**
  * Right-click menu of a card. Everything that is done to a card often enough
  * to not be worth opening it for: its outline colour, its due date, its
  * labels, a copy of it, the column it lives in, and getting rid of it. The
@@ -885,7 +953,7 @@ function CardContextMenu({
             <div className="dashboard__context-menu-separator" aria-hidden />
             {item(layersIcon, 'Скопировать', () => { onDuplicate(card); onClose(); })}
             {item(rightIcon, 'Переместить в столбец…', () => setPage('move'))}
-            {item(deleteNavIcon, 'Удалить', () => { onDelete(card.id); onClose(); }, 'dashboard__context-menu-item--danger')}
+            {item(deleteDangerIcon, 'Удалить', () => { onDelete(card.id); onClose(); }, 'dashboard__context-menu-item--danger')}
           </>
         )}
 
@@ -1114,9 +1182,14 @@ export function KanbanView({
   const [filterHover, setFilterHover] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterIds, setFilterIds] = useState([]);
+  const [dateHover, setDateHover] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+  // One of the DATE_FILTERS ids, or null while the board is laid out by stage.
+  const [dateFilter, setDateFilter] = useState(null);
   const [activeId, setActiveId] = useState(null);
   const [cardMenu, setCardMenu] = useState(null); // { x, y, card }
   const filterBtnRef = useRef(null);
+  const dateBtnRef = useRef(null);
   const boardRef = useRef(null);
   const pan = useRef(null);
 
@@ -1141,19 +1214,71 @@ export function KanbanView({
     [cards, board.id],
   );
   const cardsByColumn = useMemo(() => groupByColumn(boardCards), [boardCards]);
-  // What is drawn: every card, or only the ones wearing one of the labels the
-  // filter is set to.
-  const shownByColumn = useMemo(() => (
+  const dateOn = !!dateFilter;
+  // Every card, or only the ones wearing one of the labels the filter is set to.
+  const visibleCards = useMemo(() => (
     activeFilter.length === 0
-      ? cardsByColumn
-      : groupByColumn(boardCards.filter((c) => (c.label_ids || []).some((id) => activeFilter.includes(id))))
-  ), [activeFilter, boardCards, cardsByColumn]);
+      ? boardCards
+      : boardCards.filter((c) => (c.label_ids || []).some((id) => activeFilter.includes(id)))
+  ), [activeFilter, boardCards]);
+
+  /**
+   * The day columns standing to the left of the board: everything overdue,
+   * then one column per day that has cards, up to as far as the filter looks.
+   * A day nobody planned anything for is not worth a column of its own.
+   */
+  const dateColumns = useMemo(() => {
+    if (!dateFilter) return [];
+    const today = dueInDays(0);
+    const last = dateFilterLimit(dateFilter);
+    const rank = new Map(boardColumns.map((c, i) => [c.id, i]));
+    const groups = new Map();
+    visibleCards
+      .filter((c) => c.due_date && (!last || c.due_date <= last))
+      // Inside a day the cards keep the order of the board they came from.
+      .sort((a, b) => (rank.get(a.column_id) ?? 0) - (rank.get(b.column_id) ?? 0)
+        || (a.position ?? 0) - (b.position ?? 0))
+      .forEach((c) => {
+        const key = c.due_date < today ? OVERDUE_KEY : c.due_date;
+        const bucket = groups.get(key);
+        if (bucket) bucket.push(c);
+        else groups.set(key, [c]);
+      });
+
+    const out = [];
+    if (groups.has(OVERDUE_KEY)) {
+      out.push({
+        key: OVERDUE_KEY,
+        title: 'Просроченные',
+        accent: OVERDUE_ACCENT,
+        cards: groups.get(OVERDUE_KEY),
+      });
+    }
+    Array.from(groups.keys())
+      .filter((k) => k !== OVERDUE_KEY)
+      .sort()
+      .forEach((day) => out.push({
+        key: day,
+        title: dateColumnTitle(day),
+        accent: day === today ? TODAY_ACCENT : DAY_ACCENT,
+        cards: groups.get(day),
+      }));
+    return out;
+  }, [dateFilter, visibleCards, boardColumns]);
+
+  // Laid out by date, the columns of the board itself keep what has no date
+  // yet; everything planned stands in its day on the left.
+  const shownByColumn = useMemo(
+    () => groupByColumn(dateOn ? visibleCards.filter((c) => !c.due_date) : visibleCards),
+    [dateOn, visibleCards],
+  );
 
   const cardSettings = {
     showDescription: board.kanban_show_description !== false,
     showTasks: board.kanban_show_tasks !== false,
     showSubtasks: !!board.kanban_show_subtasks,
     quickAdd: board.kanban_quick_add !== false,
+    hideDue: dateOn,
   };
   const width = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, board.kanban_column_width ?? 280));
 
@@ -1221,6 +1346,16 @@ export function KanbanView({
     return at < 0 ? full.length : at;
   };
 
+  /**
+   * A card landing in a column of the board itself. While the board is laid
+   * out by date, those columns are the unplanned half of it, so a card dragged
+   * back into one gives up its date instead of jumping to a day column.
+   */
+  const landInColumn = (moved, columnId, index) => {
+    moveCard(moved.id, columnId, index);
+    if (dateOn && moved.due_date) updateCard(moved.id, { due_date: null });
+  };
+
   const handleDragEnd = ({ active, over }) => {
     setActiveId(null);
     if (!over) return;
@@ -1231,7 +1366,9 @@ export function KanbanView({
         ? over.id
         : (parseKanbanSlotId(over.id)?.columnId
           ?? cards.find((c) => c.id === over.id)?.column_id);
+      // A day column is no place for a column of the board.
       if (!overColumnId || overColumnId === active.id) return;
+      if (!boardColumns.some((c) => c.id === overColumnId)) return;
       const ids = boardColumns.map((c) => c.id);
       reorderColumns(arrayMove(ids, ids.indexOf(active.id), ids.indexOf(overColumnId)));
       return;
@@ -1241,31 +1378,42 @@ export function KanbanView({
     if (!moved) return;
 
     const slot = parseKanbanSlotId(over.id);
+    const overCard = slot ? null : cards.find((c) => c.id === over.id);
+    // Anywhere among the day columns — a gap, the column, or a card standing
+    // in one — only the due date changes; the card keeps its place on the board.
+    const day = dateColumnKey(slot ? slot.columnId : over.id)
+      ?? (dateOn && overCard?.due_date ? overCard.due_date : null);
+    if (day) {
+      if (day !== OVERDUE_KEY && !isOverdue(day) && moved.due_date !== day) {
+        updateCard(moved.id, { due_date: day });
+      }
+      return;
+    }
+
     if (slot) {
       // The slot index counts the cards as they are drawn, so the dragged card
       // itself has to be discounted when it comes from above the gap.
       const shownAt = (shownByColumn.get(slot.columnId) || [])
         .slice(0, slot.index)
         .filter((c) => c.id !== moved.id).length;
-      moveCard(moved.id, slot.columnId, dropIndex(slot.columnId, shownAt, moved.id));
+      landInColumn(moved, slot.columnId, dropIndex(slot.columnId, shownAt, moved.id));
       return;
     }
 
     // Dropped on a column itself (its head, or a folded one): join the end.
     if (boardColumns.some((c) => c.id === over.id)) {
       const list = (cardsByColumn.get(over.id) || []).filter((c) => c.id !== moved.id);
-      moveCard(moved.id, over.id, list.length);
+      landInColumn(moved, over.id, list.length);
       return;
     }
 
-    const overCard = cards.find((c) => c.id === over.id);
     if (!overCard || overCard.id === moved.id) return;
     const list = (cardsByColumn.get(overCard.column_id) || []).filter((c) => c.id !== moved.id);
     const at = list.findIndex((c) => c.id === overCard.id);
     const translated = active.rect.current.translated;
     const overMiddleY = over.rect.top + over.rect.height / 2;
     const pointerY = translated ? translated.top + translated.height / 2 : overMiddleY;
-    moveCard(moved.id, overCard.column_id, at + (pointerY > overMiddleY ? 1 : 0));
+    landInColumn(moved, overCard.column_id, at + (pointerY > overMiddleY ? 1 : 0));
   };
 
   return (
@@ -1273,6 +1421,18 @@ export function KanbanView({
       <div className="kanban__header">
         <span className="kanban__title">{board.title}</span>
         <span className="kanban__header-gap" />
+        <button
+          type="button"
+          ref={dateBtnRef}
+          className="kanban__icon-btn"
+          onMouseEnter={() => hasHover && setDateHover(true)}
+          onMouseLeave={() => hasHover && setDateHover(false)}
+          onClick={() => setDateOpen((v) => !v)}
+          aria-label="Фильтровать по датам"
+          title="Фильтровать по датам"
+        >
+          <img src={(hasHover && dateHover) || dateOn ? calNavIcon : calIcon} alt="" />
+        </button>
         <button
           type="button"
           ref={filterBtnRef}
@@ -1308,6 +1468,40 @@ export function KanbanView({
         >
           <img src={hasHover && settingsHover ? settingsNavIcon : settingsIcon} alt="" />
         </button>
+        {dateOpen && (
+          <Popover anchor={dateBtnRef} onClose={() => setDateOpen(false)} className="kanban-filter">
+            <div className="kanban-filter__head">Фильтровать по датам</div>
+            {DATE_FILTERS.map((f) => {
+              const on = dateFilter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  className={`kanban-filter__item ${on ? 'kanban-filter__item--on' : ''}`}
+                  onClick={() => {
+                    setDateFilter(f.id);
+                    setDateOpen(false);
+                  }}
+                >
+                  <span className="kanban-filter__title">{f.title}</span>
+                  {on && <span className="kanban-menu__check" aria-hidden>✓</span>}
+                </button>
+              );
+            })}
+            {dateOn && (
+              <button
+                type="button"
+                className="kanban-filter__reset"
+                onClick={() => {
+                  setDateFilter(null);
+                  setDateOpen(false);
+                }}
+              >
+                Выключить
+              </button>
+            )}
+          </Popover>
+        )}
         {filterOpen && (
           <Popover anchor={filterBtnRef} onClose={() => setFilterOpen(false)} className="kanban-filter">
             <div className="kanban-filter__head">Показывать плашки с метками</div>
@@ -1356,6 +1550,24 @@ export function KanbanView({
           onPointerUp={endPan}
           onPointerCancel={endPan}
         >
+          {dateColumns.map((group) => (
+            <DateColumn
+              key={group.key}
+              group={group}
+              width={width}
+              settings={cardSettings}
+              tasks={tasks}
+              getSubtasks={getSubtasks}
+              boardLabels={boardLabels}
+              onToggleTask={onToggleTask}
+              onOpenCard={onOpenCard}
+              onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
+              onToggleFold={(cardId, collapsed) => updateCard(cardId, { collapsed })}
+              hasHover={hasHover}
+            />
+          ))}
+          {dateColumns.length > 0 && <div className="kanban__split" aria-hidden />}
+
           {/* Columns differ in width once some of them are folded, so the plain
               rect strategy previews the shuffling better than the list one. */}
           <SortableContext items={boardColumns.map((c) => c.id)} strategy={rectSortingStrategy}>
