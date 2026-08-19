@@ -543,9 +543,27 @@
   gap: 0.45rem;
 }
 
-.kanban-card__task--depth-1 { padding-left: 1rem; }
-.kanban-card__task--depth-2 { padding-left: 2rem; }
-.kanban-card__task--depth-3 { padding-left: 3rem; }
+/* The indent is a margin rather than padding, so a divider above a subtask
+   starts where the subtask does. */
+.kanban-card__task--depth-1 { margin-left: 1rem; }
+.kanban-card__task--depth-2 { margin-left: 2rem; }
+.kanban-card__task--depth-3 { margin-left: 3rem; }
+
+/* The two kinds of spacing a task can carry over from the plans, at the scale
+   of a card: a wide gap, or a divider that is a shade brighter here than in a
+   list, where it has more room to be seen. */
+.kanban-card__task--top-1 {
+  margin-top: 0.75rem;
+}
+
+.kanban-card__task--top-2 {
+  padding-top: 0.4rem;
+  border-top: 1px solid #3d3d3d;
+}
+
+[data-theme="light"] .kanban-card__task--top-2 {
+  border-top-color: var(--border-strong);
+}
 
 /* Same three states as the checkbox of a task in the plans: empty, two
    stripes when subtasks are hiding behind it, and a green tick when done.

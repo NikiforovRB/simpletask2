@@ -295,9 +295,12 @@ export function LabelPicker({
 /** A task line as it is previewed on a card (read-only apart from the tick). */
 function CardTaskLine({ task, subtasks, showSubtasks, onToggle, depth = 0 }) {
   const children = subtasks(task.id);
+  // The spacing a task was given in the plans — a wide gap or a divider — is
+  // kept on the card, scaled down to the size of the preview.
+  const top = task.top_style ?? 0;
   return (
     <>
-      <li className={`kanban-card__task kanban-card__task--depth-${depth}`}>
+      <li className={`kanban-card__task kanban-card__task--depth-${depth} kanban-card__task--top-${top}`}>
         <button
           type="button"
           className={`kanban-card__task-check ${task.completed_at ? 'kanban-card__task-check--done' : ''}`}
