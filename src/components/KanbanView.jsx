@@ -834,11 +834,23 @@ function KanbanColumn({
  */
 function DateColumn({
   group, width, settings, tasks, getSubtasks, boardLabels,
-  onToggleTask, onOpenCard, onCardMenu, onToggleFold, hasHover,
+  onToggleTask, onOpenCard, onAddCard, onCardMenu, onToggleFold, hasHover,
 }) {
   const id = dateColumnId(group.key);
   const droppable = group.key !== OVERDUE_KEY;
   const { setNodeRef } = useDroppable({ id, disabled: !droppable });
+  const [plusHover, setPlusHover] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const cardsElRef = useRef(null);
+  // Nothing is ever planned for a day that has already passed.
+  const canAdd = droppable && !!onAddCard;
+
+  const scrollToEnd = () => {
+    requestAnimationFrame(() => {
+      const el = cardsElRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  };
 
   return (
     <section ref={setNodeRef} style={{ width: `${width}px` }} className="kanban-column kanban-column--date">
@@ -846,10 +858,26 @@ function DateColumn({
         <span className="kanban-column__title kanban-column__title--static">{group.title}</span>
         <span className="kanban-column__tools">
           <span className="kanban-column__count">{group.cards.length}</span>
+          {canAdd && (
+            <button
+              type="button"
+              className="kanban-column__icon-btn"
+              onMouseEnter={() => hasHover && setPlusHover(true)}
+              onMouseLeave={() => hasHover && setPlusHover(false)}
+              onClick={() => {
+                setComposing(true);
+                scrollToEnd();
+              }}
+              aria-label="Добавить плашку на этот день"
+              title="Добавить плашку на этот день"
+            >
+              <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
+            </button>
+          )}
         </span>
       </header>
       <div className="kanban-column__strip" style={{ background: group.accent }} />
-      <div className="kanban-column__cards">
+      <div className="kanban-column__cards" ref={cardsElRef}>
         <SortableContext items={group.cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {group.cards.map((card, i) => (
             <div key={card.id}>
@@ -870,6 +898,15 @@ function DateColumn({
           ))}
         </SortableContext>
         {droppable && <CardDropSlot columnId={id} index={group.cards.length} />}
+        {composing && (
+          <CardComposer
+            onSubmit={(title) => {
+              onAddCard(group.key, title);
+              scrollToEnd();
+            }}
+            onClose={() => setComposing(false)}
+          />
+        )}
       </div>
     </section>
   );
@@ -1712,6 +1749,11 @@ export function KanbanView({
               boardLabels={boardLabels}
               onToggleTask={onToggleTask}
               onOpenCard={onOpenCard}
+              // A card planned for a day still has to live somewhere on the
+              // board, and the first column is where work starts.
+              onAddCard={boardColumns.length > 0
+                ? (day, title) => addCard(board.id, boardColumns[0].id, { title, due_date: day })
+                : null}
               onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
               onToggleFold={(cardId, collapsed) => updateCard(cardId, { collapsed })}
               hasHover={hasHover}
