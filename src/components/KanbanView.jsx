@@ -24,6 +24,7 @@ import {
   OVERDUE_ACCENT,
   OVERDUE_KEY,
   TODAY_ACCENT,
+  archiveDaysLeft,
   cardLabels,
   dateColumnId,
   dateColumnKey,
@@ -31,9 +32,11 @@ import {
   dateFilterLimit,
   dueInDays,
   formatDueDate,
+  formatStamp,
   isOverdue,
   labelTextColor,
 } from '../lib/kanbanCards';
+import { ARCHIVE_DAYS } from '../hooks/useKanban';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
@@ -60,6 +63,8 @@ import rightIcon from '../assets/right.svg';
 import rightNavIcon from '../assets/right-nav.svg';
 import settingsIcon from '../assets/settings.svg';
 import settingsNavIcon from '../assets/settings-nav.svg';
+import archiveIcon from '../assets/archive.svg';
+import archiveNavIcon from '../assets/archive-nav.svg';
 import './KanbanView.css';
 
 const DEFAULT_COLUMN_COLOR = '#5a86ee';
@@ -644,7 +649,12 @@ function KanbanColumn({
           className="kanban-column__fold"
           onMouseEnter={() => hasHover && setFoldHover(true)}
           onMouseLeave={() => hasHover && setFoldHover(false)}
-          onClick={() => onUpdateColumn(column.id, { collapsed: false })}
+          onClick={() => {
+            // The button that takes its place stands somewhere else, so the
+            // pointer is no longer on anything: it starts out plain.
+            setFoldHover(false);
+            onUpdateColumn(column.id, { collapsed: false });
+          }}
           aria-label="Развернуть столбец"
           title="Развернуть столбец"
         >
@@ -714,7 +724,10 @@ function KanbanColumn({
             className="kanban-column__icon-btn"
             onMouseEnter={() => hasHover && setFoldHover(true)}
             onMouseLeave={() => hasHover && setFoldHover(false)}
-            onClick={() => onUpdateColumn(column.id, { collapsed: true })}
+            onClick={() => {
+              setFoldHover(false);
+              onUpdateColumn(column.id, { collapsed: true });
+            }}
             aria-label="Свернуть столбец"
             title="Свернуть столбец"
           >
@@ -790,7 +803,7 @@ function KanbanColumn({
         <div className="dashboard__settings-overlay" onClick={() => setConfirmDelete(false)}>
           <div className="dashboard__settings-popup" onClick={(e) => e.stopPropagation()}>
             <div className="dashboard__settings-title">Удалить столбец?</div>
-            <p className="dashboard__confirm-text">Все плашки этого столбца и их задачи будут удалены.</p>
+            <p className="dashboard__confirm-text">Все плашки этого столбца вместе с задачами уйдут в архив.</p>
             <div className="dashboard__settings-edit-actions">
               <button type="button" className="dashboard__settings-submit" onClick={() => setConfirmDelete(false)}>
                 Отмена
@@ -1163,6 +1176,127 @@ function BoardSettingsModal({ board, onChange, onClose }) {
 }
 
 /**
+ * Everything lately thrown off the board. A deleted card is not gone at once:
+ * it waits here for its 30 days, so a card cleared away in a hurry — with its
+ * description and its whole task list — can still be brought back. From here
+ * it can also be seen off for good.
+ */
+function ArchiveModal({ cards, columns, canRestore, onRestore, onPurge, onPurgeAll, onClose }) {
+  // The card being asked about, or 'all' for the whole archive.
+  const [asking, setAsking] = useState(null);
+
+  const whence = (card) => {
+    const column = columns.find((c) => c.id === card.archived_column_id);
+    return column ? `Из «${column.title || 'Без названия'}»` : 'Столбца больше нет';
+  };
+
+  return (
+    <div className="dashboard__settings-overlay" onClick={onClose}>
+      <div
+        className="dashboard__settings-popup dashboard__settings-popup--main kanban-archive"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="dashboard__settings-head">
+          <span className="dashboard__settings-heading">Архив</span>
+          <button type="button" className="dashboard__settings-close" onClick={onClose} aria-label="Закрыть">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <p className="kanban-archive__note">
+          {`Удалённые плашки хранятся ${ARCHIVE_DAYS} дней вместе со своими задачами, потом удаляются навсегда.`}
+        </p>
+
+        {cards.length === 0 ? (
+          <p className="kanban-archive__empty">Архив пуст.</p>
+        ) : (
+          <ul className="kanban-archive__list">
+            {cards.map((card) => (
+              <li key={card.id} className="kanban-archive__row">
+                <span className="kanban-archive__text">
+                  <span className="kanban-archive__title">{card.title || 'Без названия'}</span>
+                  <span className="kanban-archive__meta">
+                    {`${whence(card)} · ${formatStamp(card.deleted_at)} · ${archiveDaysLeft(card.deleted_at, ARCHIVE_DAYS)}`}
+                  </span>
+                </span>
+                {asking === card.id ? (
+                  <span className="kanban-archive__actions">
+                    <button
+                      type="button"
+                      className="kanban-archive__danger"
+                      onClick={() => {
+                        setAsking(null);
+                        onPurge(card.id);
+                      }}
+                    >
+                      Удалить навсегда
+                    </button>
+                    <button type="button" className="kanban-archive__plain" onClick={() => setAsking(null)}>
+                      Отмена
+                    </button>
+                  </span>
+                ) : (
+                  <span className="kanban-archive__actions">
+                    <button
+                      type="button"
+                      className="kanban-archive__plain"
+                      onClick={() => onRestore(card.id)}
+                      disabled={!canRestore}
+                      title={canRestore ? 'Вернуть на доску' : 'Сначала нужен хотя бы один столбец'}
+                    >
+                      Восстановить
+                    </button>
+                    <button
+                      type="button"
+                      className="kanban-archive__icon"
+                      onClick={() => setAsking(card.id)}
+                      aria-label="Удалить навсегда"
+                      title="Удалить навсегда"
+                    >
+                      <img src={deleteDangerIcon} alt="" />
+                    </button>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {cards.length > 0 && (
+          <div className="kanban-archive__foot">
+            {asking === 'all' ? (
+              <>
+                <button
+                  type="button"
+                  className="kanban-archive__danger"
+                  onClick={() => {
+                    setAsking(null);
+                    onPurgeAll();
+                  }}
+                >
+                  {`Удалить навсегда: ${cards.length}`}
+                </button>
+                <button type="button" className="kanban-archive__plain" onClick={() => setAsking(null)}>
+                  Отмена
+                </button>
+              </>
+            ) : (
+              <button type="button" className="kanban-archive__plain" onClick={() => setAsking('all')}>
+                Очистить архив
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * A kanban board: columns of cards, each card a small window into its own
  * description and task list. Cards are dragged inside a column and between
  * columns; columns are dragged by the grip in their header. The strip of
@@ -1170,14 +1304,16 @@ function BoardSettingsModal({ board, onChange, onClose }) {
  * board itself by any free spot.
  */
 export function KanbanView({
-  board, columns, cards, labels, tasks, getSubtasks,
+  board, columns, cards, archived = [], labels, tasks, getSubtasks,
   addColumn, updateColumn, deleteColumn, reorderColumns,
-  addCard, updateCard, deleteCard, duplicateCard, moveCard,
+  addCard, updateCard, deleteCard, restoreCard, purgeCard, purgeArchive, duplicateCard, moveCard,
   onToggleTask, onOpenCard, onUpdateBoard,
 }) {
   const hasHover = useMediaQuery('(hover: hover)');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveHover, setArchiveHover] = useState(false);
   const [plusHover, setPlusHover] = useState(false);
   const [filterHover, setFilterHover] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -1202,6 +1338,10 @@ export function KanbanView({
   const boardLabels = useMemo(
     () => (labels || []).filter((l) => l.board_id === board.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
     [labels, board.id],
+  );
+  const boardArchive = useMemo(
+    () => archived.filter((c) => c.board_id === board.id),
+    [archived, board.id],
   );
   // Only the labels that still exist can be filtered by.
   const activeFilter = useMemo(
@@ -1468,6 +1608,17 @@ export function KanbanView({
         >
           <img src={hasHover && settingsHover ? settingsNavIcon : settingsIcon} alt="" />
         </button>
+        <button
+          type="button"
+          className="kanban__icon-btn"
+          onMouseEnter={() => hasHover && setArchiveHover(true)}
+          onMouseLeave={() => hasHover && setArchiveHover(false)}
+          onClick={() => setArchiveOpen(true)}
+          aria-label="Архив плашек"
+          title="Архив плашек"
+        >
+          <img src={hasHover && archiveHover ? archiveNavIcon : archiveIcon} alt="" />
+        </button>
         {dateOpen && (
           <Popover anchor={dateBtnRef} onClose={() => setDateOpen(false)} className="kanban-filter">
             <div className="kanban-filter__head">Фильтровать по датам</div>
@@ -1632,6 +1783,18 @@ export function KanbanView({
           board={board}
           onChange={(patch) => onUpdateBoard(board.id, patch)}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {archiveOpen && (
+        <ArchiveModal
+          cards={boardArchive}
+          columns={boardColumns}
+          canRestore={boardColumns.length > 0}
+          onRestore={restoreCard}
+          onPurge={purgeCard}
+          onPurgeAll={() => purgeArchive(board.id)}
+          onClose={() => setArchiveOpen(false)}
         />
       )}
     </section>

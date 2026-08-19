@@ -9,6 +9,24 @@ export function formatDueDate(dateStr) {
   return `${d.getDate()} ${MONTH_GENITIVE_RU[d.getMonth()]}${year}, ${WEEKDAY_SHORT_RU[d.getDay()]}`;
 }
 
+/** The same, for a timestamp rather than a plain date. */
+export function formatStamp(iso) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : formatDueDate(toLocalDateString(d));
+}
+
+/** "осталось 28 дней" — how long an archived card is still kept. */
+export function archiveDaysLeft(deletedAt, days) {
+  const spent = Math.floor((Date.now() - Date.parse(deletedAt)) / 86400000);
+  const left = Math.max(0, days - spent);
+  const teen = left % 100 >= 11 && left % 100 <= 14;
+  const last = left % 10;
+  let word = 'дней';
+  if (!teen && last === 1) word = 'день';
+  else if (!teen && last >= 2 && last <= 4) word = 'дня';
+  return `осталось ${left} ${word}`;
+}
+
 /** True once the due day has passed; the card is highlighted from then on. */
 export function isOverdue(dateStr) {
   return !!dateStr && dateStr < toLocalDateString(new Date());

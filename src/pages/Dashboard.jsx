@@ -394,6 +394,7 @@ export default function Dashboard() {
   const {
     columns: kanbanColumns,
     cards: kanbanCards,
+    archived: kanbanArchive,
     labels: kanbanLabels,
     addColumn: addKanbanColumn,
     updateColumn: updateKanbanColumn,
@@ -402,6 +403,9 @@ export default function Dashboard() {
     addCard: addKanbanCard,
     updateCard: updateKanbanCard,
     deleteCard: deleteKanbanCard,
+    restoreCard: restoreKanbanCard,
+    purgeCard: purgeKanbanCard,
+    purgeArchive: purgeKanbanArchive,
     moveCard: moveKanbanCard,
     addLabel: addKanbanLabel,
     updateLabel: updateKanbanLabel,
@@ -2737,6 +2741,7 @@ export default function Dashboard() {
           board={activeKanbanBoard}
           columns={kanbanColumns}
           cards={kanbanCards}
+          archived={kanbanArchive}
           labels={kanbanLabels}
           tasks={tasks}
           getSubtasks={getSubtasksOf}
@@ -2747,6 +2752,9 @@ export default function Dashboard() {
           addCard={addKanbanCard}
           updateCard={updateKanbanCard}
           deleteCard={deleteKanbanCard}
+          restoreCard={restoreKanbanCard}
+          purgeCard={purgeKanbanCard}
+          purgeArchive={purgeKanbanArchive}
           duplicateCard={handleDuplicateKanbanCard}
           moveCard={moveKanbanCard}
           onToggleTask={handleToggle}

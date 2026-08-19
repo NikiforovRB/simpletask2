@@ -13,12 +13,19 @@ import { subscribeProjects } from '../lib/projectRealtime';
  * on each move would make it feel sticky.
  */
 const byPosition = (a, b) => (a.position ?? 0) - (b.position ?? 0);
+/** Newest first: the archive is read from the top. */
+const byDeletedAt = (a, b) => Date.parse(b.deleted_at) - Date.parse(a.deleted_at);
+
+/** How long a deleted card is kept before it is really gone. */
+export const ARCHIVE_DAYS = 30;
+const ARCHIVE_MS = ARCHIVE_DAYS * 24 * 60 * 60 * 1000;
 
 export function useKanban(boardIds) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
+  const [archived, setArchived] = useState([]);
   const [labels, setLabels] = useState([]);
   const [loading, setLoading] = useState(true);
   // Cards as they stand right now, including the ones added a moment ago:
@@ -41,6 +48,7 @@ export function useKanban(boardIds) {
     if (ids.length === 0) {
       setColumns([]);
       putCards([]);
+      setArchived([]);
       setLabels([]);
       setLoading(false);
       return;
@@ -50,16 +58,27 @@ export function useKanban(boardIds) {
       supabase.from('kanban_cards').select('*').in('board_id', ids).order('position', { ascending: true }),
       supabase.from('kanban_labels').select('*').in('board_id', ids).order('position', { ascending: true }),
     ]);
+    const rows = (crds || []).slice().sort(byPosition);
+    // Whatever has served its 30 days in the archive is dropped here rather
+    // than on a schedule somewhere: the boards are read often enough, and a
+    // card nobody ever comes back for costs nothing while it waits.
+    const expired = Date.now() - ARCHIVE_MS;
+    const stale = rows.filter((c) => c.deleted_at && Date.parse(c.deleted_at) < expired);
     setColumns((cols || []).slice().sort(byPosition));
-    putCards((crds || []).slice().sort(byPosition));
+    putCards(rows.filter((c) => !c.deleted_at));
+    setArchived(rows.filter((c) => c.deleted_at && Date.parse(c.deleted_at) >= expired).sort(byDeletedAt));
     setLabels((lbls || []).slice().sort(byPosition));
     setLoading(false);
+    if (stale.length > 0) {
+      await supabase.from('kanban_cards').delete().in('id', stale.map((c) => c.id));
+    }
   }, [userId, idsKey, putCards]);
 
   useEffect(() => {
     if (!userId) {
       setColumns([]);
       putCards([]);
+      setArchived([]);
       setLabels([]);
       setLoading(false);
       return undefined;
@@ -110,9 +129,28 @@ export function useKanban(boardIds) {
     if (error) await fetchAll();
   }, [fetchAll]);
 
+  /** The column goes; its cards go to the archive rather than with it. */
   const deleteColumn = useCallback(async (id) => {
+    const doomed = cardsRef.current.filter((c) => c.column_id === id);
+    const stamp = new Date().toISOString();
     setColumns((prev) => prev.filter((c) => c.id !== id));
     patchCards((prev) => prev.filter((c) => c.column_id !== id));
+    if (doomed.length > 0) {
+      setArchived((prev) => [
+        ...doomed.map((c) => ({ ...c, deleted_at: stamp, archived_column_id: id, column_id: null })),
+        ...prev,
+      ].sort(byDeletedAt));
+      // They have to leave the column before it is dropped, or the cascade
+      // takes them along.
+      const { error } = await supabase
+        .from('kanban_cards')
+        .update({ deleted_at: stamp, archived_column_id: id, column_id: null, updated_at: stamp })
+        .eq('column_id', id);
+      if (error) {
+        await fetchAll();
+        return;
+      }
+    }
     const { error } = await supabase.from('kanban_columns').delete().eq('id', id);
     if (error) await fetchAll();
   }, [fetchAll, patchCards]);
@@ -163,11 +201,70 @@ export function useKanban(boardIds) {
     if (error) await fetchAll();
   }, [fetchAll, patchCards]);
 
+  /** Off the board and into the archive, tasks and all. */
   const deleteCard = useCallback(async (id) => {
+    const card = cardsRef.current.find((c) => c.id === id);
+    const stamp = new Date().toISOString();
     patchCards((prev) => prev.filter((c) => c.id !== id));
-    const { error } = await supabase.from('kanban_cards').delete().eq('id', id);
+    if (card) {
+      const gone = { ...card, deleted_at: stamp, archived_column_id: card.column_id, column_id: null };
+      setArchived((prev) => [gone, ...prev]);
+    }
+    const { error } = await supabase
+      .from('kanban_cards')
+      .update({
+        deleted_at: stamp,
+        archived_column_id: card?.column_id ?? null,
+        column_id: null,
+        updated_at: stamp,
+      })
+      .eq('id', id);
     if (error) await fetchAll();
   }, [fetchAll, patchCards]);
+
+  /** Back to the column it was deleted from, or to the first one left. */
+  const restoreCard = useCallback(async (id) => {
+    const card = archived.find((c) => c.id === id);
+    if (!card) return;
+    const home = columns
+      .filter((c) => c.board_id === card.board_id)
+      .sort(byPosition);
+    const columnId = home.some((c) => c.id === card.archived_column_id)
+      ? card.archived_column_id
+      : home[0]?.id;
+    if (!columnId) return;
+    const position = nextPosition(cardsRef.current.filter((c) => c.column_id === columnId));
+    setArchived((prev) => prev.filter((c) => c.id !== id));
+    patchCards((prev) => [
+      ...prev,
+      { ...card, deleted_at: null, archived_column_id: null, column_id: columnId, position },
+    ].sort(byPosition));
+    const { error } = await supabase
+      .from('kanban_cards')
+      .update({
+        deleted_at: null,
+        archived_column_id: null,
+        column_id: columnId,
+        position,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+    if (error) await fetchAll();
+  }, [archived, columns, fetchAll, patchCards]);
+
+  const purgeCard = useCallback(async (id) => {
+    setArchived((prev) => prev.filter((c) => c.id !== id));
+    const { error } = await supabase.from('kanban_cards').delete().eq('id', id);
+    if (error) await fetchAll();
+  }, [fetchAll]);
+
+  const purgeArchive = useCallback(async (boardId) => {
+    const ids = archived.filter((c) => c.board_id === boardId).map((c) => c.id);
+    if (ids.length === 0) return;
+    setArchived((prev) => prev.filter((c) => c.board_id !== boardId));
+    const { error } = await supabase.from('kanban_cards').delete().in('id', ids);
+    if (error) await fetchAll();
+  }, [archived, fetchAll]);
 
   const addLabel = useCallback(async (boardId, patch = {}) => {
     if (!userId || !boardId) return null;
@@ -254,6 +351,7 @@ export function useKanban(boardIds) {
   return {
     columns,
     cards,
+    archived,
     labels,
     loading,
     addColumn,
@@ -263,6 +361,9 @@ export function useKanban(boardIds) {
     addCard,
     updateCard,
     deleteCard,
+    restoreCard,
+    purgeCard,
+    purgeArchive,
     moveCard,
     addLabel,
     updateLabel,
