@@ -25,6 +25,11 @@ function normalizeTheme(v) {
   return v === 'light' ? 'light' : 'dark';
 }
 
+/** A settings column holding a plain object, safe against nulls and arrays. */
+function normalizeMap(v) {
+  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+}
+
 // Colours offered for the filled areas on the calendar focus scale.
 export const FOCUS_SCALE_COLORS = ['#15c466', '#5a86ee'];
 
@@ -63,6 +68,7 @@ export function useSettings() {
     focus_timer_show_total: false,
     show_reputation_in_lists: false,
     reputation_in_completed: false,
+    kanban_date_filters: {},
   });
   const [loading, setLoading] = useState(true);
 
@@ -100,6 +106,7 @@ export function useSettings() {
           focus_timer_show_total: data.focus_timer_show_total === true,
           show_reputation_in_lists: data.show_reputation_in_lists === true,
           reputation_in_completed: data.reputation_in_completed === true,
+          kanban_date_filters: normalizeMap(data.kanban_date_filters),
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -136,6 +143,7 @@ export function useSettings() {
           focus_timer_show_total: false,
           show_reputation_in_lists: false,
           reputation_in_completed: false,
+          kanban_date_filters: {},
         });
       }
       setLoading(false);
@@ -274,6 +282,16 @@ export function useSettings() {
     await supabase.from('user_settings').update({ reputation_in_completed: val }).eq('user_id', user.id);
   };
 
+  /** How one kanban board is filtered by date; null puts it back to columns. */
+  const setKanbanDateFilter = async (boardId, filterId) => {
+    if (!user || !boardId) return;
+    const all = { ...normalizeMap(settings.kanban_date_filters) };
+    if (filterId) all[boardId] = filterId;
+    else delete all[boardId];
+    setSettings((s) => ({ ...s, kanban_date_filters: all }));
+    await supabase.from('user_settings').update({ kanban_date_filters: all }).eq('user_id', user.id);
+  };
+
   return {
     settings,
     setDaysCount,
@@ -295,6 +313,7 @@ export function useSettings() {
     setFocusTimerShowTotal,
     setShowReputationInLists,
     setReputationInCompleted,
+    setKanbanDateFilter,
     loading,
   };
 }

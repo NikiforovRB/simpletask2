@@ -137,6 +137,20 @@
   color: var(--text-primary);
 }
 
+/* Deleting lives here, in the corner furthest from the close button. */
+.kanban-panel__foot {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--divider);
+  background: var(--bg-app);
+}
+
+.kanban-panel__foot .kanban-panel__icon-btn {
+  width: 2rem;
+  height: 2rem;
+}
+
 /* Scrolls without a bar of its own: the panel is narrow and the bar would sit
    right on top of the task actions. */
 .kanban-panel__body {

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import leftIcon from '../assets/left.svg';
+import rightIcon from '../assets/right.svg';
 import './CalendarPopover.css';
 
 const MONTHS_RU = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
@@ -44,9 +46,13 @@ export function CalendarPopover({ value, onChange, onClose }) {
   return (
     <div className="calendar-popover">
       <div className="calendar-popover__nav">
-        <button type="button" className="calendar-popover__nav-btn" onClick={prevMonth}>←</button>
+        <button type="button" className="calendar-popover__nav-btn" onClick={prevMonth} aria-label="Предыдущий месяц">
+          <img src={leftIcon} alt="" />
+        </button>
         <span className="calendar-popover__title">{MONTHS_RU[month]} {year}</span>
-        <button type="button" className="calendar-popover__nav-btn" onClick={nextMonth}>→</button>
+        <button type="button" className="calendar-popover__nav-btn" onClick={nextMonth} aria-label="Следующий месяц">
+          <img src={rightIcon} alt="" />
+        </button>
       </div>
       <div className="calendar-popover__weekdays">
         {WEEKDAY.map((w) => (

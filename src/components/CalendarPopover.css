@@ -13,6 +13,9 @@
 }
 
 .calendar-popover__nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--text-muted);
@@ -21,8 +24,15 @@
   font-size: 0.875rem;
 }
 
-.calendar-popover__nav-btn:hover {
-  color: var(--text-strong);
+.calendar-popover__nav-btn img {
+  width: 1.125rem;
+  height: 1.125rem;
+  object-fit: contain;
+  opacity: 0.75;
+}
+
+.calendar-popover__nav-btn:hover img {
+  opacity: 1;
 }
 
 .calendar-popover__title {

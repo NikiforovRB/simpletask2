@@ -38,6 +38,7 @@ import {
 } from '../lib/kanbanCards';
 import { ARCHIVE_DAYS } from '../hooks/useKanban';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { CalendarPopover } from './CalendarPopover';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
@@ -51,6 +52,9 @@ import downIcon from '../assets/down.svg';
 import downNavIcon from '../assets/down-nav.svg';
 import calIcon from '../assets/cal.svg';
 import calNavIcon from '../assets/cal-nav.svg';
+import calendarIcon from '../assets/calendar.svg';
+import lineHeightIcon from '../assets/line-height.svg';
+import horizontalIcon from '../assets/horizontal.svg';
 import tagIcon from '../assets/tag.svg';
 import tagNavIcon from '../assets/tag-nav.svg';
 import layersIcon from '../assets/layers.svg';
@@ -75,40 +79,6 @@ const COLUMN_WIDTH_STEP = 10;
 const QUICK_COLORS = ['#f33737', '#f4ba04', '#15c466', '#5a86ee', '#613aaf'];
 
 const slotId = (columnId, index) => `kslot::${columnId}::${index}`;
-
-/**
- * The date filter is a way of looking at a board rather than a property of it,
- * so it is kept in the browser and one per board: leaving for another view, or
- * closing the tab, brings the board back the way it was left, without imposing
- * that view on everyone the board is shared with.
- */
-const DATE_FILTER_KEY = 'kanban_date_filter_by_board';
-
-function readDateFilters() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(DATE_FILTER_KEY) || '{}');
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-/** The filter a board was left with; anything no longer offered counts as off. */
-function loadDateFilter(boardId) {
-  const saved = readDateFilters()[boardId];
-  return DATE_FILTERS.some((f) => f.id === saved) ? saved : null;
-}
-
-function saveDateFilter(boardId, id) {
-  try {
-    const all = readDateFilters();
-    if (id) all[boardId] = id;
-    else delete all[boardId];
-    localStorage.setItem(DATE_FILTER_KEY, JSON.stringify(all));
-  } catch {
-    /* noop */
-  }
-}
 
 const groupByColumn = (list) => {
   const map = new Map();
@@ -401,9 +371,52 @@ function CardTaskLine({ task, subtasks, showSubtasks, onToggle, depth = 0 }) {
   );
 }
 
+/** The title of a card, typed over in place. Escape leaves it as it was. */
+function CardTitleEditor({ card, onCommit, onDone }) {
+  const [text, setText] = useState(card.title || '');
+  const cancelled = useRef(false);
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
+
+  return (
+    <textarea
+      ref={ref}
+      className="kanban-card__title-input"
+      style={card.title_color ? { color: card.title_color } : undefined}
+      rows={1}
+      autoFocus
+      value={text}
+      placeholder="Название плашки"
+      onChange={(e) => setText(e.target.value)}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          e.currentTarget.blur();
+        } else if (e.key === 'Escape') {
+          cancelled.current = true;
+          e.currentTarget.blur();
+        }
+      }}
+      onBlur={() => {
+        const next = text.trim();
+        if (!cancelled.current && next !== (card.title || '')) onCommit(card.id, next);
+        onDone();
+      }}
+    />
+  );
+}
+
 function KanbanCard({
-  card, settings, tasks, getSubtasks, boardLabels = [], hasHover = false,
-  onToggleTask, onOpen, onContextMenu, onToggleFold, dragHandleProps, overlay = false,
+  card, settings, tasks, getSubtasks, boardLabels = [], hasHover = false, editing = false,
+  onToggleTask, onOpen, onContextMenu, onToggleFold, onTitleCommit, onEditDone,
+  dragHandleProps, overlay = false,
 }) {
   // A card is dragged by its whole body, so a click only counts as a click
   // while the pointer stayed put.
@@ -509,9 +522,13 @@ function KanbanCard({
           )}
         </div>
       )}
-      <div className="kanban-card__title" style={card.title_color ? { color: card.title_color } : undefined}>
-        {card.title || 'Без названия'}
-      </div>
+      {editing ? (
+        <CardTitleEditor card={card} onCommit={onTitleCommit} onDone={onEditDone} />
+      ) : (
+        <div className="kanban-card__title" style={card.title_color ? { color: card.title_color } : undefined}>
+          {card.title || 'Без названия'}
+        </div>
+      )}
       {!folded && settings.showDescription && card.description?.trim() && (
         <p className="kanban-card__desc">{card.description}</p>
       )}
@@ -621,6 +638,7 @@ function CardComposer({ onSubmit, onClose }) {
 function KanbanColumn({
   column, cards, width, settings, tasks, getSubtasks, boardLabels, onToggleTask,
   onOpenCard, onAddCard, onUpdateColumn, onDeleteColumn, onCardMenu, onToggleFold, hasHover,
+  editingCardId, onTitleCommit, onEditDone,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: column.id,
@@ -813,10 +831,13 @@ function KanbanColumn({
                 getSubtasks={getSubtasks}
                 boardLabels={boardLabels}
                 hasHover={hasHover}
+                editing={editingCardId === card.id}
                 onToggleTask={onToggleTask}
                 onOpen={onOpenCard}
                 onContextMenu={onCardMenu}
                 onToggleFold={onToggleFold}
+                onTitleCommit={onTitleCommit}
+                onEditDone={onEditDone}
               />
             </div>
           ))}
@@ -869,6 +890,7 @@ function KanbanColumn({
 function DateColumn({
   group, width, settings, tasks, getSubtasks, boardLabels,
   onToggleTask, onOpenCard, onAddCard, onCardMenu, onToggleFold, hasHover,
+  editingCardId, onTitleCommit, onEditDone,
 }) {
   const id = dateColumnId(group.key);
   const droppable = group.key !== OVERDUE_KEY;
@@ -923,10 +945,13 @@ function DateColumn({
                 getSubtasks={getSubtasks}
                 boardLabels={boardLabels}
                 hasHover={hasHover}
+                editing={editingCardId === card.id}
                 onToggleTask={onToggleTask}
                 onOpen={onOpenCard}
                 onContextMenu={onCardMenu}
                 onToggleFold={onToggleFold}
+                onTitleCommit={onTitleCommit}
+                onEditDone={onEditDone}
               />
             </div>
           ))}
@@ -947,18 +972,64 @@ function DateColumn({
 }
 
 /**
+ * A list opening beside a menu row, to its right unless the window ends there.
+ * It is put next to the menu rather than inside it so that the menu can keep
+ * scrolling on its own without cutting the list off.
+ */
+function MenuFlyout({ anchor, children }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const at = anchor.current;
+    if (!el || !at) return;
+    const box = at.getBoundingClientRect();
+    const { offsetWidth: w, offsetHeight: h } = el;
+    const right = box.right - 2;
+    el.style.left = `${right + w > window.innerWidth - 8 ? Math.max(8, box.left - w + 2) : right}px`;
+    el.style.top = `${Math.max(8, Math.min(box.top - 4, window.innerHeight - h - 8))}px`;
+    el.style.visibility = 'visible';
+  }, [anchor]);
+  return createPortal(<div ref={ref} className="kanban-menu__flyout">{children}</div>, document.body);
+}
+
+/** A menu row that has a list of its own: it comes out on hover and on tap. */
+function MenuBranch({ icon, label, open, hover, onOpen, onToggle, children }) {
+  const ref = useRef(null);
+  return (
+    <>
+      <button
+        type="button"
+        ref={ref}
+        className={`dashboard__context-menu-item ${open ? 'dashboard__context-menu-item--open' : ''}`}
+        onMouseEnter={hover ? onOpen : undefined}
+        onClick={onToggle}
+      >
+        <img src={icon} alt="" className="dashboard__context-menu-item-icon" />
+        <span>{label}</span>
+        <img src={rightIcon} alt="" className="kanban-menu__arrow" />
+      </button>
+      {open && <MenuFlyout anchor={ref}>{children}</MenuFlyout>}
+    </>
+  );
+}
+
+/**
  * Right-click menu of a card. Everything that is done to a card often enough
- * to not be worth opening it for: its outline colour, its due date, its
- * labels, a copy of it, the column it lives in, and getting rid of it. The
- * longer lists open as a second page rather than as a flyout, which keeps the
- * menu inside the window and works the same under a finger.
+ * to not be worth opening it for: the colour of its outline and of its title,
+ * a quick go at the title itself, its due date, its labels, a copy of it, the
+ * column it lives in, and getting rid of it. What needs a list of its own
+ * opens to the side, under the pointer that asked for it.
  */
 function CardContextMenu({
   card, at, columns, cardsByColumn, boardLabels,
-  onUpdate, onDuplicate, onDelete, onMove, onOpen, onClose,
+  onUpdate, onDuplicate, onDelete, onMove, onOpen, onQuickEdit, onClose,
 }) {
   const ref = useRef(null);
-  const [page, setPage] = useState('root');
+  const hasHover = useMediaQuery('(hover: hover)');
+  // Which of the three side lists is out, if any.
+  const [flyout, setFlyout] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef(null);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -967,7 +1038,7 @@ function CardContextMenu({
     el.style.left = `${Math.max(8, Math.min(at.x, window.innerWidth - w - 8))}px`;
     el.style.top = `${Math.max(8, Math.min(at.y, window.innerHeight - h - 8))}px`;
     el.style.visibility = 'visible';
-  }, [at, page]);
+  }, [at]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -977,14 +1048,82 @@ function CardContextMenu({
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const item = (icon, label, onClick, extra = '') => (
+  /** A plain row, as used inside the side lists. */
+  const row = (icon, label, onClick, extra = '') => (
     <button type="button" className={`dashboard__context-menu-item ${extra}`} onClick={onClick}>
       <img src={icon} alt="" className="dashboard__context-menu-item-icon" />
       <span>{label}</span>
     </button>
   );
 
-  const back = item(leftIcon, 'Назад', () => setPage('root'));
+  const showFlyout = (key) => {
+    setFlyout(key);
+    setPickerOpen(false);
+  };
+
+  /** A row of the menu itself: hovering it puts away whatever list is out. */
+  const item = (icon, label, onClick, extra = '') => (
+    <button
+      type="button"
+      className={`dashboard__context-menu-item ${extra}`}
+      onMouseEnter={hasHover ? () => showFlyout(null) : undefined}
+      onClick={onClick}
+    >
+      <img src={icon} alt="" className="dashboard__context-menu-item-icon" />
+      <span>{label}</span>
+    </button>
+  );
+
+  const branch = (key, icon, label, content) => (
+    <MenuBranch
+      icon={icon}
+      label={label}
+      open={flyout === key}
+      hover={hasHover}
+      onOpen={() => { if (flyout !== key) showFlyout(key); }}
+      onToggle={() => showFlyout(flyout === key ? null : key)}
+    >
+      {content}
+    </MenuBranch>
+  );
+
+  const swatches = (value, onPick, none) => (
+    <div className="dashboard__context-menu-colors" onMouseEnter={hasHover ? () => showFlyout(null) : undefined}>
+      <span
+        className={`dashboard__context-menu-color-wrap ${!value ? 'dashboard__context-menu-color-wrap--selected' : ''}`}
+        style={{ '--swatch-color': none.swatch }}
+      >
+        <button
+          type="button"
+          className={`dashboard__context-menu-color ${none.className}`}
+          style={none.style}
+          onClick={() => onPick(null)}
+          aria-label={none.label}
+          title={none.label}
+        />
+      </span>
+      {QUICK_COLORS.map((c) => {
+        const selected = (value || '').toLowerCase() === c.toLowerCase();
+        return (
+          <span
+            key={c}
+            className={`dashboard__context-menu-color-wrap ${selected ? 'dashboard__context-menu-color-wrap--selected' : ''}`}
+            style={{ '--swatch-color': c }}
+          >
+            <button
+              type="button"
+              className="dashboard__context-menu-color"
+              style={{ background: c }}
+              onClick={() => onPick(c)}
+              aria-label={`${none.of} ${c}`}
+              title={none.of}
+            />
+          </span>
+        );
+      })}
+    </div>
+  );
+
   const labelIds = card.label_ids || [];
 
   return createPortal(
@@ -996,66 +1135,57 @@ function CardContextMenu({
         onClick={(e) => e.stopPropagation()}
         onContextMenu={(e) => e.preventDefault()}
       >
-        {page === 'root' && (
+        {swatches(card.border_color, (c) => onUpdate(card.id, { border_color: c }), {
+          label: 'Без обводки',
+          of: 'Цвет обводки',
+          className: 'kanban-menu__color--none',
+          swatch: 'var(--border-strong)',
+        })}
+        {swatches(card.title_color, (c) => onUpdate(card.id, { title_color: c }), {
+          label: 'Обычный цвет текста',
+          of: 'Цвет текста',
+          className: '',
+          style: { background: 'var(--text-strong)' },
+          swatch: 'var(--text-strong)',
+        })}
+        {item(lineHeightIcon, 'Быстрое редактирование', () => { onQuickEdit(card.id); onClose(); })}
+        {item(editIcon, 'Открыть', () => { onOpen(card.id); onClose(); })}
+        <div className="dashboard__context-menu-separator" aria-hidden />
+
+        {branch('due', calIcon, card.due_date ? `Срок: ${formatDueDate(card.due_date)}` : 'Срок…', (
           <>
-            <div className="dashboard__context-menu-colors">
-              <span
-                className={`dashboard__context-menu-color-wrap ${!card.border_color ? 'dashboard__context-menu-color-wrap--selected' : ''}`}
-                style={{ '--swatch-color': 'var(--border-strong)' }}
+            {row(starIcon, 'Сегодня', () => { onUpdate(card.id, { due_date: dueInDays(0) }); onClose(); })}
+            {row(zavtraIcon, 'Завтра', () => { onUpdate(card.id, { due_date: dueInDays(1) }); onClose(); })}
+            {row(calIcon, 'Через неделю', () => { onUpdate(card.id, { due_date: dueInDays(7) }); onClose(); })}
+            <button
+              type="button"
+              ref={pickerRef}
+              className="dashboard__context-menu-item"
+              onClick={() => setPickerOpen((v) => !v)}
+            >
+              <img src={calendarIcon} alt="" className="dashboard__context-menu-item-icon" />
+              <span>Указать дату</span>
+            </button>
+            {card.due_date && row(closeIcon, 'Убрать срок', () => { onUpdate(card.id, { due_date: null }); onClose(); })}
+            {pickerOpen && (
+              <Popover
+                anchor={pickerRef}
+                align="left"
+                className="kanban-pop--calendar"
+                onClose={() => setPickerOpen(false)}
               >
-                <button
-                  type="button"
-                  className="dashboard__context-menu-color kanban-menu__color--none"
-                  onClick={() => onUpdate(card.id, { border_color: null })}
-                  aria-label="Без обводки"
-                  title="Без обводки"
+                <CalendarPopover
+                  value={card.due_date || null}
+                  onChange={(dateStr) => onUpdate(card.id, { due_date: dateStr })}
+                  onClose={() => { setPickerOpen(false); onClose(); }}
                 />
-              </span>
-              {QUICK_COLORS.map((c) => {
-                const selected = (card.border_color || '').toLowerCase() === c.toLowerCase();
-                return (
-                  <span
-                    key={c}
-                    className={`dashboard__context-menu-color-wrap ${selected ? 'dashboard__context-menu-color-wrap--selected' : ''}`}
-                    style={{ '--swatch-color': c }}
-                  >
-                    <button
-                      type="button"
-                      className="dashboard__context-menu-color"
-                      style={{ background: c }}
-                      onClick={() => onUpdate(card.id, { border_color: c })}
-                      aria-label={`Обводка ${c}`}
-                    />
-                  </span>
-                );
-              })}
-            </div>
-            {item(editIcon, 'Открыть', () => { onOpen(card.id); onClose(); })}
-            <div className="dashboard__context-menu-separator" aria-hidden />
-            {item(calIcon, card.due_date ? `Срок: ${formatDueDate(card.due_date)}` : 'Срок…', () => setPage('due'))}
-            {item(tagIcon, labelIds.length ? `Метки: ${labelIds.length}` : 'Метки…', () => setPage('labels'))}
-            <div className="dashboard__context-menu-separator" aria-hidden />
-            {item(layersIcon, 'Скопировать', () => { onDuplicate(card); onClose(); })}
-            {item(rightIcon, 'Переместить в столбец…', () => setPage('move'))}
-            {item(deleteDangerIcon, 'Удалить', () => { onDelete(card.id); onClose(); }, 'dashboard__context-menu-item--danger')}
+              </Popover>
+            )}
           </>
-        )}
+        ))}
 
-        {page === 'due' && (
+        {branch('labels', tagIcon, labelIds.length ? `Метки: ${labelIds.length}` : 'Метки…', (
           <>
-            {back}
-            <div className="dashboard__context-menu-separator" aria-hidden />
-            {item(starIcon, 'Сегодня', () => { onUpdate(card.id, { due_date: dueInDays(0) }); onClose(); })}
-            {item(zavtraIcon, 'Завтра', () => { onUpdate(card.id, { due_date: dueInDays(1) }); onClose(); })}
-            {item(calIcon, 'Через неделю', () => { onUpdate(card.id, { due_date: dueInDays(7) }); onClose(); })}
-            {card.due_date && item(closeIcon, 'Убрать срок', () => { onUpdate(card.id, { due_date: null }); onClose(); })}
-          </>
-        )}
-
-        {page === 'labels' && (
-          <>
-            {back}
-            <div className="dashboard__context-menu-separator" aria-hidden />
             {boardLabels.length === 0 && (
               <div className="kanban-menu__empty">Метки создаются в плашке</div>
             )}
@@ -1077,30 +1207,31 @@ function CardContextMenu({
               );
             })}
           </>
-        )}
+        ))}
 
-        {page === 'move' && (
-          <>
-            {back}
-            <div className="dashboard__context-menu-separator" aria-hidden />
-            {columns.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className="dashboard__context-menu-item"
-                disabled={c.id === card.column_id}
-                onClick={() => {
-                  onMove(card.id, c.id, (cardsByColumn.get(c.id) || []).filter((x) => x.id !== card.id).length);
-                  onClose();
-                }}
-              >
-                <span className="kanban-menu__dot" style={{ background: c.accent_color || DEFAULT_COLUMN_COLOR }} aria-hidden />
-                <span>{c.title || 'Без названия'}</span>
-                {c.id === card.column_id && <span className="kanban-menu__check" aria-hidden>✓</span>}
-              </button>
-            ))}
-          </>
-        )}
+        <div className="dashboard__context-menu-separator" aria-hidden />
+        {item(layersIcon, 'Скопировать', () => { onDuplicate(card); onClose(); })}
+
+        {branch('move', horizontalIcon, 'Переместить в столбец…', (
+          columns.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className="dashboard__context-menu-item"
+              disabled={c.id === card.column_id}
+              onClick={() => {
+                onMove(card.id, c.id, (cardsByColumn.get(c.id) || []).filter((x) => x.id !== card.id).length);
+                onClose();
+              }}
+            >
+              <span className="kanban-menu__dot" style={{ background: c.accent_color || DEFAULT_COLUMN_COLOR }} aria-hidden />
+              <span>{c.title || 'Без названия'}</span>
+              {c.id === card.column_id && <span className="kanban-menu__check" aria-hidden>✓</span>}
+            </button>
+          ))
+        ))}
+
+        {item(deleteDangerIcon, 'Удалить', () => { onDelete(card.id); onClose(); }, 'dashboard__context-menu-item--danger')}
       </div>
     </>,
     document.body,
@@ -1379,6 +1510,7 @@ export function KanbanView({
   addColumn, updateColumn, deleteColumn, reorderColumns,
   addCard, updateCard, deleteCard, restoreCard, purgeCard, purgeArchive, duplicateCard,
   moveCard, planDay,
+  dateFilter: savedDateFilter = null, onDateFilterChange,
   onToggleTask, onOpenCard, onUpdateBoard,
 }) {
   const hasHover = useMediaQuery('(hover: hover)');
@@ -1392,8 +1524,8 @@ export function KanbanView({
   const [filterIds, setFilterIds] = useState([]);
   const [dateHover, setDateHover] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
-  // One of the DATE_FILTERS ids, or null while the board is laid out by stage.
-  const [dateFilter, setDateFilter] = useState(() => loadDateFilter(board.id));
+  // The card whose title is being typed over right on the board.
+  const [editingCardId, setEditingCardId] = useState(null);
   const [activeId, setActiveId] = useState(null);
   const [cardMenu, setCardMenu] = useState(null); // { x, y, card }
   const filterBtnRef = useRef(null);
@@ -1403,9 +1535,11 @@ export function KanbanView({
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  // One of the DATE_FILTERS ids, or null while the board is laid out by stage.
+  const dateFilter = DATE_FILTERS.some((f) => f.id === savedDateFilter) ? savedDateFilter : null;
+
   const pickDateFilter = (id) => {
-    setDateFilter(id);
-    saveDateFilter(board.id, id);
+    onDateFilterChange?.(board.id, id);
     setDateOpen(false);
   };
 
@@ -1699,7 +1833,7 @@ export function KanbanView({
           aria-label="Фильтровать по датам"
           title="Фильтровать по датам"
         >
-          <img src={(hasHover && dateHover) || dateOn ? calNavIcon : calIcon} alt="" />
+          <img src={hasHover && dateHover ? calNavIcon : calIcon} alt="" />
         </button>
         <button
           type="button"
@@ -1842,6 +1976,9 @@ export function KanbanView({
               onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
               onToggleFold={(cardId, collapsed) => updateCard(cardId, { collapsed })}
               hasHover={hasHover}
+              editingCardId={editingCardId}
+              onTitleCommit={(cardId, title) => updateCard(cardId, { title })}
+              onEditDone={() => setEditingCardId(null)}
             />
           ))}
           {dateColumns.length > 0 && <div className="kanban__split" aria-hidden />}
@@ -1867,6 +2004,9 @@ export function KanbanView({
                 onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
                 onToggleFold={(cardId, collapsed) => updateCard(cardId, { collapsed })}
                 hasHover={hasHover}
+                editingCardId={editingCardId}
+                onTitleCommit={(cardId, title) => updateCard(cardId, { title })}
+                onEditDone={() => setEditingCardId(null)}
               />
             ))}
           </SortableContext>
@@ -1901,6 +2041,7 @@ export function KanbanView({
           onDelete={deleteCard}
           onMove={moveCard}
           onOpen={onOpenCard}
+          onQuickEdit={setEditingCardId}
           onClose={() => setCardMenu(null)}
         />
       )}

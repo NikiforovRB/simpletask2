@@ -366,7 +366,8 @@
   object-fit: contain;
 }
 
-.dashboard__context-menu-item:hover {
+.dashboard__context-menu-item:hover,
+.dashboard__context-menu-item--open {
   background: var(--bg-hover-strong);
 }
 

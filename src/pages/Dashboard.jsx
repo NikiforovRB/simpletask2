@@ -381,6 +381,7 @@ export default function Dashboard() {
     setFocusTimerShowTotal,
     setShowReputationInLists,
     setReputationInCompleted,
+    setKanbanDateFilter,
   } = useSettings();
   const { dayHours, setDayHours, resetDayHours } = useCalendarDayHours();
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
@@ -2759,6 +2760,8 @@ export default function Dashboard() {
           duplicateCard={handleDuplicateKanbanCard}
           moveCard={moveKanbanCard}
           planDay={planKanbanDay}
+          dateFilter={settings.kanban_date_filters?.[activeKanbanBoard.id] ?? null}
+          onDateFilterChange={setKanbanDateFilter}
           onToggleTask={handleToggle}
           onOpenCard={setOpenCardId}
           onUpdateBoard={updateProjectSettings}

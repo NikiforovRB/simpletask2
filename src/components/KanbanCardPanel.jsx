@@ -192,17 +192,6 @@ export function KanbanCardPanel({
           </span>
           <button
             type="button"
-            className="kanban-panel__icon-btn"
-            onMouseEnter={() => hasHover && setDelHover(true)}
-            onMouseLeave={() => hasHover && setDelHover(false)}
-            onClick={() => setConfirmDelete(true)}
-            aria-label="Удалить плашку"
-            title="Удалить плашку"
-          >
-            <img src={hasHover && delHover ? deleteNavIcon : deleteIcon} alt="" />
-          </button>
-          <button
-            type="button"
             className="kanban-panel__close"
             onClick={() => requestClose.current?.()}
             aria-label="Закрыть"
@@ -245,7 +234,7 @@ export function KanbanCardPanel({
               </button>
             )}
             {dueOpen && (
-              <Popover anchor={dueBtnRef} align="left" onClose={() => setDueOpen(false)} className="kanban-due-pop">
+              <Popover anchor={dueBtnRef} align="left" onClose={() => setDueOpen(false)} className="kanban-due-pop kanban-pop--calendar">
                 <CalendarPopover
                   value={card.due_date || null}
                   onChange={(dateStr) => onUpdateCard(cardId, { due_date: dateStr })}
@@ -392,6 +381,22 @@ export function KanbanCardPanel({
             </>
           )}
         </div>
+
+        {/* Far from the close button: a miss on a phone should not be the one
+            press that deletes the card. */}
+        <footer className="kanban-panel__foot">
+          <button
+            type="button"
+            className="kanban-panel__icon-btn"
+            onMouseEnter={() => hasHover && setDelHover(true)}
+            onMouseLeave={() => hasHover && setDelHover(false)}
+            onClick={() => setConfirmDelete(true)}
+            aria-label="Удалить плашку"
+            title="Удалить плашку"
+          >
+            <img src={hasHover && delHover ? deleteNavIcon : deleteIcon} alt="" />
+          </button>
+        </footer>
       </aside>
 
       {confirmDelete && (
