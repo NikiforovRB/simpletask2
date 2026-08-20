@@ -76,6 +76,40 @@ const QUICK_COLORS = ['#f33737', '#f4ba04', '#15c466', '#5a86ee', '#613aaf'];
 
 const slotId = (columnId, index) => `kslot::${columnId}::${index}`;
 
+/**
+ * The date filter is a way of looking at a board rather than a property of it,
+ * so it is kept in the browser and one per board: leaving for another view, or
+ * closing the tab, brings the board back the way it was left, without imposing
+ * that view on everyone the board is shared with.
+ */
+const DATE_FILTER_KEY = 'kanban_date_filter_by_board';
+
+function readDateFilters() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DATE_FILTER_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The filter a board was left with; anything no longer offered counts as off. */
+function loadDateFilter(boardId) {
+  const saved = readDateFilters()[boardId];
+  return DATE_FILTERS.some((f) => f.id === saved) ? saved : null;
+}
+
+function saveDateFilter(boardId, id) {
+  try {
+    const all = readDateFilters();
+    if (id) all[boardId] = id;
+    else delete all[boardId];
+    localStorage.setItem(DATE_FILTER_KEY, JSON.stringify(all));
+  } catch {
+    /* noop */
+  }
+}
+
 const groupByColumn = (list) => {
   const map = new Map();
   list.forEach((c) => {
@@ -1359,7 +1393,7 @@ export function KanbanView({
   const [dateHover, setDateHover] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   // One of the DATE_FILTERS ids, or null while the board is laid out by stage.
-  const [dateFilter, setDateFilter] = useState(null);
+  const [dateFilter, setDateFilter] = useState(() => loadDateFilter(board.id));
   const [activeId, setActiveId] = useState(null);
   const [cardMenu, setCardMenu] = useState(null); // { x, y, card }
   const filterBtnRef = useRef(null);
@@ -1368,6 +1402,12 @@ export function KanbanView({
   const pan = useRef(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const pickDateFilter = (id) => {
+    setDateFilter(id);
+    saveDateFilter(board.id, id);
+    setDateOpen(false);
+  };
 
   const boardColumns = useMemo(
     () => columns.filter((c) => c.board_id === board.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
@@ -1717,10 +1757,7 @@ export function KanbanView({
                   key={f.id}
                   type="button"
                   className={`kanban-filter__item ${on ? 'kanban-filter__item--on' : ''}`}
-                  onClick={() => {
-                    setDateFilter(f.id);
-                    setDateOpen(false);
-                  }}
+                  onClick={() => pickDateFilter(f.id)}
                 >
                   <span className="kanban-filter__title">{f.title}</span>
                   {on && <span className="kanban-menu__check" aria-hidden>✓</span>}
@@ -1731,10 +1768,7 @@ export function KanbanView({
               <button
                 type="button"
                 className="kanban-filter__reset"
-                onClick={() => {
-                  setDateFilter(null);
-                  setDateOpen(false);
-                }}
+                onClick={() => pickDateFilter(null)}
               >
                 Выключить
               </button>
