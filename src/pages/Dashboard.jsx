@@ -538,6 +538,8 @@ export default function Dashboard() {
     });
   };
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const noticeTimer = useRef(null);
   const [dateLeftHover, setDateLeftHover] = useState(false);
   const [dateRightHover, setDateRightHover] = useState(false);
   const [menuHover, setMenuHover] = useState(false);
@@ -757,6 +759,25 @@ export default function Dashboard() {
     }
     if (!isWideMenu) closeMenu();
   }, [isWideMenu, closeMenu, projects]);
+
+  // A line that shows up for a few seconds and goes away on its own, for the
+  // cases where there is nothing to open and nothing to decide.
+  const showNotice = useCallback((text) => {
+    setNotice(text);
+    clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 3200);
+  }, []);
+
+  useEffect(() => () => clearTimeout(noticeTimer.current), []);
+
+  const openFirstKanban = useCallback(() => {
+    const board = projects.find((p) => p.kind === 'kanban');
+    if (!board) {
+      showNotice('Ни одна канбан-доска ещё не создана');
+      return;
+    }
+    handleMenuSelect(board.id);
+  }, [projects, handleMenuSelect, showNotice]);
 
   const handleAddProjectSubmit = useCallback(async () => {
     const title = addProjectTitle.trim();
@@ -1656,6 +1677,12 @@ export default function Dashboard() {
                 <FocusQuickStart />
               </span>
             )}
+            {viewMode === 'kanban' && (
+              <>
+                <TodayFocusTotal onOpen={() => handleMenuSelect('focus_analytics')} />
+                <FocusQuickStart />
+              </>
+            )}
             {viewMode === 'focus_analytics' && (
               <>
                 <HeaderSectionLink
@@ -1669,6 +1696,12 @@ export default function Dashboard() {
                   hoverIcon={calendarNavIcon}
                   label="Календарь"
                   onClick={() => handleMenuSelect('calendar')}
+                />
+                <HeaderSectionLink
+                  icon={kanbanIcon}
+                  hoverIcon={kanbanNavIcon}
+                  label="Канбан-доски"
+                  onClick={openFirstKanban}
                 />
               </>
             )}
@@ -2873,6 +2906,8 @@ export default function Dashboard() {
           setListCollapsed={setListCollapsed}
         />
       )}
+
+      {notice && <div className="dashboard__notice" role="status">{notice}</div>}
 
       <FocusTimer showTodayTotal={settings.focus_timer_show_total} />
 

@@ -18,7 +18,7 @@ function fmtDuration(totalSeconds) {
 }
 
 /**
- * Today's focus total for the Plans / Calendar headers. Hidden when nothing
+ * Today's focus total for the section headers that carry it. Hidden when nothing
  * was tracked today; a running session is counted live, snapped to whole
  * minutes so the number only changes once a minute.
  */
