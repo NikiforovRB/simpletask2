@@ -99,6 +99,21 @@
   border-color: var(--border-strong);
 }
 
+/* The fill of the card, shown as thinned out as it is painted there. */
+.kanban-panel__bg {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  padding: 0;
+  cursor: pointer;
+}
+
+.kanban-panel__bg--none {
+  border-style: dashed;
+}
+
 .kanban-panel__icon-btn {
   display: inline-flex;
   align-items: center;

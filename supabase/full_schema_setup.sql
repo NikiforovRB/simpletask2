@@ -1489,3 +1489,10 @@ alter table public.kanban_cards
 
 alter table public.user_settings
   add column if not exists kanban_date_filters jsonb not null default '{}'::jsonb;
+
+-- The fill of a card. The colour is kept as chosen and thinned out to a fifth
+-- when it is painted, so that a card reads as tinted rather than as a block of
+-- colour, and the text on it stays legible in either theme.
+
+alter table public.kanban_cards
+  add column if not exists bg_color text;

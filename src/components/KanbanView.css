@@ -817,6 +817,23 @@
   background: none;
 }
 
+/* A row of swatches under a quiet heading that says what they colour. */
+.kanban-menu__colors {
+  display: block;
+  padding: 0.4rem 0.75rem 0.1rem;
+}
+
+.kanban-menu__colors-title {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  opacity: 0.45;
+}
+
+.kanban-menu__colors .dashboard__context-menu-colors {
+  padding: 0.25rem 0 0.3rem;
+}
+
 /* A row that leads to a list of its own, and the list it leads to. */
 .kanban-menu__arrow {
   width: 1rem;

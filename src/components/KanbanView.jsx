@@ -25,6 +25,7 @@ import {
   OVERDUE_KEY,
   TODAY_ACCENT,
   archiveDaysLeft,
+  cardFill,
   cardLabels,
   dateColumnId,
   dateColumnKey,
@@ -55,6 +56,7 @@ import calNavIcon from '../assets/cal-nav.svg';
 import calendarIcon from '../assets/calendar.svg';
 import lineHeightIcon from '../assets/line-height.svg';
 import horizontalIcon from '../assets/horizontal.svg';
+import kanbanIcon from '../assets/align.svg';
 import tagIcon from '../assets/tag.svg';
 import tagNavIcon from '../assets/tag-nav.svg';
 import layersIcon from '../assets/layers.svg';
@@ -442,8 +444,12 @@ function KanbanCard({
   const hasBody = (settings.showDescription && !!card.description?.trim())
     || (settings.showTasks && cardTasks.length > 0);
   const showFold = !overlay && hasBody && !!onToggleFold;
-  const style = card.border_color
-    ? { border: `1px solid ${card.border_color}` }
+  const fill = cardFill(card.bg_color);
+  const style = card.border_color || fill
+    ? {
+      ...(card.border_color ? { border: `1px solid ${card.border_color}` } : null),
+      ...(fill ? { background: fill } : null),
+    }
     : undefined;
 
   return (
@@ -1021,8 +1027,8 @@ function MenuBranch({ icon, label, open, hover, onOpen, onToggle, children }) {
  * opens to the side, under the pointer that asked for it.
  */
 function CardContextMenu({
-  card, at, columns, cardsByColumn, boardLabels,
-  onUpdate, onDuplicate, onDelete, onMove, onOpen, onQuickEdit, onClose,
+  card, at, columns, cardsByColumn, boardLabels, boardTargets = [],
+  onUpdate, onDuplicate, onDelete, onMove, onMoveToBoard, onOpen, onQuickEdit, onClose,
 }) {
   const ref = useRef(null);
   const hasHover = useMediaQuery('(hover: hover)');
@@ -1088,39 +1094,42 @@ function CardContextMenu({
   );
 
   const swatches = (value, onPick, none) => (
-    <div className="dashboard__context-menu-colors" onMouseEnter={hasHover ? () => showFlyout(null) : undefined}>
-      <span
-        className={`dashboard__context-menu-color-wrap ${!value ? 'dashboard__context-menu-color-wrap--selected' : ''}`}
-        style={{ '--swatch-color': none.swatch }}
-      >
-        <button
-          type="button"
-          className={`dashboard__context-menu-color ${none.className}`}
-          style={none.style}
-          onClick={() => onPick(null)}
-          aria-label={none.label}
-          title={none.label}
-        />
+    <div className="kanban-menu__colors" onMouseEnter={hasHover ? () => showFlyout(null) : undefined}>
+      <span className="kanban-menu__colors-title">{none.of}</span>
+      <span className="dashboard__context-menu-colors">
+        <span
+          className={`dashboard__context-menu-color-wrap ${!value ? 'dashboard__context-menu-color-wrap--selected' : ''}`}
+          style={{ '--swatch-color': none.swatch }}
+        >
+          <button
+            type="button"
+            className={`dashboard__context-menu-color ${none.className}`}
+            style={none.style}
+            onClick={() => onPick(null)}
+            aria-label={none.label}
+            title={none.label}
+          />
+        </span>
+        {QUICK_COLORS.map((c) => {
+          const selected = (value || '').toLowerCase() === c.toLowerCase();
+          return (
+            <span
+              key={c}
+              className={`dashboard__context-menu-color-wrap ${selected ? 'dashboard__context-menu-color-wrap--selected' : ''}`}
+              style={{ '--swatch-color': c }}
+            >
+              <button
+                type="button"
+                className="dashboard__context-menu-color"
+                style={{ background: c }}
+                onClick={() => onPick(c)}
+                aria-label={`${none.of} ${c}`}
+                title={none.of}
+              />
+            </span>
+          );
+        })}
       </span>
-      {QUICK_COLORS.map((c) => {
-        const selected = (value || '').toLowerCase() === c.toLowerCase();
-        return (
-          <span
-            key={c}
-            className={`dashboard__context-menu-color-wrap ${selected ? 'dashboard__context-menu-color-wrap--selected' : ''}`}
-            style={{ '--swatch-color': c }}
-          >
-            <button
-              type="button"
-              className="dashboard__context-menu-color"
-              style={{ background: c }}
-              onClick={() => onPick(c)}
-              aria-label={`${none.of} ${c}`}
-              title={none.of}
-            />
-          </span>
-        );
-      })}
     </div>
   );
 
@@ -1211,6 +1220,22 @@ function CardContextMenu({
 
         <div className="dashboard__context-menu-separator" aria-hidden />
         {item(layersIcon, 'Скопировать', () => { onDuplicate(card); onClose(); })}
+
+        {boardTargets.length > 0 && branch('board', kanbanIcon, 'Переместить на другую доску…', (
+          boardTargets.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              className="dashboard__context-menu-item"
+              disabled={!b.ready}
+              title={b.ready ? undefined : 'В этой доске ещё нет столбцов'}
+              onClick={() => { onMoveToBoard(card.id, b.id); onClose(); }}
+            >
+              <img src={kanbanIcon} alt="" className="dashboard__context-menu-item-icon" />
+              <span>{b.title || 'Без названия'}</span>
+            </button>
+          ))
+        ))}
 
         {branch('move', horizontalIcon, 'Переместить в столбец…', (
           columns.map((c) => (
@@ -1509,7 +1534,7 @@ export function KanbanView({
   board, columns, cards, archived = [], labels, tasks, getSubtasks,
   addColumn, updateColumn, deleteColumn, reorderColumns,
   addCard, updateCard, deleteCard, restoreCard, purgeCard, purgeArchive, duplicateCard,
-  moveCard, planDay,
+  moveCard, moveCardToBoard, boards = [], planDay,
   dateFilter: savedDateFilter = null, onDateFilterChange,
   onToggleTask, onOpenCard, onUpdateBoard,
 }) {
@@ -1537,6 +1562,13 @@ export function KanbanView({
 
   // One of the DATE_FILTERS ids, or null while the board is laid out by stage.
   const dateFilter = DATE_FILTERS.some((f) => f.id === savedDateFilter) ? savedDateFilter : null;
+
+  // The other kanban boards a card can be handed over to. One without a column
+  // of its own has nowhere to put it, and is offered but not enabled.
+  const boardTargets = useMemo(() => boards
+    .filter((b) => b.id !== board.id)
+    .map((b) => ({ id: b.id, title: b.title, ready: columns.some((c) => c.board_id === b.id) })),
+  [boards, board.id, columns]);
 
   const pickDateFilter = (id) => {
     onDateFilterChange?.(board.id, id);
@@ -2040,6 +2072,8 @@ export function KanbanView({
           onDuplicate={duplicateCard}
           onDelete={deleteCard}
           onMove={moveCard}
+          onMoveToBoard={moveCardToBoard}
+          boardTargets={boardTargets}
           onOpen={onOpenCard}
           onQuickEdit={setEditingCardId}
           onClose={() => setCardMenu(null)}

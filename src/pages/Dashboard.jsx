@@ -391,7 +391,8 @@ export default function Dashboard() {
     deletePromise: deleteReputationPromise,
   } = useReputation();
   const { projects, loading: projectsLoading, addProject, updateProject, updateProjectSettings, deleteProject, reorderProjects } = useProjects();
-  const kanbanBoardIds = useMemo(() => projects.filter((p) => p.kind === 'kanban').map((p) => p.id), [projects]);
+  const kanbanBoards = useMemo(() => projects.filter((p) => p.kind === 'kanban'), [projects]);
+  const kanbanBoardIds = useMemo(() => kanbanBoards.map((p) => p.id), [kanbanBoards]);
   const {
     columns: kanbanColumns,
     cards: kanbanCards,
@@ -408,6 +409,7 @@ export default function Dashboard() {
     purgeCard: purgeKanbanCard,
     purgeArchive: purgeKanbanArchive,
     moveCard: moveKanbanCard,
+    moveCardToBoard: moveKanbanCardToBoard,
     planDay: planKanbanDay,
     addLabel: addKanbanLabel,
     updateLabel: updateKanbanLabel,
@@ -1067,6 +1069,7 @@ export default function Dashboard() {
       description: card.description,
       border_color: card.border_color,
       title_color: card.title_color,
+      bg_color: card.bg_color ?? null,
       due_date: card.due_date ?? null,
       label_ids: card.label_ids || [],
     });
@@ -2792,6 +2795,8 @@ export default function Dashboard() {
           purgeArchive={purgeKanbanArchive}
           duplicateCard={handleDuplicateKanbanCard}
           moveCard={moveKanbanCard}
+          moveCardToBoard={moveKanbanCardToBoard}
+          boards={kanbanBoards}
           planDay={planKanbanDay}
           dateFilter={settings.kanban_date_filters?.[activeKanbanBoard.id] ?? null}
           onDateFilterChange={setKanbanDateFilter}

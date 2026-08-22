@@ -5,7 +5,7 @@ import { DropSlot } from './DropSlot';
 import { ColorPalette, LabelPicker, Popover } from './KanbanView';
 import { CalendarPopover } from './CalendarPopover';
 import { getContainerIdForCard } from '../lib/dnd';
-import { cardLabels, formatDueDate, isOverdue, labelTextColor } from '../lib/kanbanCards';
+import { cardFill, cardLabels, formatDueDate, isOverdue, labelTextColor, withAlpha } from '../lib/kanbanCards';
 import { DEFAULT_TASK_COLOR, toLocalDateString } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import plusIcon from '../assets/plus.svg';
@@ -49,8 +49,8 @@ export function KanbanCardPanel({
   const [closing, setClosing] = useState(false);
   const [title, setTitle] = useState(card.title || '');
   const [description, setDescription] = useState(card.description || '');
-  // Which of the two colour pickers of the header is open: 'title', 'border'
-  // or none of them.
+  // Which of the colour pickers of the header is open: 'title', 'border',
+  // 'bg' or none of them.
   const [openPalette, setOpenPalette] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [plusHover, setPlusHover] = useState(false);
@@ -61,6 +61,7 @@ export function KanbanCardPanel({
   const descRef = useAutoGrow(description);
   const titleColorRef = useRef(null);
   const borderColorRef = useRef(null);
+  const bgColorRef = useRef(null);
   const labelsBtnRef = useRef(null);
   const dueBtnRef = useRef(null);
 
@@ -184,6 +185,30 @@ export function KanbanCardPanel({
                 noneLabel="Без обводки"
                 onPick={(c) => {
                   onUpdateCard(cardId, { border_color: c });
+                  setOpenPalette(null);
+                }}
+                onClose={() => setOpenPalette(null)}
+              />
+            )}
+          </span>
+          <span className="kanban-panel__color-wrap">
+            <button
+              type="button"
+              ref={bgColorRef}
+              className={`kanban-panel__bg ${card.bg_color ? '' : 'kanban-panel__bg--none'}`}
+              style={card.bg_color ? { background: cardFill(card.bg_color), borderColor: withAlpha(card.bg_color, 0.5) } : undefined}
+              onClick={() => setOpenPalette((v) => (v === 'bg' ? null : 'bg'))}
+              aria-label="Цвет фона плашки"
+              title="Цвет фона плашки"
+            />
+            {openPalette === 'bg' && (
+              <ColorPalette
+                anchor={bgColorRef}
+                value={card.bg_color}
+                allowNone
+                noneLabel="Обычный фон"
+                onPick={(c) => {
+                  onUpdateCard(cardId, { bg_color: c });
                   setOpenPalette(null);
                 }}
                 onClose={() => setOpenPalette(null)}

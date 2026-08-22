@@ -48,6 +48,23 @@ export function labelTextColor(hex) {
   return luma > 150 ? '#1a1a1a' : '#ffffff';
 }
 
+/** The same colour, thinned out. */
+export function withAlpha(hex, alpha) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+/**
+ * The fill of a card: a fifth of the chosen colour laid over the surface a
+ * card usually has, so that it reads as tinted and its text stays legible in
+ * either theme.
+ */
+export function cardFill(hex) {
+  return /^#([0-9a-f]{6})$/i.test(hex || '') ? `color-mix(in srgb, ${hex} 20%, var(--bg-elev))` : null;
+}
+
 /** The labels of a board that a card actually wears, in board order. */
 export function cardLabels(card, boardLabels) {
   const ids = card?.label_ids || [];
