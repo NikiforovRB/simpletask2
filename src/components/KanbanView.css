@@ -1149,6 +1149,40 @@
   outline: none;
 }
 
+/* Two halves of one choice, the picked one lit. */
+.kanban-settings__pair {
+  gap: 0.5rem;
+}
+
+.kanban-settings__choice {
+  flex: 1 1 0;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.kanban-settings__choice:hover {
+  background: var(--bg-hover-strong);
+}
+
+.kanban-settings__choice--on {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.kanban-settings__hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
 /* The archive: one row per deleted card, with where it came from, when it
    went, and how long it still has. */
 .kanban-archive {
@@ -1291,4 +1325,56 @@
   .kanban-column {
     max-width: calc(100vw - 2.5rem);
   }
+}
+
+/* One column under another, each across the whole screen. A phone can only
+   really read one column at a time, so the board scrolls down instead of
+   sideways and every column is as wide as the page. */
+.kanban__board--stack {
+  flex-direction: column;
+  align-items: stretch;
+  overflow-x: hidden;
+  overflow-y: auto;
+  gap: 1rem;
+}
+
+.kanban__board--stack .kanban__split {
+  flex: 0 0 1px;
+  align-self: stretch;
+  width: 100%;
+}
+
+.kanban__board--stack .kanban-column {
+  max-width: 100%;
+  max-height: none;
+}
+
+/* The whole board scrolls, so a column shows all of its cards at once. */
+.kanban__board--stack .kanban-column__cards {
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+/* Folded, a stacked column is a bar the width of the screen: the title reads
+   across it, with the count and the handle at the far end. */
+.kanban-column--bar {
+  width: 100%;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  background: var(--bg-elev);
+  box-sizing: border-box;
+}
+
+.kanban-column--bar .kanban-column__collapsed-title {
+  flex: 1 1 auto;
+  writing-mode: horizontal-tb;
+  text-align: left;
+  padding: 0;
+}
+
+.kanban-column--bar .kanban-column__grip {
+  margin-top: 0;
 }

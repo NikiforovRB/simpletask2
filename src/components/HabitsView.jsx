@@ -97,6 +97,10 @@ import spacingIcon from '../assets/spacing.svg';
 import spacingNavIcon from '../assets/spacing-nav.svg';
 import calendarIcon from '../assets/calendar.svg';
 import calendarNavIcon from '../assets/calendar-nav.svg';
+import eyeIcon from '../assets/eye.svg';
+import eyeNavIcon from '../assets/eye-nav.svg';
+import eyeoffIcon from '../assets/eyeoff.svg';
+import eyeoffNavIcon from '../assets/eyeoff-nav.svg';
 import './HabitsView.css';
 
 function clampHabitsSidebarWidthPx(n) {
@@ -163,21 +167,37 @@ function HabitNameRow({ habit, isSelected, streak, onSelect, onEdit, isFirst }) 
   );
 }
 
-function SortableReorderRow({ habit }) {
+function SortableReorderRow({ habit, hasHover, onToggleHidden }) {
   const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: habit.id });
+  const [eyeHover, setEyeHover] = useState(false);
+  const hidden = !!habit.hidden;
   const style = isDragging
     ? { opacity: 0.5, transition: 'transform 280ms ease' }
     : {
         transform: CSS.Transform.toString(transform),
         transition,
       };
+  const eye = hidden
+    ? (hasHover && eyeHover ? eyeNavIcon : eyeIcon)
+    : (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon);
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`habits-view__reorder-row ${isDragging ? 'habits-view__reorder-row--dragging' : ''}`}
+      className={`habits-view__reorder-row ${isDragging ? 'habits-view__reorder-row--dragging' : ''} ${hidden ? 'habits-view__reorder-row--hidden' : ''}`}
     >
       <span className="habits-view__reorder-title">{habit.title}</span>
+      <button
+        type="button"
+        className="habits-view__reorder-eye"
+        onMouseEnter={() => hasHover && setEyeHover(true)}
+        onMouseLeave={() => hasHover && setEyeHover(false)}
+        onClick={() => onToggleHidden(habit.id, !hidden)}
+        aria-label={hidden ? 'Показать в таблице' : 'Скрыть из таблицы'}
+        title={hidden ? 'Показать в таблице' : 'Скрыть из таблицы'}
+      >
+        <img src={eye} alt="" />
+      </button>
       <span className="habits-view__reorder-handle" {...attributes} {...listeners} aria-label="Переместить">
         <img src={dragIcon} alt="" />
       </span>
@@ -564,6 +584,12 @@ export function HabitsView({
   );
 
   const activeReorderHabit = activeReorderId ? habits.find((h) => h.id === activeReorderId) : null;
+  const visibleHabits = useMemo(() => habits.filter((h) => !h.hidden), [habits]);
+
+  const toggleHabitHidden = useCallback((id, hidden) => {
+    if (hidden && selectedId === id) setSelectedId(null);
+    updateHabit(id, { hidden });
+  }, [selectedId, updateHabit]);
 
   return (
     <div className="habits-view">
@@ -680,7 +706,7 @@ export function HabitsView({
           style={{ flexBasis: `${liveSidebarWidth}px`, width: `${liveSidebarWidth}px`, maxWidth: `${liveSidebarWidth}px` }}
         >
           <div className="habits-view__sidebar-spacer" style={{ height: stackH, minHeight: stackH }} aria-hidden />
-          {habits.map((habit, index) => {
+          {visibleHabits.map((habit, index) => {
             const streak = computeStreak(habit, entries[habit.id] || {}, todayStr);
             return (
               <HabitNameRow
@@ -694,8 +720,12 @@ export function HabitsView({
               />
             );
           })}
-          {habits.length === 0 && (
-            <div className="habits-view__empty">Нет привычек — добавьте через «+» в панели или кнопку с карандашом внизу слева</div>
+          {visibleHabits.length === 0 && (
+            <div className="habits-view__empty">
+              {habits.length === 0
+                ? 'Нет привычек — добавьте через «+» в панели или кнопку с карандашом внизу слева'
+                : 'Все привычки скрыты. Их можно вернуть в окне порядка.'}
+            </div>
           )}
         </div>
         <div className="habits-view__grid-wrap">
@@ -738,7 +768,7 @@ export function HabitsView({
               className="habits-view__data-grid"
               style={{ gridTemplateColumns }}
             >
-              {habits.flatMap((habit) =>
+              {visibleHabits.flatMap((habit) =>
                 dateColumns.map((d) => {
                   const ds = toLocalDateString(d);
                   const entry = (entries[habit.id] || {})[ds];
@@ -1026,14 +1056,22 @@ export function HabitsView({
               <SortableContext items={habits.map((h) => h.id)} strategy={verticalListSortingStrategy}>
                 <div className="habits-view__reorder-list">
                   {habits.map((h) => (
-                    <SortableReorderRow key={h.id} habit={h} />
+                    <SortableReorderRow
+                      key={h.id}
+                      habit={h}
+                      hasHover={hasHover}
+                      onToggleHidden={toggleHabitHidden}
+                    />
                   ))}
                 </div>
               </SortableContext>
               <DragOverlay>
                 {activeReorderHabit ? (
-                  <div className="habits-view__reorder-row habits-view__reorder-row--overlay">
+                  <div className={`habits-view__reorder-row habits-view__reorder-row--overlay ${activeReorderHabit.hidden ? 'habits-view__reorder-row--hidden' : ''}`}>
                     <span className="habits-view__reorder-title">{activeReorderHabit.title}</span>
+                    <span className="habits-view__reorder-eye" aria-hidden>
+                      <img src={activeReorderHabit.hidden ? eyeIcon : eyeoffIcon} alt="" />
+                    </span>
                     <span className="habits-view__reorder-handle">
                       <img src={dragIcon} alt="" />
                     </span>

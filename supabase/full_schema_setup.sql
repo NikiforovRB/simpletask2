@@ -1496,3 +1496,17 @@ alter table public.user_settings
 
 alter table public.kanban_cards
   add column if not exists bg_color text;
+
+-- Two more things a kanban board remembers about itself: which end of a column
+-- a new card joins, and whether a phone should show the columns one under
+-- another at full width instead of side by side.
+
+alter table public.task_projects
+  add column if not exists kanban_new_card_position text not null default 'end',
+  add column if not exists kanban_mobile_single boolean not null default false;
+
+-- A habit kept out of the table without being deleted: the entries it already
+-- has stay where they are, and it can be brought back from the order dialog.
+
+alter table public.habits
+  add column if not exists hidden boolean not null default false;

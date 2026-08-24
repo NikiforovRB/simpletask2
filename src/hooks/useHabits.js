@@ -164,8 +164,12 @@ export function useHabits() {
       const updates = { ...patch };
       if (patch.title != null) updates.title = String(patch.title).trim();
       Object.keys(updates).forEach((k) => updates[k] === undefined && delete updates[k]);
-      await supabase.from('habits').update(updates).eq('id', habitId).eq('user_id', user.id);
-      await fetchAll();
+      setState((s) => ({
+        ...s,
+        habits: s.habits.map((h) => (h.id === habitId ? { ...h, ...updates } : h)),
+      }));
+      const { error } = await supabase.from('habits').update(updates).eq('id', habitId).eq('user_id', user.id);
+      if (error) await fetchAll();
     },
     [user?.id, fetchAll]
   );

@@ -82,6 +82,20 @@ const QUICK_COLORS = ['#f33737', '#f4ba04', '#15c466', '#5a86ee', '#613aaf'];
 
 const slotId = (columnId, index) => `kslot::${columnId}::${index}`;
 
+/** Which end of a column a new card joins. */
+const newCardPosition = (board) => (board.kanban_new_card_position === 'start' ? 'start' : 'end');
+
+/** Folding a column takes it sideways, or upwards when the columns are stacked. */
+const foldIcon = (stacked, hover) => {
+  if (stacked) return hover ? upNavIcon : upIcon;
+  return hover ? leftNavIcon : leftIcon;
+};
+
+const unfoldIcon = (stacked, hover) => {
+  if (stacked) return hover ? downNavIcon : downIcon;
+  return hover ? rightNavIcon : rightIcon;
+};
+
 const groupByColumn = (list) => {
   const map = new Map();
   list.forEach((c) => {
@@ -663,6 +677,7 @@ function KanbanColumn({
   const colorBtnRef = useRef(null);
   const cardsElRef = useRef(null);
   const collapsed = !!column.collapsed;
+  const stacked = !!settings.stacked;
   const accent = column.accent_color || DEFAULT_COLUMN_COLOR;
 
   const commitTitle = () => {
@@ -672,17 +687,20 @@ function KanbanColumn({
     if (next !== (column.title || '')) onUpdateColumn(column.id, { title: next });
   };
 
-  const scrollToEnd = () => {
+  // The composer stands at whichever end of the list new cards join, and the
+  // column is scrolled there so it is in sight while typing.
+  const atStart = !!settings.atStart;
+  const scrollToComposer = () => {
     requestAnimationFrame(() => {
       const el = cardsElRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
+      if (el) el.scrollTop = atStart ? 0 : el.scrollHeight;
     });
   };
 
   const openComposer = () => {
     if (collapsed) onUpdateColumn(column.id, { collapsed: false });
     setComposing(true);
-    scrollToEnd();
+    scrollToComposer();
   };
 
   const style = {
@@ -701,7 +719,11 @@ function KanbanColumn({
   // used as a parking place without unfolding it first.
   if (collapsed) {
     return (
-      <section ref={setNodeRef} style={style} className="kanban-column kanban-column--collapsed">
+      <section
+        ref={setNodeRef}
+        style={style}
+        className={`kanban-column kanban-column--collapsed ${stacked ? 'kanban-column--bar' : ''}`}
+      >
         <button
           type="button"
           className="kanban-column__fold"
@@ -716,7 +738,8 @@ function KanbanColumn({
           aria-label="Развернуть столбец"
           title="Развернуть столбец"
         >
-          <img src={hasHover && foldHover ? rightNavIcon : rightIcon} alt="" />
+          {/* Stacked, a column opens downwards rather than sideways. */}
+          <img src={unfoldIcon(stacked, hasHover && foldHover)} alt="" />
         </button>
         <button
           type="button"
@@ -733,7 +756,11 @@ function KanbanColumn({
   }
 
   return (
-    <section ref={setNodeRef} style={{ ...style, width: `${width}px` }} className="kanban-column">
+    <section
+      ref={setNodeRef}
+      style={{ ...style, width: stacked ? '100%' : `${width}px` }}
+      className="kanban-column"
+    >
       <header className={`kanban-column__head ${paletteOpen ? 'kanban-column__head--pinned' : ''}`}>
         {editingTitle ? (
           <input
@@ -789,7 +816,7 @@ function KanbanColumn({
             aria-label="Свернуть столбец"
             title="Свернуть столбец"
           >
-            <img src={hasHover && foldHover ? leftNavIcon : leftIcon} alt="" />
+            <img src={foldIcon(stacked, hasHover && foldHover)} alt="" />
           </button>
           <button
             type="button"
@@ -826,6 +853,15 @@ function KanbanColumn({
           if (settings.quickAdd && e.target === e.currentTarget) openComposer();
         }}
       >
+        {composing && atStart && (
+          <CardComposer
+            onSubmit={(title) => {
+              onAddCard(column.id, title);
+              scrollToComposer();
+            }}
+            onClose={() => setComposing(false)}
+          />
+        )}
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {cards.map((card, i) => (
             <div key={card.id}>
@@ -849,11 +885,11 @@ function KanbanColumn({
           ))}
         </SortableContext>
         <CardDropSlot columnId={column.id} index={cards.length} tall={cards.length === 0 && !composing} />
-        {composing && (
+        {composing && !atStart && (
           <CardComposer
             onSubmit={(title) => {
               onAddCard(column.id, title);
-              scrollToEnd();
+              scrollToComposer();
             }}
             onClose={() => setComposing(false)}
           />
@@ -906,16 +942,21 @@ function DateColumn({
   const cardsElRef = useRef(null);
   // Nothing is ever planned for a day that has already passed.
   const canAdd = droppable && !!onAddCard;
+  const atStart = !!settings.atStart;
 
-  const scrollToEnd = () => {
+  const scrollToComposer = () => {
     requestAnimationFrame(() => {
       const el = cardsElRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
+      if (el) el.scrollTop = atStart ? 0 : el.scrollHeight;
     });
   };
 
   return (
-    <section ref={setNodeRef} style={{ width: `${width}px` }} className="kanban-column kanban-column--date">
+    <section
+      ref={setNodeRef}
+      style={{ width: settings.stacked ? '100%' : `${width}px` }}
+      className="kanban-column kanban-column--date"
+    >
       <header className="kanban-column__head">
         <span className="kanban-column__title kanban-column__title--static">{group.title}</span>
         <span className="kanban-column__tools">
@@ -928,7 +969,7 @@ function DateColumn({
               onMouseLeave={() => hasHover && setPlusHover(false)}
               onClick={() => {
                 setComposing(true);
-                scrollToEnd();
+                scrollToComposer();
               }}
               aria-label="Добавить плашку на этот день"
               title="Добавить плашку на этот день"
@@ -940,6 +981,15 @@ function DateColumn({
       </header>
       <div className="kanban-column__strip" style={{ background: group.accent }} />
       <div className="kanban-column__cards" ref={cardsElRef}>
+        {composing && atStart && (
+          <CardComposer
+            onSubmit={(title) => {
+              onAddCard(group.key, title);
+              scrollToComposer();
+            }}
+            onClose={() => setComposing(false)}
+          />
+        )}
         <SortableContext items={group.cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {group.cards.map((card, i) => (
             <div key={card.id}>
@@ -963,11 +1013,11 @@ function DateColumn({
           ))}
         </SortableContext>
         {droppable && <CardDropSlot columnId={id} index={group.cards.length} />}
-        {composing && (
+        {composing && !atStart && (
           <CardComposer
             onSubmit={(title) => {
               onAddCard(group.key, title);
-              scrollToEnd();
+              scrollToComposer();
             }}
             onClose={() => setComposing(false)}
           />
@@ -1388,6 +1438,21 @@ function BoardSettingsModal({ board, onChange, onClose }) {
 
         <div className="dashboard__settings-group">
           <div className="dashboard__settings-title">Создание плашек</div>
+          <div className="dashboard__settings-row kanban-settings__pair">
+            {[
+              { id: 'start', label: 'В начало списка' },
+              { id: 'end', label: 'В конец списка' },
+            ].map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className={`kanban-settings__choice ${newCardPosition(board) === o.id ? 'kanban-settings__choice--on' : ''}`}
+                onClick={() => onChange({ kanban_new_card_position: o.id })}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
           <label className="dashboard__settings-check">
             <input
               type="checkbox"
@@ -1396,6 +1461,21 @@ function BoardSettingsModal({ board, onChange, onClose }) {
             />
             <span>Поле для новой плашки по клику на пустое место</span>
           </label>
+        </div>
+
+        <div className="dashboard__settings-group">
+          <div className="dashboard__settings-title">Мобильная версия</div>
+          <label className="dashboard__settings-check">
+            <input
+              type="checkbox"
+              checked={!!board.kanban_mobile_single}
+              onChange={(e) => onChange({ kanban_mobile_single: e.target.checked })}
+            />
+            <span>В один столбец</span>
+          </label>
+          <p className="kanban-settings__hint">
+            На телефоне столбцы встают друг под другом во всю ширину экрана.
+          </p>
         </div>
       </div>
     </div>
@@ -1681,12 +1761,20 @@ export function KanbanView({
     [dateOn, visibleCards],
   );
 
+  // Below this width the columns can be laid out one under another, if the
+  // board is set to; a wide window always shows them side by side.
+  const narrow = useMediaQuery('(max-width: 640px)');
+  const stacked = narrow && !!board.kanban_mobile_single;
+  const atStart = newCardPosition(board) === 'start';
+
   const cardSettings = {
     showDescription: board.kanban_show_description !== false,
     showTasks: board.kanban_show_tasks !== false,
     showSubtasks: !!board.kanban_show_subtasks,
     quickAdd: board.kanban_quick_add !== false,
     hideDue: dateOn,
+    atStart,
+    stacked,
   };
   const width = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, board.kanban_column_width ?? 280));
 
@@ -1711,7 +1799,7 @@ export function KanbanView({
   );
 
   const startPan = (e) => {
-    if (e.button !== 0 || !canPanFrom(e.target)) return;
+    if (stacked || e.button !== 0 || !canPanFrom(e.target)) return;
     const el = boardRef.current;
     if (!el) return;
     pan.current = { pointerId: e.pointerId, x: e.clientX, left: el.scrollLeft, moved: false };
@@ -1982,7 +2070,7 @@ export function KanbanView({
         onDragEnd={handleDragEnd}
       >
         <div
-          className="kanban__board"
+          className={`kanban__board ${stacked ? 'kanban__board--stack' : ''}`}
           ref={boardRef}
           onPointerDown={startPan}
           onPointerMove={movePan}
@@ -2003,7 +2091,7 @@ export function KanbanView({
               // A card planned for a day still has to live somewhere on the
               // board, and the first column is where work starts.
               onAddCard={boardColumns.length > 0
-                ? (day, title) => addCard(board.id, boardColumns[0].id, { title, due_date: day })
+                ? (day, title) => addCard(board.id, boardColumns[0].id, { title, due_date: day, atStart })
                 : null}
               onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
               onToggleFold={(cardId, collapsed) => updateCard(cardId, { collapsed })}
@@ -2030,7 +2118,7 @@ export function KanbanView({
                 boardLabels={boardLabels}
                 onToggleTask={onToggleTask}
                 onOpenCard={onOpenCard}
-                onAddCard={(columnId, title) => addCard(board.id, columnId, { title })}
+                onAddCard={(columnId, title) => addCard(board.id, columnId, { title, atStart })}
                 onUpdateColumn={updateColumn}
                 onDeleteColumn={deleteColumn}
                 onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
@@ -2042,8 +2130,9 @@ export function KanbanView({
               />
             ))}
           </SortableContext>
-          {/* Free space to take hold of the board by, past the last column. */}
-          <div className="kanban__pan-space" />
+          {/* Free space to take hold of the board by, past the last column.
+              Stacked, there is nothing to pan to. */}
+          {!stacked && <div className="kanban__pan-space" />}
         </div>
 
         <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
