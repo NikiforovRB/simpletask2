@@ -133,8 +133,24 @@ function getDays(baseDate, count) {
   return days;
 }
 
+/**
+ * Grey or bright, whichever the habit is set to. Without a choice of its own it
+ * keeps the colour its type was always drawn in: the informational ones quiet,
+ * the rest as bright as the rest of the app.
+ */
+const NAME_TONES = [
+  { id: 'grey', label: 'Серый' },
+  { id: 'bright', label: 'Яркий' },
+];
+
+function nameTone(habit) {
+  if (habit.name_tone === 'grey' || habit.name_tone === 'bright') return habit.name_tone;
+  return isInfoHabitType(habit.type) ? 'grey' : 'bright';
+}
+
 function HabitNameRow({ habit, isSelected, streak, onSelect, onEdit, isFirst }) {
   const isInfo = isInfoHabitType(habit.type);
+  const tone = nameTone(habit);
   return (
     <div
       className={`habits-view__name-row ${isFirst ? 'habits-view__name-row--first' : ''}`}
@@ -151,10 +167,8 @@ function HabitNameRow({ habit, isSelected, streak, onSelect, onEdit, isFirst }) 
           onEdit(habit.id);
         }}
       >
-        <span
-          className="habits-view__name-text"
-          style={isInfo && !isSelected ? { color: INFO_HABIT_COLOR } : undefined}
-        >
+        {/* Selected, the row is drawn in the accent colour instead. */}
+        <span className={`habits-view__name-text ${isSelected ? '' : `habits-view__name-text--${tone}`}`}>
           {habit.title}
         </span>
         {!isInfo && habit.streak_enabled && streak > 0 && (
@@ -167,7 +181,25 @@ function HabitNameRow({ habit, isSelected, streak, onSelect, onEdit, isFirst }) 
   );
 }
 
-function SortableReorderRow({ habit, hasHover, onToggleHidden }) {
+/** The two colours a habit's name can be drawn in, the current one ringed. */
+function ToneSwatches({ tone, onPick }) {
+  return (
+    <span className="habits-view__reorder-tones">
+      {NAME_TONES.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          className={`habits-view__reorder-tone habits-view__reorder-tone--${t.id} ${tone === t.id ? 'habits-view__reorder-tone--on' : ''}`}
+          onClick={onPick ? () => onPick(t.id) : undefined}
+          aria-label={`Цвет названия: ${t.label}`}
+          title={`Цвет названия: ${t.label}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+function SortableReorderRow({ habit, hasHover, onToggleHidden, onPickTone }) {
   const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: habit.id });
   const [eyeHover, setEyeHover] = useState(false);
   const hidden = !!habit.hidden;
@@ -187,6 +219,7 @@ function SortableReorderRow({ habit, hasHover, onToggleHidden }) {
       className={`habits-view__reorder-row ${isDragging ? 'habits-view__reorder-row--dragging' : ''} ${hidden ? 'habits-view__reorder-row--hidden' : ''}`}
     >
       <span className="habits-view__reorder-title">{habit.title}</span>
+      <ToneSwatches tone={nameTone(habit)} onPick={(t) => onPickTone(habit.id, t)} />
       <button
         type="button"
         className="habits-view__reorder-eye"
@@ -590,6 +623,10 @@ export function HabitsView({
     if (hidden && selectedId === id) setSelectedId(null);
     updateHabit(id, { hidden });
   }, [selectedId, updateHabit]);
+
+  const pickHabitNameTone = useCallback((id, tone) => {
+    updateHabit(id, { name_tone: tone });
+  }, [updateHabit]);
 
   return (
     <div className="habits-view">
@@ -1061,6 +1098,7 @@ export function HabitsView({
                       habit={h}
                       hasHover={hasHover}
                       onToggleHidden={toggleHabitHidden}
+                      onPickTone={pickHabitNameTone}
                     />
                   ))}
                 </div>
@@ -1069,6 +1107,7 @@ export function HabitsView({
                 {activeReorderHabit ? (
                   <div className={`habits-view__reorder-row habits-view__reorder-row--overlay ${activeReorderHabit.hidden ? 'habits-view__reorder-row--hidden' : ''}`}>
                     <span className="habits-view__reorder-title">{activeReorderHabit.title}</span>
+                    <ToneSwatches tone={nameTone(activeReorderHabit)} />
                     <span className="habits-view__reorder-eye" aria-hidden>
                       <img src={activeReorderHabit.hidden ? eyeIcon : eyeoffIcon} alt="" />
                     </span>

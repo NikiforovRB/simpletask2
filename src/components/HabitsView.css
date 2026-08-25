@@ -6,6 +6,15 @@
   gap: 0.75rem;
   align-self: flex-start;
   width: 100%;
+
+  /* The two colours a habit's name can be drawn in. */
+  --habit-name-grey: #666666;
+  --habit-name-bright: #ffffff;
+}
+
+[data-theme="light"] .habits-view {
+  --habit-name-grey: #a4a4a4;
+  --habit-name-bright: #000000;
 }
 
 .habits-view__drag-overlay {
@@ -224,6 +233,14 @@
   white-space: nowrap;
 }
 
+.habits-view__name-text--grey {
+  color: var(--habit-name-grey);
+}
+
+.habits-view__name-text--bright {
+  color: var(--habit-name-bright);
+}
+
 .habits-view__streak {
   flex-shrink: 0;
   font-size: 0.75rem;
@@ -416,6 +433,36 @@
 
 .habits-view__reorder-row--hidden .habits-view__reorder-title {
   opacity: 0.45;
+}
+
+.habits-view__reorder-tones {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.habits-view__reorder-tone {
+  width: 0.85rem;
+  height: 0.85rem;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 0 0 transparent;
+  transition: box-shadow 120ms ease;
+}
+
+.habits-view__reorder-tone--grey {
+  background: var(--habit-name-grey);
+}
+
+.habits-view__reorder-tone--bright {
+  background: var(--habit-name-bright);
+}
+
+.habits-view__reorder-tone--on {
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 .habits-view__reorder-eye {
