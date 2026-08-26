@@ -157,12 +157,12 @@
   margin-right: 0.25rem;
 }
 
-/* The zoom of a mind map, standing to the left of the menu button. */
+/* The zoom of a mind map, standing beside the menu button. */
 .dashboard__mind-header-slot {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  margin-right: 0.15rem;
+  margin-left: 0.15rem;
 }
 
 .dashboard__mind-header-slot:empty {

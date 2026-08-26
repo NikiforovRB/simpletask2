@@ -22,8 +22,11 @@ import deleteDangerIcon from '../assets/delete-danger.svg';
 import dragIcon from '../assets/drag.svg';
 import editIcon from '../assets/edit.svg';
 import lineHeightIcon from '../assets/line-height.svg';
-import layersIcon from '../assets/layers.svg';
-import horizontalIcon from '../assets/horizontal.svg';
+import childIcon from '../assets/doches.svg';
+import siblingIcon from '../assets/ryadom.svg';
+import copyBranchIcon from '../assets/copy2.svg';
+import outdentIcon from '../assets/align-top.svg';
+import rootIcon from '../assets/koren.svg';
 import mindmapIcon from '../assets/mindmap.svg';
 import upIcon from '../assets/up.svg';
 import upNavIcon from '../assets/up-nav.svg';
@@ -531,8 +534,8 @@ function NodeContextMenu({
         {item(editIcon, 'Открыть', () => { onOpen(node.id); onClose(); })}
         <div className="dashboard__context-menu-separator" aria-hidden />
 
-        {item(mindmapIcon, 'Дочерняя плашка', () => { onAddChild(node); onClose(); })}
-        {item(plusIcon, 'Плашка рядом', () => { onAddSibling(node); onClose(); })}
+        {item(childIcon, 'Дочерняя плашка', () => { onAddChild(node); onClose(); })}
+        {item(siblingIcon, 'Плашка рядом', () => { onAddSibling(node); onClose(); })}
         {childCount > 0 && item(
           folded ? unfoldIcon(down, false) : foldIcon(down, false),
           folded ? 'Развернуть ветку' : 'Свернуть ветку',
@@ -547,9 +550,9 @@ function NodeContextMenu({
             onClose();
           },
         )}
-        {item(layersIcon, 'Скопировать с ветвями', () => { onDuplicate(node.id); onClose(); })}
-        {canOutdent && item(horizontalIcon, 'Поднять на уровень выше', () => { onOutdent(node); onClose(); })}
-        {node.parent_id && item(upIcon, 'Сделать корневой', () => { onMoveToRoot(node); onClose(); })}
+        {item(copyBranchIcon, 'Скопировать с ветвями', () => { onDuplicate(node.id); onClose(); })}
+        {canOutdent && item(outdentIcon, 'Поднять на уровень выше', () => { onOutdent(node); onClose(); })}
+        {node.parent_id && item(rootIcon, 'Сделать корневой', () => { onMoveToRoot(node); onClose(); })}
         <div className="dashboard__context-menu-separator" aria-hidden />
         {item(
           deleteDangerIcon,

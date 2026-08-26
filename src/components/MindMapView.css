@@ -857,32 +857,37 @@
   outline: none;
 }
 
-/* Which way this node holds the level under it. */
+/* Which way this node holds the level under it: two halves of one field, the
+   chosen one filled in. */
 .mind-panel__pair {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.15rem;
   margin-bottom: 1.25rem;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-elev);
 }
 
 .mind-panel__choice {
   flex: 1 1 0;
   padding: 0.4rem 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-elev);
+  border: none;
+  border-radius: 7px;
+  background: transparent;
   color: var(--text-secondary);
   font-family: inherit;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .mind-panel__choice:hover {
   background: var(--bg-hover-strong);
+  color: var(--text-primary);
 }
 
 .mind-panel__choice--on {
-  border-color: var(--accent);
+  background: var(--accent-soft);
   color: var(--text-primary);
 }
 
@@ -1011,29 +1016,36 @@
   color: var(--text-faint);
 }
 
-.mind-settings__pair {
-  gap: 0.5rem;
+/* Named with the row it is, so the padding of a settings row gives way to the
+   padding of the field itself whichever stylesheet comes first. */
+.dashboard__settings-row.mind-settings__pair {
+  gap: 0.15rem;
+  padding: 3px;
+  margin: 0.15rem 0.55rem 0.25rem;
+  border-radius: 10px;
+  background: var(--bg-elev);
 }
 
 .mind-settings__choice {
   flex: 1 1 0;
   padding: 0.4rem 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-elev);
+  border: none;
+  border-radius: 7px;
+  background: transparent;
   color: var(--text-secondary);
   font-family: inherit;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .mind-settings__choice:hover {
   background: var(--bg-hover-strong);
+  color: var(--text-primary);
 }
 
 .mind-settings__choice--on {
-  border-color: var(--accent);
+  background: var(--accent-soft);
   color: var(--text-primary);
 }
 

@@ -1690,9 +1690,6 @@ export default function Dashboard() {
       <header className="dashboard__header">
         <div className="dashboard__header-row">
           <div className="dashboard__top-left">
-            {viewMode === 'mindmap' && (
-              <div ref={setMindHeaderLeftSlot} className="dashboard__mind-header-slot" />
-            )}
             <button
               type="button"
               className="dashboard__menu-btn"
@@ -1708,6 +1705,9 @@ export default function Dashboard() {
                 ref={setBoardHeaderLeftSlot}
                 className="dashboard__board-header-slot dashboard__board-header-slot--left"
               />
+            )}
+            {viewMode === 'mindmap' && (
+              <div ref={setMindHeaderLeftSlot} className="dashboard__mind-header-slot" />
             )}
             {(viewMode === 'plans' || viewMode === 'goal_plan' || viewMode === 'calendar') && (
               <>
