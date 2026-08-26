@@ -45,12 +45,14 @@ import { useProjects } from '../hooks/useProjects';
 import { useHabits } from '../hooks/useHabits';
 import { useBoardItems } from '../hooks/useBoardItems';
 import { useKanban } from '../hooks/useKanban';
+import { useMindmap } from '../hooks/useMindmap';
 import { useGoalPlan } from '../hooks/useGoalPlan';
 import { DayCard } from '../components/DayCard';
 import { HabitsView } from '../components/HabitsView';
 import { BoardView } from '../components/BoardView';
 import { KanbanView } from '../components/KanbanView';
 import { KanbanCardPanel } from '../components/KanbanCardPanel';
+import { MindMapView } from '../components/MindMapView';
 import { GoalPlanView } from '../components/GoalPlanView';
 import { CalendarView } from '../components/CalendarView';
 import { TodayFocusTotal, FocusQuickStart } from '../components/TodayFocusTotal';
@@ -129,6 +131,8 @@ import doskaIcon from '../assets/doska.svg';
 import doskaNavIcon from '../assets/doska-nav.svg';
 import kanbanIcon from '../assets/align.svg';
 import kanbanNavIcon from '../assets/align-nav.svg';
+import mindmapIcon from '../assets/mindmap.svg';
+import mindmapNavIcon from '../assets/mindmap-nav.svg';
 import pdfIcon from '../assets/pdf.svg';
 import pdfNavIcon from '../assets/pdf-nav.svg';
 import { BoardPdfExportModal } from '../components/BoardPdfExportModal';
@@ -206,6 +210,7 @@ const PROJECT_KIND_ICONS = {
   project: [folderIcon, folderNavIcon],
   board: [doskaIcon, doskaNavIcon],
   kanban: [kanbanIcon, kanbanNavIcon],
+  mindmap: [mindmapIcon, mindmapNavIcon],
 };
 
 const projectIcons = (kind) => PROJECT_KIND_ICONS[kind] || PROJECT_KIND_ICONS.project;
@@ -242,6 +247,16 @@ const PROJECT_KIND_WORDS = {
     deleteButton: 'Удалить канбан-доску',
     deleteTitle: 'Удалить канбан-доску?',
     deleteText: 'Все столбцы, плашки и их задачи также будут удалены.',
+  },
+  mindmap: {
+    tab: 'Mind-карта',
+    createTitle: 'Новая mind-карта',
+    createButton: 'Добавить mind-карту',
+    namePlaceholder: 'Название mind-карты',
+    editTitle: 'Редактировать mind-карту',
+    deleteButton: 'Удалить mind-карту',
+    deleteTitle: 'Удалить mind-карту?',
+    deleteText: 'Все плашки этой карты также будут удалены.',
   },
 };
 
@@ -415,6 +430,17 @@ export default function Dashboard() {
     updateLabel: updateKanbanLabel,
     deleteLabel: deleteKanbanLabel,
   } = useKanban(kanbanBoardIds);
+  const mindMaps = useMemo(() => projects.filter((p) => p.kind === 'mindmap'), [projects]);
+  const mindMapIds = useMemo(() => mindMaps.map((p) => p.id), [mindMaps]);
+  const {
+    nodes: mindNodes,
+    addNode: addMindNode,
+    updateNode: updateMindNode,
+    updateNodes: updateMindNodes,
+    deleteNode: deleteMindNode,
+    moveNode: moveMindNode,
+    duplicateNode: duplicateMindNode,
+  } = useMindmap(mindMapIds);
   const { habits, entries: habitEntries, addHabit, updateHabit, deleteHabit, reorderHabits, setEntry: setHabitEntry } = useHabits();
   const {
     items: boardItems,
@@ -466,7 +492,7 @@ export default function Dashboard() {
       if (!raw) return 'plans';
       const parsed = JSON.parse(raw);
       const v = parsed?.viewMode;
-      return ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'focus_analytics', 'board', 'kanban', 'project'].includes(v) ? v : 'plans';
+      return ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'focus_analytics', 'board', 'kanban', 'mindmap', 'project'].includes(v) ? v : 'plans';
     } catch {
       return 'plans';
     }
@@ -511,6 +537,16 @@ export default function Dashboard() {
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       return parsed?.activeKanbanId ?? null;
+    } catch {
+      return null;
+    }
+  });
+  const [activeMindmapId, setActiveMindmapId] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dashboard_view_state');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.activeMindmapId ?? null;
     } catch {
       return null;
     }
@@ -694,10 +730,10 @@ export default function Dashboard() {
     try {
       localStorage.setItem(
         'dashboard_view_state',
-        JSON.stringify({ viewMode, activeProjectId, activeBoardId, activeKanbanId, menuOpen })
+        JSON.stringify({ viewMode, activeProjectId, activeBoardId, activeKanbanId, activeMindmapId, menuOpen })
       );
     } catch {}
-  }, [viewMode, activeProjectId, activeBoardId, activeKanbanId, menuOpen]);
+  }, [viewMode, activeProjectId, activeBoardId, activeKanbanId, activeMindmapId, menuOpen]);
 
   useEffect(() => {
     if (viewMode === 'project') {
@@ -736,8 +772,16 @@ export default function Dashboard() {
       const firstKanban = projects.find((p) => p.kind === 'kanban');
       if (firstKanban) setActiveKanbanId(firstKanban.id);
       else setViewMode('plans');
+      return;
     }
-  }, [viewMode, activeProjectId, activeBoardId, activeKanbanId, projects, projectsLoading, boardItems, boardItemsLoading]);
+    if (viewMode === 'mindmap') {
+      if (projectsLoading) return;
+      if (projects.some((p) => p.id === activeMindmapId && p.kind === 'mindmap')) return;
+      const firstMap = projects.find((p) => p.kind === 'mindmap');
+      if (firstMap) setActiveMindmapId(firstMap.id);
+      else setViewMode('plans');
+    }
+  }, [viewMode, activeProjectId, activeBoardId, activeKanbanId, activeMindmapId, projects, projectsLoading, boardItems, boardItemsLoading]);
 
   const handleMenuSelect = useCallback((target) => {
     const isBuiltinView = ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'focus_analytics'].includes(target);
@@ -753,6 +797,10 @@ export default function Dashboard() {
       } else if (project && project.kind === 'kanban') {
         setViewMode('kanban');
         setActiveKanbanId(target);
+        setActiveProjectId(null);
+      } else if (project && project.kind === 'mindmap') {
+        setViewMode('mindmap');
+        setActiveMindmapId(target);
         setActiveProjectId(null);
       } else {
         setViewMode('project');
@@ -796,6 +844,10 @@ export default function Dashboard() {
       } else if (addProjectKind === 'kanban') {
         setViewMode('kanban');
         setActiveKanbanId(created.id);
+        setActiveProjectId(null);
+      } else if (addProjectKind === 'mindmap') {
+        setViewMode('mindmap');
+        setActiveMindmapId(created.id);
         setActiveProjectId(null);
       } else {
         setViewMode('project');
@@ -890,6 +942,11 @@ export default function Dashboard() {
         setActiveBoardId(null);
       }
       setViewMode('plans');
+    } else if (kind === 'mindmap') {
+      if (activeMindmapId === editProjectId) {
+        setActiveMindmapId(null);
+      }
+      setViewMode('plans');
     } else {
       if (activeProjectId === editProjectId) {
         setActiveProjectId(null);
@@ -900,7 +957,7 @@ export default function Dashboard() {
     setEditProjectId(null);
     setEditProjectTitle('');
     setDeleteProjectConfirmOpen(false);
-  }, [editProjectId, editProjectKind, activeBoardId, activeProjectId, deleteProject]);
+  }, [editProjectId, editProjectKind, activeBoardId, activeMindmapId, activeProjectId, deleteProject]);
 
   const handleCancelDeleteProject = useCallback(() => {
     setDeleteProjectConfirmOpen(false);
@@ -1045,6 +1102,26 @@ export default function Dashboard() {
     () => (viewMode === 'kanban' ? projects.find((p) => p.id === activeKanbanId && p.kind === 'kanban') ?? null : null),
     [viewMode, projects, activeKanbanId],
   );
+  const activeMindMap = useMemo(
+    () => (viewMode === 'mindmap' ? projects.find((p) => p.id === activeMindmapId && p.kind === 'mindmap') ?? null : null),
+    [viewMode, projects, activeMindmapId],
+  );
+
+  /** The id of the user-made section on screen, whichever kind it is. */
+  const openSectionId = useCallback(() => {
+    if (viewMode === 'board') return activeBoardId;
+    if (viewMode === 'kanban') return activeKanbanId;
+    if (viewMode === 'mindmap') return activeMindmapId;
+    return activeProjectId;
+  }, [viewMode, activeBoardId, activeKanbanId, activeMindmapId, activeProjectId]);
+
+  /** Whether the menu row of a user-made section is the one on screen. */
+  const isSectionOpen = useCallback((kind, id) => {
+    if (kind === 'board') return viewMode === 'board' && activeBoardId === id;
+    if (kind === 'kanban') return viewMode === 'kanban' && activeKanbanId === id;
+    if (kind === 'mindmap') return viewMode === 'mindmap' && activeMindmapId === id;
+    return viewMode === 'project' && activeProjectId === id;
+  }, [viewMode, activeBoardId, activeKanbanId, activeMindmapId, activeProjectId]);
   // The card panel closes by itself when its card is gone (deleted here or by
   // someone else on a shared board).
   const openCard = useMemo(
@@ -1601,7 +1678,7 @@ export default function Dashboard() {
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
     <div
-      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''} ${viewMode === 'board' ? 'dashboard--board' : ''} ${viewMode === 'board' && !activeBoardId ? 'dashboard--board-pdf-only' : ''} ${viewMode === 'kanban' ? 'dashboard--kanban' : ''} ${viewMode === 'goal_plan' ? 'dashboard--goal-plan' : ''}`}
+      className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''} ${viewMode === 'board' ? 'dashboard--board' : ''} ${viewMode === 'board' && !activeBoardId ? 'dashboard--board-pdf-only' : ''} ${viewMode === 'kanban' ? 'dashboard--kanban' : ''} ${viewMode === 'mindmap' ? 'dashboard--mindmap' : ''} ${viewMode === 'goal_plan' ? 'dashboard--goal-plan' : ''}`}
       style={{
         '--sidebar-width': `${liveMenuWidth}px`,
         '--task-font-weight': String(taskFontWeightToCssNumber(normalizeTaskFontWeight(liveTaskFontWeight))),
@@ -1680,7 +1757,7 @@ export default function Dashboard() {
                 <FocusQuickStart />
               </span>
             )}
-            {viewMode === 'kanban' && (
+            {(viewMode === 'kanban' || viewMode === 'mindmap') && (
               <>
                 <TodayFocusTotal onOpen={() => handleMenuSelect('focus_analytics')} />
                 <FocusQuickStart />
@@ -1719,12 +1796,12 @@ export default function Dashboard() {
                 className="dashboard__board-header-slot dashboard__board-header-slot--right"
               />
             )}
-            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'reputation' && (
+            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'mindmap' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'reputation' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
             )}
-            {viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'reputation' && (
+            {viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'mindmap' && viewMode !== 'reputation' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setSettingsHover(true)} onMouseLeave={() => hasHover && setSettingsHover(false)} onClick={() => setSettingsOpen((v) => !v)} aria-label="Настройки">
               <img src={hasHover && settingsHover ? settingsNavIcon : settingsIcon} alt="" />
             </button>
@@ -1863,11 +1940,7 @@ export default function Dashboard() {
                 {projects.filter((p) => !isProjectHidden(p.id)).map((p) => {
                   const kind = p.kind || 'project';
                   const [iconDefault, iconHover] = projectIcons(kind);
-                  const isActive = kind === 'board'
-                    ? viewMode === 'board' && activeBoardId === p.id
-                    : kind === 'kanban'
-                      ? viewMode === 'kanban' && activeKanbanId === p.id
-                      : viewMode === 'project' && activeProjectId === p.id;
+                  const isActive = isSectionOpen(kind, p.id);
                   return (
                     <SortableProjectItem
                       key={p.id}
@@ -2056,11 +2129,7 @@ export default function Dashboard() {
                 {projects.filter((p) => !isProjectHidden(p.id)).map((p) => {
                   const kind = p.kind || 'project';
                   const [iconDefault, iconHover] = projectIcons(kind);
-                  const isActive = kind === 'board'
-                    ? viewMode === 'board' && activeBoardId === p.id
-                    : kind === 'kanban'
-                      ? viewMode === 'kanban' && activeKanbanId === p.id
-                      : viewMode === 'project' && activeProjectId === p.id;
+                  const isActive = isSectionOpen(kind, p.id);
                   return (
                     <SortableProjectItem
                       key={p.id}
@@ -2132,7 +2201,7 @@ export default function Dashboard() {
               aria-label="Тип нового элемента"
             >
               <span className="dashboard__kind-toggle-indicator" aria-hidden="true" />
-              {['project', 'board', 'kanban'].map((kind) => (
+              {['project', 'board', 'kanban', 'mindmap'].map((kind) => (
                 <button
                   key={kind}
                   type="button"
@@ -2834,6 +2903,21 @@ export default function Dashboard() {
         />
       )}
 
+      {viewMode === 'mindmap' && activeMindMap && (
+        <MindMapView
+          key={activeMindMap.id}
+          board={activeMindMap}
+          nodes={mindNodes}
+          addNode={addMindNode}
+          updateNode={updateMindNode}
+          updateNodes={updateMindNodes}
+          deleteNode={deleteMindNode}
+          moveNode={moveMindNode}
+          duplicateNode={duplicateMindNode}
+          onUpdateBoard={updateProjectSettings}
+        />
+      )}
+
       {viewMode === 'project' && activeProjectId && (
         <ProjectList
           projectId={activeProjectId}
@@ -2869,18 +2953,18 @@ export default function Dashboard() {
         </button>
       )}
 
-      {((viewMode === 'project' && activeProjectId) || (viewMode === 'board' && activeBoardId) || (viewMode === 'kanban' && activeKanbanId)) && (
+      {((viewMode === 'project' && activeProjectId) || (viewMode === 'board' && activeBoardId) || (viewMode === 'kanban' && activeKanbanId) || (viewMode === 'mindmap' && activeMindmapId)) && (
         <button
           type="button"
           className="dashboard__edit-project-fab"
           onMouseEnter={() => hasHover && setEditProjectFabHover(true)}
           onMouseLeave={() => hasHover && setEditProjectFabHover(false)}
           onClick={() => {
-            const id = viewMode === 'board' ? activeBoardId : viewMode === 'kanban' ? activeKanbanId : activeProjectId;
+            const id = openSectionId();
             const entry = projects.find((p) => p.id === id);
             handleOpenEditProject(id, entry?.title ?? '', entry?.kind ?? 'project');
           }}
-          aria-label={kindWords(viewMode === 'board' ? 'board' : viewMode === 'kanban' ? 'kanban' : 'project').editTitle}
+          aria-label={kindWords(viewMode === 'project' ? 'project' : viewMode).editTitle}
         >
           <img src={hasHover && editProjectFabHover ? editNavIcon : editIcon} alt="" />
         </button>

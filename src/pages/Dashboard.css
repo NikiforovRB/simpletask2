@@ -24,7 +24,8 @@
 
 /* The kanban columns scroll inside the page, so the board takes the height
    that is left under the header instead of growing the page. */
-.dashboard--kanban {
+.dashboard--kanban,
+.dashboard--mindmap {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -33,7 +34,8 @@
   overflow: hidden;
 }
 
-.dashboard--kanban .dashboard__header {
+.dashboard--kanban .dashboard__header,
+.dashboard--mindmap .dashboard__header {
   flex-shrink: 0;
 }
 
@@ -560,14 +562,16 @@
   color: var(--text-dim);
 }
 
-/* Segmented "Список задач / Доска / Канбан" toggle. A single rounded container
-   holds the options on top of a shared background; an absolutely-positioned
-   pill slides between the thirds to animate the selection. The buttons are kept
-   fully transparent and stacked on top of the indicator via `z-index`, so the
-   sliding pill is what visually conveys the active state. */
+/* The kind of a new section: "Список задач / Доска / Канбан / Mind-карта" as
+   rows of one rounded container, with an absolutely-positioned pill sliding
+   down them to say which is picked. The buttons are kept fully transparent and
+   stacked on top of the indicator via `z-index`, so the sliding pill is what
+   visually conveys the active state. The rows stand under each other rather
+   than side by side: four names do not fit across a modal. */
 .dashboard__kind-toggle {
   position: relative;
   display: flex;
+  flex-direction: column;
   background: var(--bg-elev);
   border: 1px solid var(--border-strong);
   border-radius: 8px;
@@ -579,9 +583,10 @@
 .dashboard__kind-toggle-indicator {
   position: absolute;
   top: 3px;
-  bottom: 3px;
   left: 3px;
-  width: calc(33.333% - 2px);
+  right: 3px;
+  /* One row of the four, the padding of the container taken off. */
+  height: calc(25% - 1.5px);
   background: var(--accent-soft);
   border: 1px solid var(--accent);
   border-radius: 6px;
@@ -592,11 +597,15 @@
 }
 
 .dashboard__kind-toggle--board .dashboard__kind-toggle-indicator {
-  transform: translateX(100%);
+  transform: translateY(100%);
 }
 
 .dashboard__kind-toggle--kanban .dashboard__kind-toggle-indicator {
-  transform: translateX(200%);
+  transform: translateY(200%);
+}
+
+.dashboard__kind-toggle--mindmap .dashboard__kind-toggle-indicator {
+  transform: translateY(300%);
 }
 
 .dashboard__kind-toggle-option {
@@ -605,8 +614,8 @@
   z-index: 1;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
+  justify-content: flex-start;
+  gap: 0.5rem;
   background: transparent;
   color: var(--text-muted);
   border: none;

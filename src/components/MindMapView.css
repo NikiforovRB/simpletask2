@@ -1,0 +1,769 @@
+.mind {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.mind__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.25rem 0.5rem;
+}
+
+.mind__title {
+  font-size: 1.0625rem;
+  color: var(--text-strong);
+}
+
+/* Pushes the tools of the map to the right edge of the header. */
+.mind__header-gap {
+  flex: 1;
+  min-width: 0.5rem;
+}
+
+.mind__icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.mind__icon-btn img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+}
+
+.mind__header-line {
+  height: 1px;
+  background: var(--divider);
+  margin-bottom: 0.9rem;
+}
+
+/* The map scrolls both ways and can be taken hold of by any free spot and
+   dragged; shift and the wheel walk it sideways. */
+.mind__canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+
+  /* Half the distance from a node to its children: the stub out of the parent
+     and the stub into the child are each this long, with the line the branch
+     hangs on between them. */
+  --mind-arm: 1.1rem;
+  /* Half the space between two nodes of one branch. It is padding rather than
+     a gap so the line of the branch stays unbroken. */
+  --mind-row: 0.3rem;
+  --mind-line: var(--border-strong);
+}
+
+.mind__canvas--panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.mind__roots {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+  /* Fills the canvas, so the empty space beside the map can be grabbed too. */
+  min-width: 100%;
+  padding: 0.25rem 1.5rem 1rem 0.25rem;
+  box-sizing: border-box;
+}
+
+/* Somewhere to grab the map below the last branch. */
+.mind__pan-space {
+  align-self: stretch;
+  height: 4rem;
+  cursor: grab;
+}
+
+.mind__canvas--panning .mind__pan-space {
+  cursor: grabbing;
+}
+
+.mind__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.mind__empty-icon {
+  width: 2rem;
+  height: 2rem;
+  opacity: 0.5;
+}
+
+.mind__empty-text {
+  max-width: 22rem;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.mind__empty-btn {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.mind__empty-btn:hover {
+  background: var(--bg-hover-strong);
+  border-color: var(--accent);
+}
+
+/* A node and, to the right of it, the column of its children. Both halves are
+   centred on each other, so the line out of a node meets the branch it holds
+   at the middle. */
+.mind-branch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: var(--mind-row) 0;
+}
+
+.mind-branch__self {
+  position: relative;
+  flex: 0 0 var(--mind-node-width, 240px);
+  width: var(--mind-node-width, 240px);
+}
+
+.mind-branch__kids {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: calc(var(--mind-arm) * 2);
+}
+
+/* The stub leading out of a node that has an open branch. */
+.mind-branch--open > .mind-branch__self::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: var(--mind-arm);
+  height: 1px;
+  background: var(--mind-line);
+}
+
+/* The stub leading into a child. */
+.mind-branch--child > .mind-branch__self::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--mind-arm) * -1);
+  top: 50%;
+  width: var(--mind-arm);
+  height: 1px;
+  background: var(--mind-line);
+}
+
+/* The line the children of one node hang on, drawn by each child as the half
+   above and the half below its own stub. The first child leaves off the upper
+   half and the last one the lower, so the line ends at the outermost stubs
+   instead of running past them. */
+.mind-branch--child::before,
+.mind-branch--child::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--mind-arm) * -1);
+  width: 1px;
+  background: var(--mind-line);
+}
+
+.mind-branch--child::before {
+  top: 0;
+  height: 50%;
+}
+
+.mind-branch--child::after {
+  top: 50%;
+  bottom: 0;
+}
+
+.mind-branch--child.mind-branch--first::before,
+.mind-branch--child.mind-branch--last::after {
+  content: none;
+}
+
+/* The gap a node drops into: no height of its own, and a band around it to
+   aim at. */
+.mind-slot {
+  position: relative;
+  height: 0;
+  width: var(--mind-node-width, 240px);
+  pointer-events: none;
+}
+
+.mind-slot__hit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -11px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.mind-slot__line {
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.mind-slot__hit--over .mind-slot__line {
+  opacity: 1;
+}
+
+.mind-node-wrap {
+  width: 100%;
+}
+
+/* The node stays in place while it is dragged, only faded. */
+.mind-node-wrap--lifted {
+  opacity: 0.35;
+}
+
+.mind-node {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  background: var(--bg-elev);
+  /* Always there, so giving a node an outline does not move it. */
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  cursor: grab;
+  touch-action: none;
+  transition: background 0.15s ease;
+}
+
+.mind-node:hover {
+  background: var(--bg-hover-strong);
+}
+
+.mind-node:active {
+  cursor: grabbing;
+}
+
+.mind-node--overlay {
+  cursor: grabbing;
+  box-shadow: var(--shadow-elev);
+}
+
+/* The node a dragged one is about to join as its last child. */
+.mind-node--dropping {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* A node is dragged by its grip alone, so the map can be swiped around
+   without picking one up. */
+.mind-node--handled {
+  touch-action: auto;
+  cursor: default;
+}
+
+.mind-node__corner {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.mind-node__plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+.mind-node__plus img {
+  width: 0.9rem;
+  height: 0.9rem;
+  object-fit: contain;
+}
+
+.mind-node__grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
+  touch-action: none;
+  cursor: grab;
+  opacity: 0.6;
+}
+
+.mind-node__grip img {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+}
+
+/* Room for whatever sits in the corner. */
+.mind-node__title,
+.mind-node__title-input {
+  padding-right: 1.3rem;
+}
+
+.mind-node--handled .mind-node__title,
+.mind-node--handled .mind-node__title-input {
+  padding-right: 2.7rem;
+}
+
+.mind-node__title,
+.mind-node__title-input {
+  font-family: 'Gilroy Task', 'Gilroy', system-ui, sans-serif;
+  font-weight: var(--task-font-weight, 500);
+  font-size: calc(0.9375rem * var(--task-font-scale, 1));
+  line-height: 1.35;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.mind-node__title-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 0;
+  resize: none;
+  border: none;
+  background: none;
+  outline: none;
+  overflow: hidden;
+}
+
+.mind-node__desc {
+  margin: 0.3rem 0 0;
+  /* However the description was typed, that is how it reads here. */
+  white-space: pre-wrap;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+/* Folds the branch away. It sits on the line leading out of the node, and
+   while the branch is folded it stays out as the only sign of it, with the
+   number of nodes waiting inside. */
+.mind-node__fold {
+  position: absolute;
+  top: 50%;
+  right: -0.65rem;
+  transform: translateY(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0 0.15rem;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-surface-2);
+  cursor: pointer;
+}
+
+.mind-node__fold img {
+  width: 0.85rem;
+  height: 0.85rem;
+  object-fit: contain;
+}
+
+.mind-node__fold-count {
+  font-size: 0.6875rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (hover: hover) {
+  .mind-node__plus,
+  .mind-node__fold {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .mind-node:hover .mind-node__plus,
+  .mind-node:hover .mind-node__fold,
+  .mind-node__fold--shown {
+    opacity: 1;
+  }
+}
+
+/* The right-click menu of a node, on the shared menu skin. */
+.mind-menu {
+  visibility: hidden;
+  left: 0;
+  top: 0;
+  max-width: min(20rem, calc(100vw - 1rem));
+  max-height: calc(100vh - 1rem);
+  overflow-y: auto;
+}
+
+.mind-menu__colors {
+  display: block;
+  padding: 0.4rem 0.75rem 0.1rem;
+}
+
+.mind-menu__colors-title {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  opacity: 0.45;
+}
+
+.mind-menu__colors .dashboard__context-menu-colors {
+  padding: 0.25rem 0 0.3rem;
+}
+
+/* The choice of no colour at all. */
+.mind-menu__color--none {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-strong);
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.mind-menu__color--none::after {
+  content: '';
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  top: 50%;
+  height: 1px;
+  background: var(--border-strong);
+  transform: rotate(-45deg);
+}
+
+.mind-menu__hint {
+  padding: 0.35rem 0.75rem 0.5rem;
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+}
+
+/* Everything about one node, in a panel over the whole height of the window. */
+.mind-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(0, 0, 0, 0.7);
+  animation: mind-panel-fade-in 0.18s ease;
+}
+
+[data-theme="light"] .mind-panel-overlay {
+  background: var(--overlay);
+}
+
+.mind-panel-overlay--closing {
+  animation: mind-panel-fade-out 0.22s ease forwards;
+}
+
+@keyframes mind-panel-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mind-panel-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.mind-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(560px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-app);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-elev);
+  box-sizing: border-box;
+  animation: mind-panel-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mind-panel--closing {
+  animation: mind-panel-out 0.22s ease forwards;
+}
+
+@keyframes mind-panel-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes mind-panel-out {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+.mind-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--divider);
+}
+
+.mind-panel__head-gap {
+  flex: 1;
+}
+
+.mind-panel__color {
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.mind-panel__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.mind-panel__icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.mind-panel__icon-btn img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+}
+
+.mind-panel__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.mind-panel__title {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 1.25rem;
+  padding: 0;
+  resize: none;
+  overflow: hidden;
+  border: none;
+  background: none;
+  outline: none;
+  font-family: 'Gilroy Task', 'Gilroy', system-ui, sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.35;
+  color: var(--text-strong);
+}
+
+.mind-panel__label {
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.mind-panel__desc {
+  width: 100%;
+  min-height: 5rem;
+  box-sizing: border-box;
+  margin-bottom: 1.25rem;
+  padding: 0.5rem 0.6rem;
+  resize: none;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--bg-surface);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.mind-panel__desc:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.mind-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mind-panel__meta {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.mind-panel__add {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.mind-panel__add:hover {
+  background: var(--bg-hover-strong);
+  border-color: var(--accent);
+}
+
+/* Deleting lives here, in the corner furthest from the close button. */
+.mind-panel__foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--divider);
+  background: var(--bg-app);
+}
+
+.mind-panel__foot .mind-panel__icon-btn {
+  width: 2rem;
+  height: 2rem;
+}
+
+.mind-panel__confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.mind-panel__confirm-yes,
+.mind-panel__confirm-no {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.mind-panel__confirm-yes {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* The width of a node, stepped up and down or typed straight in. */
+.mind-settings__stepper {
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mind-settings__step {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mind-settings__step:hover:not(:disabled) {
+  background: var(--bg-hover-strong);
+  border-color: var(--accent);
+}
+
+.mind-settings__step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.mind-settings__value {
+  min-width: 5rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: text;
+}
+
+.mind-settings__value--input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.mind-settings__hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-faint);
+}
+
+@media (max-width: 640px) {
+  .mind__canvas {
+    --mind-arm: 0.8rem;
+  }
+
+  .mind__roots {
+    padding-right: 0.75rem;
+  }
+}
