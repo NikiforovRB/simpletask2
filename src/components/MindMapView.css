@@ -237,6 +237,101 @@
   opacity: 1;
 }
 
+/* Branches growing down instead of to the right. Everything turns a quarter
+   turn: a node sits above its children, they stand side by side, and the line
+   they hang on runs across instead of down. */
+.mind__canvas--down .mind__roots {
+  flex-direction: row;
+  align-items: flex-start;
+  /* Room to grab the map below the branches. */
+  min-height: 100%;
+  padding: 0.25rem 0.75rem 1.5rem 0.25rem;
+}
+
+.mind__canvas--down .mind__pan-space {
+  align-self: stretch;
+  width: 4rem;
+  height: auto;
+}
+
+.mind__canvas--down .mind-branch {
+  flex-direction: column;
+  align-items: center;
+  padding: 0 var(--mind-row);
+}
+
+/* A flex basis is a height in a column, and the node keeps its own. */
+.mind__canvas--down .mind-branch__self {
+  flex: 0 0 auto;
+}
+
+.mind__canvas--down .mind-branch__kids {
+  flex-direction: row;
+  align-items: flex-start;
+  padding-left: 0;
+  padding-top: calc(var(--mind-arm) * 2);
+}
+
+.mind__canvas--down .mind-branch--open > .mind-branch__self::after {
+  left: 50%;
+  top: 100%;
+  width: 1px;
+  height: var(--mind-arm);
+}
+
+.mind__canvas--down .mind-branch--child > .mind-branch__self::before {
+  left: 50%;
+  top: calc(var(--mind-arm) * -1);
+  width: 1px;
+  height: var(--mind-arm);
+}
+
+.mind__canvas--down .mind-branch--child::before,
+.mind__canvas--down .mind-branch--child::after {
+  top: calc(var(--mind-arm) * -1);
+  bottom: auto;
+  width: 50%;
+  height: 1px;
+}
+
+.mind__canvas--down .mind-branch--child::before {
+  left: 0;
+}
+
+.mind__canvas--down .mind-branch--child::after {
+  left: 50%;
+}
+
+/* The gap between two nodes standing side by side. */
+.mind__canvas--down .mind-slot {
+  width: 0;
+  height: 3rem;
+}
+
+.mind__canvas--down .mind-slot__hit {
+  left: -11px;
+  right: auto;
+  top: 0;
+  bottom: 0;
+  width: 22px;
+  height: auto;
+  justify-content: center;
+}
+
+.mind__canvas--down .mind-slot__line {
+  width: 2px;
+  height: 100%;
+}
+
+/* The fold knob follows the line out of the node, now below it. */
+.mind__canvas--down .mind-node__fold {
+  top: auto;
+  right: auto;
+  bottom: -0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .mind-node-wrap {
   width: 100%;
 }
@@ -756,6 +851,32 @@
   font-size: 0.75rem;
   line-height: 1.4;
   color: var(--text-faint);
+}
+
+.mind-settings__pair {
+  gap: 0.5rem;
+}
+
+.mind-settings__choice {
+  flex: 1 1 0;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.mind-settings__choice:hover {
+  background: var(--bg-hover-strong);
+}
+
+.mind-settings__choice--on {
+  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 @media (max-width: 640px) {

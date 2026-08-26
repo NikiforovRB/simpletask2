@@ -609,7 +609,10 @@
 }
 
 .dashboard__kind-toggle-option {
-  flex: 1 1 0;
+  /* Each row is as tall as its own padding makes it. A flex basis of zero —
+     which is what gave the options equal widths while they stood side by side
+     — would squeeze the rows down to the height of their text. */
+  flex: 0 0 auto;
   position: relative;
   z-index: 1;
   display: inline-flex;
@@ -619,7 +622,7 @@
   background: transparent;
   color: var(--text-muted);
   border: none;
-  padding: 0.45rem 0.5rem;
+  padding: 0.6rem 0.65rem;
   font-size: 0.875rem;
   border-radius: 6px;
   cursor: pointer;

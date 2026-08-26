@@ -26,6 +26,9 @@ import layersIcon from '../assets/layers.svg';
 import horizontalIcon from '../assets/horizontal.svg';
 import mindmapIcon from '../assets/mindmap.svg';
 import upIcon from '../assets/up.svg';
+import upNavIcon from '../assets/up-nav.svg';
+import downIcon from '../assets/down.svg';
+import downNavIcon from '../assets/down-nav.svg';
 import leftIcon from '../assets/left.svg';
 import leftNavIcon from '../assets/left-nav.svg';
 import rightIcon from '../assets/right.svg';
@@ -57,6 +60,20 @@ function parseSlotId(id) {
 }
 
 const parseIntoId = (id) => (typeof id === 'string' && id.startsWith('minto::') ? id.slice(7) : null);
+
+/** Which way the branches of a map grow. */
+const branchDirection = (board) => (board.mind_direction === 'down' ? 'down' : 'right');
+
+/** Folding a branch takes it aside, or upwards when the branches go down. */
+const foldIcon = (down, hover) => {
+  if (down) return hover ? upNavIcon : upIcon;
+  return hover ? leftNavIcon : leftIcon;
+};
+
+const unfoldIcon = (down, hover) => {
+  if (down) return hover ? downNavIcon : downIcon;
+  return hover ? rightNavIcon : rightIcon;
+};
 
 /** The children of every node, each branch in the order it stands in. */
 function groupByParent(nodes) {
@@ -267,8 +284,8 @@ function MindNode({
           ) : (
             <img
               src={collapsed
-                ? (hasHover && foldHover ? rightNavIcon : rightIcon)
-                : (hasHover && foldHover ? leftNavIcon : leftIcon)}
+                ? unfoldIcon(settings.down, hasHover && foldHover)
+                : foldIcon(settings.down, hasHover && foldHover)}
               alt=""
             />
           )}
@@ -375,7 +392,7 @@ function Branch({ node, depth, first, last, byParent, blocked, shared }) {
  * whole branch, the level it sits on, and getting rid of it.
  */
 function NodeContextMenu({
-  node, at, childCount, canOutdent,
+  node, at, childCount, canOutdent, down,
   onUpdate, onAddChild, onAddSibling, onDuplicate, onFoldBranch, onMoveToRoot, onOutdent,
   onOpen, onQuickEdit, onDelete, onClose,
 }) {
@@ -482,11 +499,11 @@ function NodeContextMenu({
         {item(mindmapIcon, 'Дочерняя плашка', () => { onAddChild(node); onClose(); })}
         {item(plusIcon, 'Плашка рядом', () => { onAddSibling(node); onClose(); })}
         {childCount > 0 && item(
-          folded ? rightIcon : leftIcon,
+          folded ? unfoldIcon(down, false) : foldIcon(down, false),
           folded ? 'Развернуть ветку' : 'Свернуть ветку',
           () => { onUpdate(node.id, { collapsed: !folded }); onClose(); },
         )}
-        {childCount > 0 && item(leftIcon, 'Свернуть всё внутри', () => { onFoldBranch(node.id); onClose(); })}
+        {childCount > 0 && item(foldIcon(down, false), 'Свернуть всё внутри', () => { onFoldBranch(node.id); onClose(); })}
         {item(layersIcon, 'Скопировать с ветвями', () => { onDuplicate(node.id); onClose(); })}
         {canOutdent && item(horizontalIcon, 'Поднять на уровень выше', () => { onOutdent(node); onClose(); })}
         {node.parent_id && item(upIcon, 'Сделать корневой', () => { onMoveToRoot(node); onClose(); })}
@@ -812,6 +829,25 @@ function MapSettingsModal({ board, onChange, onClose }) {
         </div>
 
         <div className="dashboard__settings-group">
+          <div className="dashboard__settings-title">Куда растут ветки</div>
+          <div className="dashboard__settings-row mind-settings__pair">
+            {[
+              { id: 'right', label: 'Вправо' },
+              { id: 'down', label: 'Вниз' },
+            ].map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className={`mind-settings__choice ${branchDirection(board) === o.id ? 'mind-settings__choice--on' : ''}`}
+                onClick={() => onChange({ mind_direction: o.id })}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="dashboard__settings-group">
           <div className="dashboard__settings-title">Что показывать на плашке</div>
           <label className="dashboard__settings-check">
             <input
@@ -874,9 +910,11 @@ export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, de
   const openNode = openId ? mapNodes.find((n) => n.id === openId) : null;
 
   const width = Math.max(MIN_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, board.mind_node_width ?? 240));
+  const down = branchDirection(board) === 'down';
   const settings = {
     showDescription: board.mind_show_description !== false,
     showCount: board.mind_show_count !== false,
+    down,
   };
 
   const addChild = async (node) => {
@@ -1033,24 +1071,24 @@ export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, de
             <button
               type="button"
               className="mind__icon-btn"
-              onMouseEnter={() => hasHover && setOpenHover(true)}
-              onMouseLeave={() => hasHover && setOpenHover(false)}
-              onClick={() => setAllFolded(false)}
-              aria-label="Развернуть все ветки"
-              title="Развернуть все ветки"
-            >
-              <img src={hasHover && openHover ? rightNavIcon : rightIcon} alt="" />
-            </button>
-            <button
-              type="button"
-              className="mind__icon-btn"
               onMouseEnter={() => hasHover && setFoldHover(true)}
               onMouseLeave={() => hasHover && setFoldHover(false)}
               onClick={() => setAllFolded(true)}
               aria-label="Свернуть все ветки"
               title="Свернуть все ветки"
             >
-              <img src={hasHover && foldHover ? leftNavIcon : leftIcon} alt="" />
+              <img src={foldIcon(down, hasHover && foldHover)} alt="" />
+            </button>
+            <button
+              type="button"
+              className="mind__icon-btn"
+              onMouseEnter={() => hasHover && setOpenHover(true)}
+              onMouseLeave={() => hasHover && setOpenHover(false)}
+              onClick={() => setAllFolded(false)}
+              aria-label="Развернуть все ветки"
+              title="Развернуть все ветки"
+            >
+              <img src={unfoldIcon(down, hasHover && openHover)} alt="" />
             </button>
           </>
         )}
@@ -1087,7 +1125,7 @@ export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, de
         onDragEnd={handleDragEnd}
       >
         <div
-          className="mind__canvas"
+          className={`mind__canvas ${down ? 'mind__canvas--down' : ''}`}
           ref={canvasRef}
           style={{ '--mind-node-width': `${width}px` }}
           onPointerDown={startPan}
@@ -1143,6 +1181,7 @@ export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, de
           at={menu}
           childCount={(byParent.get(menu.node.id) || []).length}
           canOutdent={!!menu.node.parent_id}
+          down={down}
           onUpdate={updateNode}
           onAddChild={addChild}
           onAddSibling={addSibling}
