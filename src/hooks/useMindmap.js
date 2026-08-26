@@ -239,6 +239,7 @@ export function useMindmap(boardIds) {
         title_color: node.title_color,
         border_color: node.border_color,
         bg_color: node.bg_color,
+        kids_layout: node.kids_layout,
         collapsed: node.collapsed,
         position: node.position,
         ...fields,

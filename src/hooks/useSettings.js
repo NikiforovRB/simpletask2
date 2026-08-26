@@ -21,6 +21,12 @@ function clampBoardZoom(n) {
   return 100;
 }
 
+function clampMindZoom(n) {
+  const v = Number(n);
+  if (Number.isFinite(v)) return Math.max(30, Math.min(200, Math.round(v)));
+  return 100;
+}
+
 function normalizeTheme(v) {
   return v === 'light' ? 'light' : 'dark';
 }
@@ -58,6 +64,7 @@ export function useSettings() {
     task_font_weight: 'medium',
     task_font_scale: 1,
     board_zoom: 100,
+    mind_zoom: 100,
     board_dots: false,
     theme: 'dark',
     calendar_scale: 1,
@@ -96,6 +103,7 @@ export function useSettings() {
           task_font_weight: normalizeTaskFontWeight(data.task_font_weight),
           task_font_scale: normalizeTaskFontScale(data.task_font_scale),
           board_zoom: clampBoardZoom(data.board_zoom),
+          mind_zoom: clampMindZoom(data.mind_zoom),
           board_dots: data.board_dots === true,
           theme: normalizeTheme(data.theme),
           calendar_scale: clampScale(data.calendar_scale),
@@ -133,6 +141,7 @@ export function useSettings() {
           task_font_weight: 'medium',
           task_font_scale: 1,
           board_zoom: 100,
+          mind_zoom: 100,
           board_dots: false,
           theme: 'dark',
           calendar_scale: 1,
@@ -210,6 +219,13 @@ export function useSettings() {
     const z = clampBoardZoom(board_zoom);
     await supabase.from('user_settings').update({ board_zoom: z }).eq('user_id', user.id);
     setSettings((s) => ({ ...s, board_zoom: z }));
+  };
+
+  const setMindZoom = async (mind_zoom) => {
+    if (!user) return;
+    const z = clampMindZoom(mind_zoom);
+    await supabase.from('user_settings').update({ mind_zoom: z }).eq('user_id', user.id);
+    setSettings((s) => ({ ...s, mind_zoom: z }));
   };
 
   const setBoardDots = async (board_dots) => {
@@ -303,6 +319,7 @@ export function useSettings() {
     setTaskFontWeight,
     setTaskFontScale,
     setBoardZoom,
+    setMindZoom,
     setBoardDots,
     setTheme,
     setCalendarScale,

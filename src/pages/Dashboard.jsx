@@ -386,6 +386,7 @@ export default function Dashboard() {
     setTaskFontWeight,
     setTaskFontScale,
     setBoardZoom,
+    setMindZoom,
     setBoardDots,
     setTheme,
     setCalendarScale,
@@ -605,6 +606,7 @@ export default function Dashboard() {
   const boardWorldRef = useRef(null);
   const [boardHeaderLeftSlot, setBoardHeaderLeftSlot] = useState(null);
   const [boardHeaderRightSlot, setBoardHeaderRightSlot] = useState(null);
+  const [mindHeaderLeftSlot, setMindHeaderLeftSlot] = useState(null);
   const [repHeaderSlot, setRepHeaderSlot] = useState(null);
   const [addProjectModalOpen, setAddProjectModalOpen] = useState(false);
   const [addProjectTitle, setAddProjectTitle] = useState('');
@@ -1688,6 +1690,9 @@ export default function Dashboard() {
       <header className="dashboard__header">
         <div className="dashboard__header-row">
           <div className="dashboard__top-left">
+            {viewMode === 'mindmap' && (
+              <div ref={setMindHeaderLeftSlot} className="dashboard__mind-header-slot" />
+            )}
             <button
               type="button"
               className="dashboard__menu-btn"
@@ -2915,6 +2920,9 @@ export default function Dashboard() {
           moveNode={moveMindNode}
           duplicateNode={duplicateMindNode}
           onUpdateBoard={updateProjectSettings}
+          headerLeftSlot={mindHeaderLeftSlot}
+          zoom={settings.mind_zoom ?? 100}
+          setZoom={setMindZoom}
         />
       )}
 

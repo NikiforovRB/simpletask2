@@ -29,17 +29,30 @@ import upIcon from '../assets/up.svg';
 import upNavIcon from '../assets/up-nav.svg';
 import downIcon from '../assets/down.svg';
 import downNavIcon from '../assets/down-nav.svg';
+import gridTopIcon from '../assets/grid-top.svg';
+import gridLeftIcon from '../assets/grid-left.svg';
 import leftIcon from '../assets/left.svg';
 import leftNavIcon from '../assets/left-nav.svg';
 import rightIcon from '../assets/right.svg';
 import rightNavIcon from '../assets/right-nav.svg';
 import settingsIcon from '../assets/settings.svg';
 import settingsNavIcon from '../assets/settings-nav.svg';
+import zoomInIcon from '../assets/zoom-in.svg';
+import zoomInNavIcon from '../assets/zoom-in-nav.svg';
+import zoomOutIcon from '../assets/zoom-out.svg';
+import zoomOutNavIcon from '../assets/zoom-out-nav.svg';
+import fitIcon from '../assets/fit.svg';
+import fitNavIcon from '../assets/fit-nav.svg';
 import './MindMapView.css';
 
 const MIN_NODE_WIDTH = 160;
 const MAX_NODE_WIDTH = 520;
 const NODE_WIDTH_STEP = 10;
+const MIN_ZOOM = 30;
+const MAX_ZOOM = 200;
+const ZOOM_STEP = 10;
+/** How long the zoom sits still before it is saved. */
+const ZOOM_SAVE_DELAY = 500;
 /** The colours offered straight from the context menu of a node. */
 const QUICK_COLORS = ['#f33737', '#f4ba04', '#15c466', '#5a86ee', '#613aaf'];
 /** How long a title or a description sits still before it is saved. */
@@ -63,6 +76,15 @@ const parseIntoId = (id) => (typeof id === 'string' && id.startsWith('minto::') 
 
 /** Which way the branches of a map grow. */
 const branchDirection = (board) => (board.mind_direction === 'down' ? 'down' : 'right');
+
+/**
+ * How a node shows the level under it while the branches grow down: children
+ * across a row, or stacked in one column off its left edge. Growing to the
+ * right they are stacked either way, so there the setting sits idle.
+ */
+const kidsStacked = (node) => node.kids_layout === 'column';
+
+const snapZoom = (n) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(Number(n) || 100)));
 
 /** Folding a branch takes it aside, or upwards when the branches go down. */
 const foldIcon = (down, hover) => {
@@ -320,10 +342,10 @@ function DraggableNode({ node, blocked, ...rest }) {
  * it. It takes no height of its own, so the gaps don't stretch a branch; the
  * hit area is a band reaching into the nodes above and below it.
  */
-function NodeSlot({ parentId, index, disabled }) {
+function NodeSlot({ parentId, index, disabled, vertical }) {
   const { isOver, setNodeRef } = useDroppable({ id: slotId(parentId, index), disabled });
   return (
-    <div className="mind-slot">
+    <div className={`mind-slot ${vertical ? 'mind-slot--vertical' : ''}`}>
       <div ref={setNodeRef} className={`mind-slot__hit ${isOver ? 'mind-slot__hit--over' : ''}`}>
         <div className="mind-slot__line" aria-hidden />
       </div>
@@ -332,16 +354,26 @@ function NodeSlot({ parentId, index, disabled }) {
 }
 
 /**
- * A node with its branch: the node itself, and to the right of it the column
- * of its children, joined to it by lines. First and last are marked, because
- * the drop gaps stand between the children and `:first-child` would find one
- * of those instead.
+ * A node with its branch: the node itself, and beside or below it the children,
+ * joined to it by lines. First and last are marked, because the drop gaps stand
+ * between the children and `:first-child` would find one of those instead.
+ *
+ * Where the lines are drawn depends on two things, and both are told in classes
+ * for the stylesheet to read. `--stack` means this node holds its children in
+ * one column rather than a row. `--anchored` means the node stands at the left
+ * edge of its own branch instead of over the middle of it — which is where the
+ * line must meet it, both when its children hang off that edge and when it is
+ * itself one of a stacked set.
  */
-function Branch({ node, depth, first, last, byParent, blocked, shared }) {
+function Branch({ node, depth, first, last, parentStacked, byParent, blocked, shared }) {
   const { editingId, ...rest } = shared;
   const kids = byParent.get(node.id) || [];
   const open = !node.collapsed && kids.length > 0;
   const inside = blocked.has(node.id);
+  const down = shared.settings.down;
+  const stack = down && kidsStacked(node);
+  const anchored = down && (stack || parentStacked);
+  const kidsAcross = down && !stack;
   return (
     <div
       className={[
@@ -350,6 +382,8 @@ function Branch({ node, depth, first, last, byParent, blocked, shared }) {
         first ? 'mind-branch--first' : '',
         last ? 'mind-branch--last' : '',
         open ? 'mind-branch--open' : '',
+        stack ? 'mind-branch--stack' : '',
+        anchored ? 'mind-branch--anchored' : '',
       ].join(' ')}
     >
       <div className="mind-branch__self">
@@ -363,8 +397,8 @@ function Branch({ node, depth, first, last, byParent, blocked, shared }) {
         />
       </div>
       {open && (
-        <div className="mind-branch__kids">
-          <NodeSlot parentId={node.id} index={0} disabled={inside} />
+        <div className={`mind-branch__kids mind-branch__kids--${kidsAcross ? 'row' : 'column'}`}>
+          <NodeSlot parentId={node.id} index={0} disabled={inside} vertical={kidsAcross} />
           {kids.map((kid, i) => (
             <Fragment key={kid.id}>
               <Branch
@@ -372,11 +406,12 @@ function Branch({ node, depth, first, last, byParent, blocked, shared }) {
                 depth={depth + 1}
                 first={i === 0}
                 last={i === kids.length - 1}
+                parentStacked={stack}
                 byParent={byParent}
                 blocked={blocked}
                 shared={shared}
               />
-              <NodeSlot parentId={node.id} index={i + 1} disabled={inside} />
+              <NodeSlot parentId={node.id} index={i + 1} disabled={inside} vertical={kidsAcross} />
             </Fragment>
           ))}
         </div>
@@ -504,6 +539,14 @@ function NodeContextMenu({
           () => { onUpdate(node.id, { collapsed: !folded }); onClose(); },
         )}
         {childCount > 0 && item(foldIcon(down, false), 'Свернуть всё внутри', () => { onFoldBranch(node.id); onClose(); })}
+        {down && childCount > 0 && item(
+          kidsStacked(node) ? gridTopIcon : gridLeftIcon,
+          kidsStacked(node) ? 'Уровень ниже по горизонтали' : 'Уровень ниже по вертикали',
+          () => {
+            onUpdate(node.id, { kids_layout: kidsStacked(node) ? 'row' : 'column' });
+            onClose();
+          },
+        )}
         {item(layersIcon, 'Скопировать с ветвями', () => { onDuplicate(node.id); onClose(); })}
         {canOutdent && item(horizontalIcon, 'Поднять на уровень выше', () => { onOutdent(node); onClose(); })}
         {node.parent_id && item(upIcon, 'Сделать корневой', () => { onMoveToRoot(node); onClose(); })}
@@ -528,7 +571,7 @@ function NodeContextMenu({
  * title and the three colours it can be given, and a description of any
  * length, kept exactly as it was typed — line breaks and all.
  */
-function MindNodePanel({ node, childCount, onUpdate, onAddChild, onDelete, onClose }) {
+function MindNodePanel({ node, childCount, down, onUpdate, onAddChild, onDelete, onClose }) {
   const CLOSE_MS = 220;
   const hasHover = useMediaQuery('(hover: hover)');
   const [closing, setClosing] = useState(false);
@@ -675,6 +718,29 @@ function MindNodePanel({ node, childCount, onUpdate, onAddChild, onDelete, onClo
             onChange={(e) => setDescription(e.target.value)}
             onBlur={() => onUpdate(nodeId, { description })}
           />
+
+          {/* Only worth showing while the branches grow down: growing to the
+              right, a level is a column whichever way this is set. */}
+          {down && (
+            <>
+              <div className="mind-panel__label">Плашки следующего уровня</div>
+              <div className="mind-panel__pair">
+                {[
+                  { id: 'row', label: 'По горизонтали' },
+                  { id: 'column', label: 'По вертикали' },
+                ].map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    className={`mind-panel__choice ${(kidsStacked(node) ? 'column' : 'row') === o.id ? 'mind-panel__choice--on' : ''}`}
+                    onClick={() => onUpdate(nodeId, { kids_layout: o.id })}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           <div className="mind-panel__row">
             <span className="mind-panel__meta">
@@ -866,7 +932,8 @@ function MapSettingsModal({ board, onChange, onClose }) {
             <span>Число вложенных у свёрнутой ветки</span>
           </label>
           <p className="mind-settings__hint">
-            Enter — плашка рядом, Tab — вложенная. Shift и колесо мыши ведут карту в сторону.
+            Enter — плашка рядом, Tab — вложенная. Shift и колесо мыши ведут карту в сторону,
+            Ctrl и колесо меняют масштаб.
           </p>
         </div>
       </div>
@@ -874,19 +941,32 @@ function MapSettingsModal({ board, onChange, onClose }) {
   );
 }
 
-export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, deleteNode, moveNode, duplicateNode, onUpdateBoard }) {
+export function MindMapView({
+  board, nodes, addNode, updateNode, updateNodes, deleteNode, moveNode, duplicateNode,
+  onUpdateBoard, headerLeftSlot, zoom: savedZoom, setZoom: saveZoom,
+}) {
   const hasHover = useMediaQuery('(hover: hover)');
+  const wideHeader = useMediaQuery('(min-width: 501px)');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
   const [plusHover, setPlusHover] = useState(false);
   const [openHover, setOpenHover] = useState(false);
   const [foldHover, setFoldHover] = useState(false);
+  const [zoomInHover, setZoomInHover] = useState(false);
+  const [zoomOutHover, setZoomOutHover] = useState(false);
+  const [fitHover, setFitHover] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [menu, setMenu] = useState(null); // { x, y, node }
   const [activeId, setActiveId] = useState(null);
+  // The zoom answers the pointer at once and is written down once it settles:
+  // a wheel or a held-down button would otherwise be a stream of writes.
+  const [zoom, setZoom] = useState(() => snapZoom(savedZoom));
+  // The zoom to come back to when the whole map has been fitted on the screen.
+  const [zoomBefore, setZoomBefore] = useState(null);
   const canvasRef = useRef(null);
   const pan = useRef(null);
+  const zoomSave = useRef(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -952,18 +1032,71 @@ export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, de
     updateNodes(parents.map((n) => n.id), { collapsed });
   };
 
-  // Shift and the wheel walk the map sideways; the plain wheel scrolls it.
+  const changeZoom = useCallback((next, keepFitMemory = false) => {
+    const z = snapZoom(next);
+    setZoom(z);
+    if (!keepFitMemory) setZoomBefore(null);
+    clearTimeout(zoomSave.current);
+    zoomSave.current = setTimeout(() => saveZoom?.(z), ZOOM_SAVE_DELAY);
+  }, [saveZoom]);
+
+  useEffect(() => () => clearTimeout(zoomSave.current), []);
+
+  /**
+   * The whole map at once: the zoom it takes to bring every node inside the
+   * screen, measured from where the nodes actually are — the canvas itself
+   * always fills the view and would say nothing. Pressing it again goes back to
+   * the zoom the map was read at.
+   */
+  const toggleFit = () => {
+    if (zoomBefore !== null) {
+      changeZoom(zoomBefore);
+      return;
+    }
+    const el = canvasRef.current;
+    const drawn = el?.querySelectorAll('.mind-node');
+    if (!el || !drawn?.length) return;
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    drawn.forEach((n) => {
+      const r = n.getBoundingClientRect();
+      left = Math.min(left, r.left);
+      top = Math.min(top, r.top);
+      right = Math.max(right, r.right);
+      bottom = Math.max(bottom, r.bottom);
+    });
+    // Those rectangles are as they look now, so back to 1:1 before asking how
+    // much of the map there is; the margin leaves the lines around it room.
+    const scale = zoom / 100;
+    const full = (right - left) / scale + 56;
+    const tall = (bottom - top) / scale + 56;
+    const fits = Math.min(el.clientWidth / full, el.clientHeight / tall, 1);
+    setZoomBefore(zoom);
+    changeZoom(Math.floor((fits * 100) / 5) * 5, true);
+    el.scrollTo({ left: 0, top: 0 });
+  };
+
+  // Shift and the wheel walk the map sideways, ctrl and the wheel zoom it; the
+  // plain wheel scrolls it.
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return undefined;
     const onWheel = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.deltaY === 0) return;
+        e.preventDefault();
+        changeZoom(zoom + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
+        return;
+      }
       if (!e.shiftKey || e.deltaY === 0) return;
       el.scrollLeft += e.deltaY;
       e.preventDefault();
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, []);
+  }, [zoom, changeZoom]);
 
   const canPanFrom = (target) => (
     target === canvasRef.current
@@ -1061,11 +1194,66 @@ export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, de
     onChild: addChild,
   };
 
+  // The zoom of the map sits in the top bar, to the left of the menu, where
+  // there is room for it; on a narrow screen there is none, so it joins the
+  // tools of the map itself.
+  const zoomGroup = (
+    <div className="mind__zoom">
+      <button
+        type="button"
+        className="mind__icon-btn"
+        onMouseEnter={() => hasHover && setZoomOutHover(true)}
+        onMouseLeave={() => hasHover && setZoomOutHover(false)}
+        onClick={() => changeZoom(zoom - ZOOM_STEP)}
+        disabled={zoom <= MIN_ZOOM}
+        aria-label="Уменьшить масштаб"
+        title="Уменьшить масштаб"
+      >
+        <img src={hasHover && zoomOutHover ? zoomOutNavIcon : zoomOutIcon} alt="" />
+      </button>
+      <button
+        type="button"
+        className="mind__zoom-value"
+        onClick={() => changeZoom(100)}
+        aria-label="Обычный масштаб"
+        title="Обычный масштаб"
+      >
+        {zoom}%
+      </button>
+      <button
+        type="button"
+        className="mind__icon-btn"
+        onMouseEnter={() => hasHover && setZoomInHover(true)}
+        onMouseLeave={() => hasHover && setZoomInHover(false)}
+        onClick={() => changeZoom(zoom + ZOOM_STEP)}
+        disabled={zoom >= MAX_ZOOM}
+        aria-label="Увеличить масштаб"
+        title="Увеличить масштаб"
+      >
+        <img src={hasHover && zoomInHover ? zoomInNavIcon : zoomInIcon} alt="" />
+      </button>
+      <button
+        type="button"
+        className="mind__icon-btn"
+        onMouseEnter={() => hasHover && setFitHover(true)}
+        onMouseLeave={() => hasHover && setFitHover(false)}
+        onClick={toggleFit}
+        aria-label={zoomBefore !== null ? 'Вернуть прежний масштаб' : 'Вся карта на экране'}
+        title={zoomBefore !== null ? 'Вернуть прежний масштаб' : 'Вся карта на экране'}
+      >
+        <img src={hasHover && fitHover ? fitNavIcon : fitIcon} alt="" />
+      </button>
+    </div>
+  );
+  const zoomInHeader = wideHeader && headerLeftSlot;
+
   return (
     <section className="mind">
+      {zoomInHeader && createPortal(zoomGroup, headerLeftSlot)}
       <div className="mind__header">
         <span className="mind__title">{board.title}</span>
         <span className="mind__header-gap" />
+        {!zoomInHeader && zoomGroup}
         {parents.length > 0 && (
           <>
             <button
@@ -1127,7 +1315,7 @@ export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, de
         <div
           className={`mind__canvas ${down ? 'mind__canvas--down' : ''}`}
           ref={canvasRef}
-          style={{ '--mind-node-width': `${width}px` }}
+          style={{ '--mind-node-width': `${width}px`, '--mind-zoom': zoom / 100 }}
           onPointerDown={startPan}
           onPointerMove={movePan}
           onPointerUp={endPan}
@@ -1145,7 +1333,7 @@ export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, de
             </div>
           ) : (
             <div className="mind__roots">
-              <NodeSlot parentId={null} index={0} />
+              <NodeSlot parentId={null} index={0} vertical={down} />
               {roots.map((node, i) => (
                 <Fragment key={node.id}>
                   <Branch
@@ -1153,11 +1341,12 @@ export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, de
                     depth={0}
                     first={i === 0}
                     last={i === roots.length - 1}
+                    parentStacked={false}
                     byParent={byParent}
                     blocked={blocked}
                     shared={shared}
                   />
-                  <NodeSlot parentId={null} index={i + 1} />
+                  <NodeSlot parentId={null} index={i + 1} vertical={down} />
                 </Fragment>
               ))}
               <div className="mind__pan-space" />
@@ -1167,7 +1356,10 @@ export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, de
 
         <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }}>
           {activeNode ? (
-            <div className="mind-node-wrap mind-node-wrap--overlay" style={{ width: `${width}px` }}>
+            <div
+              className="mind-node-wrap mind-node-wrap--overlay"
+              style={{ width: `${width}px`, zoom: zoom / 100 }}
+            >
               <MindNode node={activeNode} settings={settings} overlay />
             </div>
           ) : null}
@@ -1201,6 +1393,7 @@ export function MindMapView({ board, nodes, addNode, updateNode, updateNodes, de
           key={openNode.id}
           node={openNode}
           childCount={countBelow(byParent, openNode.id)}
+          down={down}
           onUpdate={updateNode}
           onAddChild={addChild}
           onDelete={deleteNode}

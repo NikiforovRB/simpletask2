@@ -42,6 +42,38 @@
   object-fit: contain;
 }
 
+/* How far out the map is drawn: two steps, the reading itself, and the whole
+   map at once. */
+.mind__zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.mind__zoom-value {
+  min-width: 3rem;
+  padding: 0.15rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+}
+
+.mind__zoom-value:hover {
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+.mind__icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .mind__header-line {
   height: 1px;
   background: var(--divider);
@@ -63,6 +95,10 @@
   /* Half the space between two nodes of one branch. It is padding rather than
      a gap so the line of the branch stays unbroken. */
   --mind-row: 0.3rem;
+  /* Where a line coming in from the left meets a node: the middle of the first
+     line of its title, so a stacked column of nodes is joined along one edge
+     however tall each of them turns out to be. */
+  --mind-hook: 1.2rem;
   --mind-line: var(--border-strong);
 }
 
@@ -75,6 +111,9 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  /* The map is drawn smaller or larger rather than scaled after the fact, so
+     what it takes to scroll around stays true to what is on the screen. */
+  zoom: var(--mind-zoom, 1);
   width: max-content;
   /* Fills the canvas, so the empty space beside the map can be grabbed too. */
   min-width: 100%;
@@ -237,9 +276,40 @@
   opacity: 1;
 }
 
-/* Branches growing down instead of to the right. Everything turns a quarter
-   turn: a node sits above its children, they stand side by side, and the line
-   they hang on runs across instead of down. */
+/* The gap between two nodes standing side by side rather than one under the
+   other: the same thing on its side. */
+.mind-slot--vertical {
+  width: 0;
+  height: 3rem;
+}
+
+.mind-slot--vertical .mind-slot__hit {
+  left: -11px;
+  right: auto;
+  top: 0;
+  bottom: 0;
+  width: 22px;
+  height: auto;
+  justify-content: center;
+}
+
+.mind-slot--vertical .mind-slot__line {
+  width: 2px;
+  height: 100%;
+}
+
+/* --- Branches growing down ------------------------------------------------
+   A node stands above its children instead of beside them, and each node says
+   how it holds them: across a row, centred under it, or stacked in one column
+   hanging off its left edge. Both are drawn with the same three pieces — a stub
+   out of the parent, a line the children hang on, and a stub into each child —
+   only turned a quarter turn from one another.
+
+   Every child draws the part of that line which crosses its own box, split at
+   its own stub, so neighbours meet at the box edges however tall or wide their
+   own branches turn out to be. The split can only be put in a constant place,
+   which is why a node whose line comes in from the left stands at the left edge
+   of its branch (`--anchored`) rather than over the middle of it. */
 .mind__canvas--down .mind__roots {
   flex-direction: row;
   align-items: flex-start;
@@ -265,71 +335,130 @@
   flex: 0 0 auto;
 }
 
-.mind__canvas--down .mind-branch__kids {
+/* The line into this node comes from its left, so the node waits at that edge
+   for it — with its own branch spreading out to the right of it. */
+.mind__canvas--down .mind-branch--anchored {
+  align-items: flex-start;
+}
+
+/* --- Children across a row --- */
+
+.mind__canvas--down .mind-branch__kids--row {
   flex-direction: row;
   align-items: flex-start;
   padding-left: 0;
   padding-top: calc(var(--mind-arm) * 2);
 }
 
-.mind__canvas--down .mind-branch--open > .mind-branch__self::after {
+.mind__canvas--down .mind-branch--open:not(.mind-branch--stack) > .mind-branch__self::after {
   left: 50%;
   top: 100%;
   width: 1px;
   height: var(--mind-arm);
 }
 
-.mind__canvas--down .mind-branch--child > .mind-branch__self::before {
+.mind__canvas--down .mind-branch__kids--row > .mind-branch--child > .mind-branch__self::before {
   left: 50%;
   top: calc(var(--mind-arm) * -1);
   width: 1px;
   height: var(--mind-arm);
 }
 
-.mind__canvas--down .mind-branch--child::before,
-.mind__canvas--down .mind-branch--child::after {
+.mind__canvas--down .mind-branch__kids--row > .mind-branch--child::before,
+.mind__canvas--down .mind-branch__kids--row > .mind-branch--child::after {
   top: calc(var(--mind-arm) * -1);
   bottom: auto;
   width: 50%;
   height: 1px;
 }
 
-.mind__canvas--down .mind-branch--child::before {
+.mind__canvas--down .mind-branch__kids--row > .mind-branch--child::before {
   left: 0;
 }
 
-.mind__canvas--down .mind-branch--child::after {
+.mind__canvas--down .mind-branch__kids--row > .mind-branch--child::after {
   left: 50%;
 }
 
-/* The gap between two nodes standing side by side. */
-.mind__canvas--down .mind-slot {
-  width: 0;
-  height: 3rem;
+/* A node standing at the left edge of its branch is not over the middle of it,
+   so the line it hangs on breaks at the middle of the node instead. */
+.mind__canvas--down .mind-branch__kids--row > .mind-branch--anchored::before {
+  width: calc(var(--mind-row) + var(--mind-node-width, 240px) / 2);
 }
 
-.mind__canvas--down .mind-slot__hit {
-  left: -11px;
-  right: auto;
+.mind__canvas--down .mind-branch__kids--row > .mind-branch--anchored::after {
+  left: calc(var(--mind-row) + var(--mind-node-width, 240px) / 2);
+  width: auto;
+  right: 0;
+}
+
+/* A row under a node that stands at its own left edge starts at the left edge
+   of the row, not at the first child: that is where the stub comes down. */
+.mind__canvas--down .mind-branch--anchored > .mind-branch__kids--row > .mind-branch--first::before {
+  content: '';
+}
+
+/* --- Children stacked in one column --- */
+
+.mind__canvas--down .mind-branch__kids--column {
+  align-items: flex-start;
+  padding-top: var(--mind-arm);
+}
+
+.mind__canvas--down .mind-branch--stack.mind-branch--open > .mind-branch__self::after {
+  left: var(--mind-arm);
+  top: 100%;
+  width: 1px;
+  height: var(--mind-arm);
+}
+
+.mind__canvas--down .mind-branch__kids--column > .mind-branch {
+  padding: var(--mind-row) 0;
+}
+
+.mind__canvas--down .mind-branch__kids--column > .mind-branch--child > .mind-branch__self::before {
+  left: calc(var(--mind-arm) * -1);
+  top: var(--mind-hook);
+  width: var(--mind-arm);
+  height: 1px;
+}
+
+.mind__canvas--down .mind-branch__kids--column > .mind-branch--child::before,
+.mind__canvas--down .mind-branch__kids--column > .mind-branch--child::after {
+  left: calc(var(--mind-arm) * -1);
+  width: 1px;
+}
+
+.mind__canvas--down .mind-branch__kids--column > .mind-branch--child::before {
   top: 0;
+  bottom: auto;
+  height: calc(var(--mind-row) + var(--mind-hook));
+}
+
+.mind__canvas--down .mind-branch__kids--column > .mind-branch--child::after {
+  top: calc(var(--mind-row) + var(--mind-hook));
   bottom: 0;
-  width: 22px;
   height: auto;
-  justify-content: center;
 }
 
-.mind__canvas--down .mind-slot__line {
-  width: 2px;
-  height: 100%;
+/* The line comes down to the first of them from the node above, so unlike a
+   row it keeps the part before its own stub. */
+.mind__canvas--down .mind-branch__kids--column > .mind-branch--first::before {
+  content: '';
 }
 
-/* The fold knob follows the line out of the node, now below it. */
+/* The fold knob sits on the line out of the node, which now leaves from
+   below — from the middle of the node, or from the edge the column hangs on. */
 .mind__canvas--down .mind-node__fold {
   top: auto;
   right: auto;
   bottom: -0.65rem;
   left: 50%;
   transform: translateX(-50%);
+}
+
+.mind__canvas--down .mind-branch--stack > .mind-branch__self .mind-node__fold {
+  left: var(--mind-arm);
 }
 
 .mind-node-wrap {
@@ -726,6 +855,35 @@
 .mind-panel__desc:focus {
   border-color: var(--accent);
   outline: none;
+}
+
+/* Which way this node holds the level under it. */
+.mind-panel__pair {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.mind-panel__choice {
+  flex: 1 1 0;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.mind-panel__choice:hover {
+  background: var(--bg-hover-strong);
+}
+
+.mind-panel__choice--on {
+  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .mind-panel__row {

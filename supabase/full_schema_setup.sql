@@ -1651,3 +1651,23 @@ alter table public.task_projects
 alter table public.task_projects drop constraint if exists task_projects_mind_direction_check;
 alter table public.task_projects
   add constraint task_projects_mind_direction_check check (mind_direction in ('right', 'down'));
+
+-- How one node shows the level under it when the branches of the map grow
+-- down: children spread across a row, as they do by default, or stacked in one
+-- column hanging off the left edge of the node. It belongs to the node, so a
+-- map can read across in one place and down in another.
+
+alter table public.mind_nodes
+  add column if not exists kids_layout text not null default 'row';
+
+alter table public.mind_nodes drop constraint if exists mind_nodes_kids_layout_check;
+alter table public.mind_nodes
+  add constraint mind_nodes_kids_layout_check check (kids_layout in ('row', 'column'));
+
+-- How far the mind maps are zoomed out. It belongs to the viewer rather than to
+-- a map — the same map can be read close up on one screen and from afar on
+-- another — so it lives beside the zoom of the boards.
+
+alter table public.user_settings
+  add column if not exists mind_zoom int not null default 100
+  check (mind_zoom >= 30 and mind_zoom <= 200);
