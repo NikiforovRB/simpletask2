@@ -900,7 +900,7 @@ function KanbanColumn({
         <div className="dashboard__settings-overlay" onClick={() => setConfirmDelete(false)}>
           <div className="dashboard__settings-popup" onClick={(e) => e.stopPropagation()}>
             <div className="dashboard__settings-title">Удалить столбец?</div>
-            <p className="dashboard__confirm-text">Все плашки этого столбца вместе с задачами уйдут в архив.</p>
+            <p className="dashboard__confirm-text">Плашки без даты вместе с задачами уйдут в архив. Плашки с датой останутся — они живут в столбцах с датами.</p>
             <div className="dashboard__settings-edit-actions">
               <button type="button" className="dashboard__settings-submit" onClick={() => setConfirmDelete(false)}>
                 Отмена
@@ -1754,11 +1754,14 @@ export function KanbanView({
     return out;
   }, [dateFilter, visibleCards, byDay]);
 
-  // Laid out by date, the columns of the board itself keep what has no date
-  // yet; everything planned stands in its day on the left.
+  // A card with a date belongs to its day, not to a stage of work: it is only
+  // ever seen in its date column (and only while the board is laid out by
+  // date). The stage columns hold what has not been planned yet, whichever way
+  // the board is shown — so a plan can never be lost by dropping the column a
+  // card once happened to sit in.
   const shownByColumn = useMemo(
-    () => groupByColumn(dateOn ? visibleCards.filter((c) => !c.due_date) : visibleCards),
-    [dateOn, visibleCards],
+    () => groupByColumn(visibleCards.filter((c) => !c.due_date)),
+    [visibleCards],
   );
 
   // Below this width the columns can be laid out one under another, if the
@@ -2160,7 +2163,13 @@ export function KanbanView({
           onUpdate={updateCard}
           onDuplicate={duplicateCard}
           onDelete={deleteCard}
-          onMove={moveCard}
+          onMove={(cardId, columnId, index) => {
+            // Sent to a stage of work, a dated card gives up its date so it
+            // actually lands there instead of staying in its day column.
+            const c = cards.find((x) => x.id === cardId);
+            moveCard(cardId, columnId, index);
+            if (c?.due_date) updateCard(cardId, { due_date: null });
+          }}
           onMoveToBoard={moveCardToBoard}
           boardTargets={boardTargets}
           onOpen={onOpenCard}

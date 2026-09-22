@@ -129,24 +129,48 @@ export function useKanban(boardIds) {
     if (error) await fetchAll();
   }, [fetchAll]);
 
-  /** The column goes; its cards go to the archive rather than with it. */
+  /**
+   * The column goes. A card with a date does not belong to a column any more —
+   * it lives in its day — so it only lets go of the column and stays on the
+   * board; the rest go to the archive, the way a deleted card does.
+   */
   const deleteColumn = useCallback(async (id) => {
-    const doomed = cardsRef.current.filter((c) => c.column_id === id);
+    const inColumn = cardsRef.current.filter((c) => c.column_id === id);
+    const dated = inColumn.filter((c) => c.due_date);
+    const plain = inColumn.filter((c) => !c.due_date);
     const stamp = new Date().toISOString();
     setColumns((prev) => prev.filter((c) => c.id !== id));
-    patchCards((prev) => prev.filter((c) => c.column_id !== id));
-    if (doomed.length > 0) {
+    // The dated ones stay, cut loose from the column; the rest leave the board.
+    patchCards((prev) => prev
+      .filter((c) => !(c.column_id === id && !c.due_date))
+      .map((c) => (c.column_id === id && c.due_date ? { ...c, column_id: null } : c)));
+    if (plain.length > 0) {
       setArchived((prev) => [
-        ...doomed.map((c) => ({ ...c, deleted_at: stamp, archived_column_id: id, column_id: null })),
+        ...plain.map((c) => ({ ...c, deleted_at: stamp, archived_column_id: id, column_id: null })),
         ...prev,
       ].sort(byDeletedAt));
-      // They have to leave the column before it is dropped, or the cascade
-      // takes them along.
-      const { error } = await supabase
+    }
+    // Everything has to stop pointing at the column before it is dropped, or
+    // the cascade takes it along. The dated cards merely let go of it; the
+    // undated ones are archived on their way out.
+    const writes = [];
+    if (dated.length > 0) {
+      writes.push(supabase
+        .from('kanban_cards')
+        .update({ column_id: null, updated_at: stamp })
+        .eq('column_id', id)
+        .not('due_date', 'is', null));
+    }
+    if (plain.length > 0) {
+      writes.push(supabase
         .from('kanban_cards')
         .update({ deleted_at: stamp, archived_column_id: id, column_id: null, updated_at: stamp })
-        .eq('column_id', id);
-      if (error) {
+        .eq('column_id', id)
+        .is('due_date', null));
+    }
+    if (writes.length > 0) {
+      const results = await Promise.all(writes);
+      if (results.some((r) => r.error)) {
         await fetchAll();
         return;
       }
@@ -195,16 +219,32 @@ export function useKanban(boardIds) {
   const updateCard = useCallback(async (id, patch) => {
     // A card given a new date has not been put anywhere in that day yet, so it
     // gives up the place it held in the old one and joins the end of the new.
-    const full = 'due_date' in patch && !('due_position' in patch)
+    let full = 'due_date' in patch && !('due_position' in patch)
       ? { ...patch, due_position: null }
       : patch;
+    // A card losing its date returns to the stage board. If the column it used
+    // to sit in has since been deleted, it joins the first one still standing,
+    // so it never ends up with neither a date nor a place to be seen in.
+    if ('due_date' in full && !full.due_date && !('column_id' in full)) {
+      const card = cardsRef.current.find((c) => c.id === id);
+      if (card && !card.column_id) {
+        const home = columns.filter((c) => c.board_id === card.board_id).sort(byPosition)[0];
+        if (home) {
+          full = {
+            ...full,
+            column_id: home.id,
+            position: nextPosition(cardsRef.current.filter((c) => c.column_id === home.id)),
+          };
+        }
+      }
+    }
     patchCards((prev) => prev.map((c) => (c.id === id ? { ...c, ...full } : c)));
     const { error } = await supabase
       .from('kanban_cards')
       .update({ ...full, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (error) await fetchAll();
-  }, [fetchAll, patchCards]);
+  }, [fetchAll, patchCards, columns]);
 
   /**
    * Lay out one day: `orderedIds` is every card due that day in the order they
@@ -356,7 +396,8 @@ export function useKanban(boardIds) {
       if (id === cardId) patch.column_id = columnId;
       writes.set(id, patch);
     });
-    if (fromColumnId !== columnId) {
+    // A dated card cut loose from its column has no old column to renumber.
+    if (fromColumnId && fromColumnId !== columnId) {
       all
         .filter((c) => c.column_id === fromColumnId && c.id !== cardId)
         .sort(byPosition)
