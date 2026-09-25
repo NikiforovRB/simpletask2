@@ -553,7 +553,7 @@ function CalendarDayColumn({
   completedVisible, recentCompletedIds, getListCollapsed, setListCollapsed,
   reputationPromises, reputationInCompleted, onUpdateReputation, onDeleteReputation,
   onUpdateTiming, onOpenModal, onAddTaskAt, onSetHours, onResetHours, taskHandlers,
-  onEventMenu, noDateList = null,
+  onEventMenu, noDateList = null, noDateDone = false,
 }) {
   const dateStr = toLocalDateString(date);
   const pxPerMin = hourHeight / 60;
@@ -591,15 +591,29 @@ function CalendarDayColumn({
     dayTasks.length,
   );
 
+  const byCompletion = (a, b) => {
+    const ca = a.completed_at || '';
+    const cb = b.completed_at || '';
+    return ca === cb ? (a.position ?? 0) - (b.position ?? 0) : (ca < cb ? -1 : 1);
+  };
+
   // Every completed task of the day, timed ones included: they keep their slot
   // on the timeline and are listed here as well, just like in Plans.
   const completedTasks = tasks
     .filter((t) => !t.parent_id && t.completed_at && t.scheduled_date === dateStr && (t.list_type || 'inbox') === 'inbox')
-    .sort((a, b) => {
-      const ca = a.completed_at || '';
-      const cb = b.completed_at || '';
-      return ca === cb ? (a.position ?? 0) - (b.position ?? 0) : (ca < cb ? -1 : 1);
-    });
+    .sort(byCompletion);
+
+  // The tasks without a date done on this day can be listed among them too.
+  // They stay without a date: their rows and drop slots keep the container of
+  // the no-date completed list, indexed the way that list is.
+  const noDateDoneAll = noDateDone
+    ? tasks
+      .filter((t) => !t.parent_id && t.completed_at && !t.scheduled_date && (t.list_type || 'inbox') === 'inbox')
+      .sort(byCompletion)
+    : [];
+  const completedItems = noDateDoneAll.length
+    ? [...completedTasks, ...noDateDoneAll.filter((t) => toLocalDateString(new Date(t.completed_at)) === dateStr)].sort(byCompletion)
+    : completedTasks;
 
   const completedKey = `completed_${dateStr}`;
   const completedOpen = getListCollapsed ? !getListCollapsed(completedKey) : true;
@@ -794,6 +808,7 @@ function CalendarDayColumn({
 
   const containerId = getContainerId(dateStr, null, false);
   const completedContainerId = getContainerId(dateStr, null, true);
+  const noDateCompletedContainerId = getContainerId(null, null, true);
 
   const laneLayout = layoutLanes(timedEvents);
 
@@ -860,7 +875,7 @@ function CalendarDayColumn({
             </SortableContext>
           </ul>
 
-          {completedVisible && (completedTasks.length > 0 || donePromises.length > 0) && (
+          {completedVisible && (completedItems.length > 0 || donePromises.length > 0) && (
             <div className="calendar-day__completed">
               <button type="button" className="calendar-day__completed-toggle" onClick={toggleCompleted}>
                 Выполненные задачи
@@ -876,13 +891,19 @@ function CalendarDayColumn({
                       />
                     </li>
                   ))}
-                  <SortableContext items={completedTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                    {completedTasks.map((task, i) => (
+                  <SortableContext items={completedItems.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                    {completedItems.map((task) => {
+                      const noDate = !task.scheduled_date;
+                      const itemContainerId = noDate ? noDateCompletedContainerId : completedContainerId;
+                      return (
                       <li key={task.id}>
-                        <DropSlot id={completedContainerId} index={i} />
+                        <DropSlot
+                          id={itemContainerId}
+                          index={noDate ? noDateDoneAll.indexOf(task) : completedTasks.indexOf(task)}
+                        />
                         <SortableTask
                           task={task}
-                          containerId={completedContainerId}
+                          containerId={itemContainerId}
                           subtasks={taskHandlers.getSubtasks(task.id)}
                           getSubtasks={taskHandlers.getSubtasks}
                           isCompleted
@@ -899,7 +920,8 @@ function CalendarDayColumn({
                           isRecentlyCompleted={recentCompletedIds?.has(task.id)}
                         />
                       </li>
-                    ))}
+                      );
+                    })}
                     <li><DropSlot id={completedContainerId} index={completedTasks.length} /></li>
                   </SortableContext>
                 </ul>
@@ -1014,7 +1036,7 @@ function CalendarDayColumn({
 
 export function CalendarView({
   days, tasks, scale = 1, showCheckboxes = false, twoColumns = false,
-  focusScale = false, focusColor = FOCUS_SEG_COLOR, showNoDate = true,
+  focusScale = false, focusColor = FOCUS_SEG_COLOR, showNoDate = true, noDateInCompleted = false,
   dayHours = {}, setDayHours, resetDayHours,
   completedVisible = true, recentCompletedIds, getListCollapsed, setListCollapsed,
   reputationByDate, reputationInCompleted = false, onUpdateReputation, onDeleteReputation,
@@ -1154,11 +1176,15 @@ export function CalendarView({
   };
 
   // One day on screen leaves room under its list for the tasks that still
-  // wait for a date, so they can be dragged into it.
-  const noDateList = days.length === 1 && showNoDate ? (
+  // wait for a date, so they can be dragged into it. Those done on the day can
+  // go to the day's completed list instead of one of their own.
+  const noDateShown = days.length === 1 && showNoDate;
+  const noDateDone = noDateShown && noDateInCompleted;
+  const noDateList = noDateShown ? (
     <NoDateList
       tasks={tasks}
       className="no-date-list--calendar"
+      collapseKey="no_date_calendar"
       visible
       onToggle={onToggle}
       onUpdate={updateTask}
@@ -1171,7 +1197,7 @@ export function CalendarView({
       onCreateSiblingTask={onCreateSiblingTask}
       onCreateSiblingSubtask={onCreateSiblingSubtask}
       onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
-      completedVisible={completedVisible}
+      completedVisible={completedVisible && !noDateDone}
       getListCollapsed={getListCollapsed}
       setListCollapsed={setListCollapsed}
     />
@@ -1213,6 +1239,7 @@ export function CalendarView({
               taskHandlers={taskHandlers}
               onEventMenu={openEventMenu}
               noDateList={noDateList}
+              noDateDone={noDateDone}
             />
           );
         })}

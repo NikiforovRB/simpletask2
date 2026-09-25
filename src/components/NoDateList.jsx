@@ -7,16 +7,21 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { DEFAULT_TASK_COLOR } from '../constants';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
+import eyeoffIcon from '../assets/eyeoff.svg';
 import './NoDateList.css';
 
 const NO_DATE_COMPLETED_KEY = 'completed_no_date';
 
-export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, editingTaskId, onEditingTaskConsumed, onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit, visible, completedVisible, getListCollapsed, setListCollapsed, className = '' }) {
+/** `collapseKey` makes the title fold the list; the state is kept under that key. */
+export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, editingTaskId, onEditingTaskConsumed, onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit, visible, completedVisible, getListCollapsed, setListCollapsed, className = '', collapseKey = null }) {
   const completedOpen = getListCollapsed ? !getListCollapsed(NO_DATE_COMPLETED_KEY) : true;
+  const collapsible = !!collapseKey && !!getListCollapsed;
+  const listOpen = collapsible ? !getListCollapsed(collapseKey) : true;
   const [plusHover, setPlusHover] = useState(false);
   const hasHover = useMediaQuery('(hover: hover)');
 
   const toggleCompleted = () => setListCollapsed?.(NO_DATE_COMPLETED_KEY, !getListCollapsed(NO_DATE_COMPLETED_KEY));
+  const toggleList = () => setListCollapsed?.(collapseKey, listOpen);
 
   const byParent = useMemo(() => {
     const map = new Map();
@@ -44,6 +49,8 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
   const getSubtasks = (parentId) => (byParent.get(parentId) || []).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
   const handleAddAtStart = () => {
+    // The new task opens for editing, so a folded list has to show it.
+    if (!listOpen) toggleList();
     onAddAtStart?.({ scheduled_date: null, text_color: DEFAULT_TASK_COLOR });
   };
 
@@ -52,12 +59,28 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
   return (
     <section className={`no-date-list ${className}`}>
       <div className="no-date-list__header">
-        <span className="no-date-list__title">Задачи без даты</span>
+        {collapsible ? (
+          <button
+            type="button"
+            className="no-date-list__title-btn"
+            onClick={toggleList}
+            aria-expanded={listOpen}
+            title={listOpen ? 'Свернуть список' : 'Развернуть список'}
+          >
+            <span className="no-date-list__title-inner">
+              Задачи без даты
+              {!listOpen && <img src={eyeoffIcon} alt="" className="no-date-list__collapsed-icon" />}
+            </span>
+          </button>
+        ) : (
+          <span className="no-date-list__title">Задачи без даты</span>
+        )}
         <button type="button" className="no-date-list__icon-btn no-date-list__icon-btn--plus" onMouseEnter={() => hasHover && setPlusHover(true)} onMouseLeave={() => hasHover && setPlusHover(false)} onClick={handleAddAtStart} aria-label="Добавить задачу">
           <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
         </button>
       </div>
       <div className="no-date-list__header-line" />
+      {listOpen && (
       <div className="no-date-list__body">
           <ul className="no-date-list__list">
             <SortableContext items={mainTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
@@ -120,6 +143,7 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
             </>
           )}
       </div>
+      )}
     </section>
   );
 }

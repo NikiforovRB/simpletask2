@@ -73,6 +73,7 @@ export function useSettings() {
     calendar_focus_scale: false,
     calendar_focus_color: FOCUS_SCALE_COLORS[0],
     calendar_show_no_date: true,
+    calendar_no_date_in_completed: false,
     focus_timer_show_total: false,
     show_reputation_in_lists: false,
     reputation_in_completed: false,
@@ -113,6 +114,7 @@ export function useSettings() {
           calendar_focus_scale: data.calendar_focus_scale === true,
           calendar_focus_color: normalizeFocusColor(data.calendar_focus_color),
           calendar_show_no_date: data.calendar_show_no_date !== false,
+          calendar_no_date_in_completed: data.calendar_no_date_in_completed === true,
           focus_timer_show_total: data.focus_timer_show_total === true,
           show_reputation_in_lists: data.show_reputation_in_lists === true,
           reputation_in_completed: data.reputation_in_completed === true,
@@ -152,6 +154,7 @@ export function useSettings() {
           calendar_focus_scale: false,
           calendar_focus_color: FOCUS_SCALE_COLORS[0],
           calendar_show_no_date: true,
+          calendar_no_date_in_completed: false,
           focus_timer_show_total: false,
           show_reputation_in_lists: false,
           reputation_in_completed: false,
@@ -287,6 +290,13 @@ export function useSettings() {
     await supabase.from('user_settings').update({ calendar_show_no_date: val }).eq('user_id', user.id);
   };
 
+  const setCalendarNoDateInCompleted = async (v) => {
+    if (!user) return;
+    const val = !!v;
+    setSettings((s) => ({ ...s, calendar_no_date_in_completed: val }));
+    await supabase.from('user_settings').update({ calendar_no_date_in_completed: val }).eq('user_id', user.id);
+  };
+
   const setFocusTimerShowTotal = async (v) => {
     if (!user) return;
     const val = !!v;
@@ -338,6 +348,7 @@ export function useSettings() {
     setCalendarFocusScale,
     setCalendarFocusColor,
     setCalendarShowNoDate,
+    setCalendarNoDateInCompleted,
     setFocusTimerShowTotal,
     setShowReputationInLists,
     setReputationInCompleted,

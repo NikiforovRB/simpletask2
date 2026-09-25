@@ -38,6 +38,19 @@
   color: var(--text-strong);
 }
 
+.no-date-list__title-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.no-date-list__collapsed-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
 .no-date-list__title {
   flex: 1;
   font-size: 0.9375rem;

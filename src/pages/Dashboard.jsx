@@ -395,6 +395,7 @@ export default function Dashboard() {
     setCalendarFocusScale,
     setCalendarFocusColor,
     setCalendarShowNoDate,
+    setCalendarNoDateInCompleted,
     setFocusTimerShowTotal,
     setShowReputationInLists,
     setReputationInCompleted,
@@ -2490,6 +2491,16 @@ export default function Dashboard() {
                 />
                 <span>Задачи без даты под списком дня (в режиме 1 день)</span>
               </label>
+              {settings.calendar_show_no_date && (
+                <label className="dashboard__settings-check">
+                  <input
+                    type="checkbox"
+                    checked={settings.calendar_no_date_in_completed}
+                    onChange={(e) => setCalendarNoDateInCompleted(e.target.checked)}
+                  />
+                  <span>Отображать задачи из списка «Задачи без даты» в списке выполненных задач</span>
+                </label>
+              )}
             </div>
 
             <div className="dashboard__settings-group">
@@ -2727,6 +2738,7 @@ export default function Dashboard() {
           focusScale={settings.calendar_focus_scale}
           focusColor={settings.calendar_focus_color}
           showNoDate={settings.calendar_show_no_date}
+          noDateInCompleted={settings.calendar_no_date_in_completed}
           dayHours={dayHours}
           setDayHours={setDayHours}
           resetDayHours={resetDayHours}
