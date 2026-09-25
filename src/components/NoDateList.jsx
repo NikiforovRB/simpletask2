@@ -11,7 +11,7 @@ import './NoDateList.css';
 
 const NO_DATE_COMPLETED_KEY = 'completed_no_date';
 
-export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, editingTaskId, onEditingTaskConsumed, onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit, visible, completedVisible, getListCollapsed, setListCollapsed }) {
+export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, onAddAtStart, onTaskContextMenu, editingTaskId, onEditingTaskConsumed, onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit, visible, completedVisible, getListCollapsed, setListCollapsed, className = '' }) {
   const completedOpen = getListCollapsed ? !getListCollapsed(NO_DATE_COMPLETED_KEY) : true;
   const [plusHover, setPlusHover] = useState(false);
   const hasHover = useMediaQuery('(hover: hover)');
@@ -50,7 +50,7 @@ export function NoDateList({ tasks, onToggle, onUpdate, onDelete, onAddSubtask, 
   if (!visible) return null;
 
   return (
-    <section className="no-date-list">
+    <section className={`no-date-list ${className}`}>
       <div className="no-date-list__header">
         <span className="no-date-list__title">Задачи без даты</span>
         <button type="button" className="no-date-list__icon-btn no-date-list__icon-btn--plus" onMouseEnter={() => hasHover && setPlusHover(true)} onMouseLeave={() => hasHover && setPlusHover(false)} onClick={handleAddAtStart} aria-label="Добавить задачу">

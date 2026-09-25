@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { toLocalDateString, formatDayLabel, TASK_COLORS, DEFAULT_TASK_COLOR } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useFocus } from '../contexts/FocusContext';
 import { CalendarPopover } from './CalendarPopover';
+import { NoDateList } from './NoDateList';
 import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
 import { CompletedReputationRow, SortableReputationRow } from './ReputationTaskRow';
@@ -15,6 +17,17 @@ import clockIcon from '../assets/times.svg';
 import clockNavIcon from '../assets/times-nav.svg';
 import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav2.svg';
+import deleteDangerIcon from '../assets/delete-danger.svg';
+import editIcon from '../assets/edit.svg';
+import checkIcon from '../assets/check.svg';
+import refreshIcon from '../assets/refresh.svg';
+import focusIcon from '../assets/focus.svg';
+import playIcon from '../assets/play.svg';
+import zavtraIcon from '../assets/zavtra.svg';
+import calendarIcon from '../assets/calendar.svg';
+import closeIcon from '../assets/close.svg';
+import layersIcon from '../assets/layers.svg';
+import copyIcon from '../assets/copy2.svg';
 import { DEFAULT_DAY_START_HOUR, DEFAULT_DAY_END_HOUR } from '../hooks/useCalendarDayHours';
 import './CalendarView.css';
 
@@ -28,6 +41,10 @@ const FOCUS_STRIP_GAP = 4;
 // Space the timeline gives up on the right when the focus scale is shown.
 const FOCUS_RIGHT_PAD = RIGHT_PAD + FOCUS_STRIP_W + FOCUS_STRIP_GAP;
 const FOCUS_SEG_COLOR = '#15c466';
+// The colours offered straight from the menu of a block, as for any task.
+const MENU_COLORS = ['#ffffff', '#f33737', '#666666', '#5a86ee', '#15c466'];
+const MENU_DURATIONS = [15, 30, 60, 90, 120];
+const MENU_SHIFTS = [-60, -15, 15, 60];
 
 const snap15 = (m) => Math.round(m / SNAP) * SNAP;
 const pad = (n) => String(n).padStart(2, '0');
@@ -45,6 +62,16 @@ const timeStrToMin = (t) => {
   return h * 60 + (m || 0);
 };
 const minToTimeStr = (min) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}:00`;
+/** "15 мин", "1 ч", "1,5 ч" — a stretch of time as the menu labels it. */
+const fmtSpan = (min) => {
+  const a = Math.abs(min);
+  return a < 60 ? `${a} мин` : `${String(a / 60).replace('.', ',')} ч`;
+};
+const addDays = (dateStr, n) => {
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return toLocalDateString(d);
+};
 
 const formatEventDate = (dateStr) => {
   const d = new Date(`${dateStr}T12:00:00`);
@@ -323,6 +350,158 @@ function EventModal({ event, onClose, onSave, onDelete }) {
   );
 }
 
+/**
+ * Right-click menu of a block on the timeline: what is done to a planned slot
+ * often enough not to open the task for it — its colour, how long it lasts,
+ * nudging it along the day, sending it to another day or off the timeline, a
+ * copy of it straight after, and getting rid of it. The colour, the length and
+ * the nudges leave the menu open, so a block can be walked into place.
+ */
+function EventContextMenu({ menu, task, actions, onClose }) {
+  const { x, y, windowStart, windowEnd } = menu;
+  const ref = useRef(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // Read here rather than by the calendar, which would otherwise re-render
+  // every tick of a running session; the menu is only there for a moment.
+  const { openFocus } = useFocus();
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { offsetWidth: w, offsetHeight: h } = el;
+    el.style.left = `${Math.max(8, Math.min(x, window.innerWidth - w - 8))}px`;
+    el.style.top = `${Math.max(8, Math.min(y, window.innerHeight - h - 8))}px`;
+    el.style.visibility = 'visible';
+  }, [x, y, pickerOpen]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const start = timeStrToMin(task.scheduled_time);
+  const end = task.scheduled_end_time ? timeStrToMin(task.scheduled_end_time) : start + 60;
+  const length = end - start;
+  const done = !!task.completed_at;
+  const color = (task.text_color || DEFAULT_TASK_COLOR).toLowerCase();
+  const isToday = task.scheduled_date === toLocalDateString(new Date());
+  const nowSlot = actions.nowSlot(length);
+
+  const item = (icon, label, onClick, extra = '') => (
+    <button type="button" className={`dashboard__context-menu-item ${extra}`} onClick={onClick}>
+      <img src={icon} alt="" className="dashboard__context-menu-item-icon" />
+      <span>{label}</span>
+    </button>
+  );
+  const then = (fn) => () => {
+    fn();
+    onClose();
+  };
+
+  return createPortal(
+    <>
+      <div
+        className="dashboard__context-menu-backdrop"
+        aria-hidden
+        onClick={onClose}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onClose();
+        }}
+      />
+      <div
+        ref={ref}
+        className="dashboard__context-menu calendar-menu"
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <div className="calendar-menu__head">
+          <span className="calendar-menu__time">{fmtMinutes(start)}–{fmtMinutes(end)}</span>
+          {task.title && <span className="calendar-menu__title">{task.title}</span>}
+        </div>
+        <div className="dashboard__context-menu-colors">
+          {MENU_COLORS.map((c) => (
+            <span
+              key={c}
+              className={`dashboard__context-menu-color-wrap${color === c ? ' dashboard__context-menu-color-wrap--selected' : ''}`}
+              style={{ '--swatch-color': c }}
+            >
+              <button
+                type="button"
+                className="dashboard__context-menu-color"
+                style={{ background: c }}
+                onClick={() => actions.color(task, c)}
+                aria-label={`Цвет ${c}`}
+              />
+            </span>
+          ))}
+        </div>
+        {item(editIcon, 'Открыть', then(() => actions.open(task)))}
+        {item(done ? refreshIcon : checkIcon, done ? 'Вернуть в работу' : 'Выполнено', then(() => actions.toggle(task)))}
+        {item(focusIcon, 'Сфокусироваться', then(() => openFocus({ ref: task.id, title: task.title, source: 'task' }, 'stopwatch')))}
+        <div className="dashboard__context-menu-separator" aria-hidden />
+
+        <div className="calendar-menu__group">
+          <span className="calendar-menu__group-title">Длительность</span>
+          <span className="calendar-menu__chips">
+            {MENU_DURATIONS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                className={`calendar-menu__chip${d === length ? ' calendar-menu__chip--on' : ''}`}
+                disabled={start + d > windowEnd}
+                onClick={() => actions.setTiming(task, start, start + d)}
+              >
+                {fmtSpan(d)}
+              </button>
+            ))}
+          </span>
+        </div>
+        <div className="calendar-menu__group">
+          <span className="calendar-menu__group-title">Сдвинуть</span>
+          <span className="calendar-menu__chips">
+            {MENU_SHIFTS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                className="calendar-menu__chip"
+                disabled={start + m < windowStart || end + m > windowEnd}
+                onClick={() => actions.setTiming(task, start + m, end + m)}
+              >
+                {`${m < 0 ? '−' : '+'}${fmtSpan(m)}`}
+              </button>
+            ))}
+          </span>
+        </div>
+        {nowSlot && item(playIcon, `Начать сейчас · ${fmtMinutes(nowSlot.start)}`, then(() => actions.startAt(task, nowSlot)))}
+        <div className="dashboard__context-menu-separator" aria-hidden />
+
+        {item(zavtraIcon, isToday ? 'На завтра' : 'На следующий день', then(() => actions.moveToDate(task, addDays(task.scheduled_date, 1))))}
+        {item(calendarIcon, 'Перенести на дату…', () => setPickerOpen((v) => !v), pickerOpen ? 'dashboard__context-menu-item--open' : '')}
+        {pickerOpen && (
+          <div className="calendar-menu__picker">
+            <CalendarPopover
+              value={task.scheduled_date}
+              onChange={(d) => actions.moveToDate(task, d)}
+              onClose={onClose}
+            />
+          </div>
+        )}
+        {item(closeIcon, 'Убрать время', then(() => actions.clearTime(task)))}
+        {item(layersIcon, 'В задачи без даты', then(() => actions.toNoDate(task)))}
+        <div className="dashboard__context-menu-separator" aria-hidden />
+
+        {item(copyIcon, 'Дублировать следом', then(() => actions.duplicate(task, windowEnd)))}
+        {item(deleteDangerIcon, 'Удалить', then(() => actions.remove(task)), 'dashboard__context-menu-item--danger')}
+      </div>
+    </>,
+    document.body,
+  );
+}
+
 // Vertical focus-session scale drawn beside the timeline. It reads the focus
 // context on its own so a ticking session re-renders only this strip.
 function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin, color = FOCUS_SEG_COLOR }) {
@@ -374,6 +553,7 @@ function CalendarDayColumn({
   completedVisible, recentCompletedIds, getListCollapsed, setListCollapsed,
   reputationPromises, reputationInCompleted, onUpdateReputation, onDeleteReputation,
   onUpdateTiming, onOpenModal, onAddTaskAt, onSetHours, onResetHours, taskHandlers,
+  onEventMenu, noDateList = null,
 }) {
   const dateStr = toLocalDateString(date);
   const pxPerMin = hourHeight / 60;
@@ -387,6 +567,9 @@ function CalendarDayColumn({
   const [, forceTick] = useReducer((x) => x + 1, 0);
   const hasHover = useMediaQuery('(hover: hover)');
   const [plusHover, setPlusHover] = useState(false);
+  // A long press on a block moves it, and some phones follow it up with a
+  // context menu of their own; the menu of a block is only for the mouse.
+  const lastPointerRef = useRef('mouse');
 
   // Drop slots and promise anchors are indexed against every open task of the
   // day, timed ones included, so they mean the same thing here as in Plans.
@@ -503,6 +686,7 @@ function CalendarDayColumn({
 
   const beginTimelineCreate = (e) => {
     if (e.target !== timelineRef.current) return; // only empty area
+    if (e.button !== 0) return; // the right button is for menus, not for new blocks
     // Touch: let the page scroll on a drag; create only on a clean tap.
     if (e.pointerType === 'touch') {
       const sx = e.clientX;
@@ -540,6 +724,9 @@ function CalendarDayColumn({
 
   const beginMove = (e, ev) => {
     e.stopPropagation();
+    lastPointerRef.current = e.pointerType;
+    // A right click opens the menu of the block instead of picking it up.
+    if (e.button !== 0) return;
     // Desktop / mouse: start dragging immediately.
     if (e.pointerType !== 'touch') {
       startMove(e.clientY, ev);
@@ -580,6 +767,8 @@ function CalendarDayColumn({
 
   const beginResize = (e, ev, edge) => {
     e.stopPropagation();
+    lastPointerRef.current = e.pointerType;
+    if (e.button !== 0) return;
     if (e.pointerType === 'touch' && timelineRef.current) timelineRef.current.style.touchAction = 'none';
     dragRef.current = {
       type: edge === 'top' ? 'resize-top' : 'resize-bottom',
@@ -717,6 +906,8 @@ function CalendarDayColumn({
               )}
             </div>
           )}
+
+          {noDateList}
         </div>
 
         <div
@@ -763,6 +954,12 @@ function CalendarDayColumn({
                 className={`calendar-event${ev.completed ? ' calendar-event--done' : ''}${isDragged ? ' calendar-event--dragging' : ''}`}
                 style={{ top, height, '--ev-color': ev.color, ...laneStyle }}
                 onPointerDown={(e) => beginMove(e, ev)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (lastPointerRef.current === 'touch' || !onEventMenu) return;
+                  onEventMenu(e, ev.task, dayStartMin, dayEndMin);
+                }}
               >
                 <div className="calendar-event__resize calendar-event__resize--top" onPointerDown={(e) => beginResize(e, ev, 'top')} />
                 <div className="calendar-event__body">
@@ -817,7 +1014,7 @@ function CalendarDayColumn({
 
 export function CalendarView({
   days, tasks, scale = 1, showCheckboxes = false, twoColumns = false,
-  focusScale = false, focusColor = FOCUS_SEG_COLOR,
+  focusScale = false, focusColor = FOCUS_SEG_COLOR, showNoDate = true,
   dayHours = {}, setDayHours, resetDayHours,
   completedVisible = true, recentCompletedIds, getListCollapsed, setListCollapsed,
   reputationByDate, reputationInCompleted = false, onUpdateReputation, onDeleteReputation,
@@ -863,6 +1060,123 @@ export function CalendarView({
     updateTask(id, { scheduled_time: minToTimeStr(startMin), scheduled_end_time: minToTimeStr(endMin) });
   };
 
+  // { taskId, x, y, windowStart, windowEnd } while a block's menu is open.
+  const [eventMenu, setEventMenu] = useState(null);
+  const menuTask = eventMenu ? tasks.find((t) => t.id === eventMenu.taskId && t.scheduled_time) : null;
+
+  /** The end of a list of the day: `dateStr` null for the tasks without a date. */
+  const nextPositionIn = (dateStr, completed) => {
+    const list = tasks.filter((t) => !t.parent_id
+      && (t.list_type || 'inbox') === 'inbox'
+      && (t.scheduled_date ?? null) === dateStr
+      && !!t.completed_at === completed);
+    return list.length ? Math.max(...list.map((t) => t.position ?? 0)) + 1 : 0;
+  };
+
+  const windowOf = (dateStr) => {
+    const custom = dayHours[dateStr];
+    return {
+      start: (custom?.start ?? DEFAULT_DAY_START_HOUR) * 60,
+      end: (custom?.end ?? DEFAULT_DAY_END_HOUR) * 60,
+    };
+  };
+
+  const menuActions = {
+    open: (task) => setEditingEvent(taskToEvent(task)),
+    toggle: (task) => onToggle(task),
+    color: (task, c) => updateTask(task.id, { text_color: c }),
+    setTiming: (task, s, e) => updateTiming(task.id, s, e),
+    /** Today's slot starting at the present quarter hour, if today's timeline has room for it. */
+    nowSlot: (length) => {
+      const now = new Date();
+      const date = toLocalDateString(now);
+      const win = windowOf(date);
+      const start = snap15(now.getHours() * 60 + now.getMinutes());
+      if (start < win.start || start + MIN_DURATION > win.end) return null;
+      return { date, start, end: Math.min(win.end, start + length) };
+    },
+    startAt: (task, slot) => updateTask(task.id, {
+      scheduled_time: minToTimeStr(slot.start),
+      scheduled_end_time: minToTimeStr(slot.end),
+      ...(slot.date !== task.scheduled_date
+        ? { scheduled_date: slot.date, position: nextPositionIn(slot.date, !!task.completed_at) }
+        : null),
+    }),
+    // A day of its own keeps the time of day the block had.
+    moveToDate: (task, dateStr) => {
+      if (!dateStr || dateStr === task.scheduled_date) return;
+      updateTask(task.id, { scheduled_date: dateStr, position: nextPositionIn(dateStr, !!task.completed_at) });
+    },
+    clearTime: (task) => updateTask(task.id, { scheduled_time: null, scheduled_end_time: null }),
+    toNoDate: (task) => updateTask(task.id, {
+      scheduled_date: null,
+      scheduled_time: null,
+      scheduled_end_time: null,
+      position: nextPositionIn(null, !!task.completed_at),
+    }),
+    // The copy takes the next slot of the same length, subtasks and all, or
+    // the same one when the day ends first. It starts out not done.
+    duplicate: async (task, windowEnd) => {
+      const s = timeStrToMin(task.scheduled_time);
+      const e = task.scheduled_end_time ? timeStrToMin(task.scheduled_end_time) : s + 60;
+      const fits = e + (e - s) <= windowEnd;
+      const copy = await addTask({
+        title: task.title,
+        text_color: task.text_color,
+        top_style: task.top_style ?? 0,
+        list_type: 'inbox',
+        scheduled_date: task.scheduled_date,
+        scheduled_time: minToTimeStr(fits ? e : s),
+        scheduled_end_time: minToTimeStr(fits ? e + (e - s) : e),
+        position: nextPositionIn(task.scheduled_date, false),
+      });
+      const copyChildren = async (fromId, toId) => {
+        for (const st of getSubtasks(fromId)) {
+          const made = await addTask({
+            title: st.title,
+            text_color: st.text_color,
+            top_style: st.top_style ?? 0,
+            list_type: 'inbox',
+            scheduled_date: task.scheduled_date,
+            parent_id: toId,
+            position: st.position ?? 0,
+          });
+          if (made?.id) await copyChildren(st.id, made.id);
+        }
+      };
+      if (copy?.id) await copyChildren(task.id, copy.id);
+    },
+    remove: (task) => deleteTask(task.id),
+  };
+
+  const openEventMenu = (e, task, windowStart, windowEnd) => {
+    setEventMenu({ taskId: task.id, x: e.clientX, y: e.clientY, windowStart, windowEnd });
+  };
+
+  // One day on screen leaves room under its list for the tasks that still
+  // wait for a date, so they can be dragged into it.
+  const noDateList = days.length === 1 && showNoDate ? (
+    <NoDateList
+      tasks={tasks}
+      className="no-date-list--calendar"
+      visible
+      onToggle={onToggle}
+      onUpdate={updateTask}
+      onDelete={deleteTask}
+      onAddSubtask={onAddSubtask}
+      onAddAtStart={onAddTaskAt}
+      onTaskContextMenu={onTaskContextMenu}
+      editingTaskId={editingTaskId}
+      onEditingTaskConsumed={onEditingTaskConsumed}
+      onCreateSiblingTask={onCreateSiblingTask}
+      onCreateSiblingSubtask={onCreateSiblingSubtask}
+      onCreateSubtaskAndEdit={onCreateSubtaskAndEdit}
+      completedVisible={completedVisible}
+      getListCollapsed={getListCollapsed}
+      setListCollapsed={setListCollapsed}
+    />
+  ) : null;
+
   return (
     <div className="calendar-view">
       <div className="calendar-view__days">
@@ -897,10 +1211,21 @@ export function CalendarView({
               onSetHours={setDayHours}
               onResetHours={resetDayHours}
               taskHandlers={taskHandlers}
+              onEventMenu={openEventMenu}
+              noDateList={noDateList}
             />
           );
         })}
       </div>
+
+      {menuTask && (
+        <EventContextMenu
+          menu={eventMenu}
+          task={menuTask}
+          actions={menuActions}
+          onClose={() => setEventMenu(null)}
+        />
+      )}
 
       {editingEvent && (
         <EventModal

@@ -72,6 +72,7 @@ export function useSettings() {
     calendar_two_columns: false,
     calendar_focus_scale: false,
     calendar_focus_color: FOCUS_SCALE_COLORS[0],
+    calendar_show_no_date: true,
     focus_timer_show_total: false,
     show_reputation_in_lists: false,
     reputation_in_completed: false,
@@ -111,6 +112,7 @@ export function useSettings() {
           calendar_two_columns: data.calendar_two_columns === true,
           calendar_focus_scale: data.calendar_focus_scale === true,
           calendar_focus_color: normalizeFocusColor(data.calendar_focus_color),
+          calendar_show_no_date: data.calendar_show_no_date !== false,
           focus_timer_show_total: data.focus_timer_show_total === true,
           show_reputation_in_lists: data.show_reputation_in_lists === true,
           reputation_in_completed: data.reputation_in_completed === true,
@@ -149,6 +151,7 @@ export function useSettings() {
           calendar_two_columns: false,
           calendar_focus_scale: false,
           calendar_focus_color: FOCUS_SCALE_COLORS[0],
+          calendar_show_no_date: true,
           focus_timer_show_total: false,
           show_reputation_in_lists: false,
           reputation_in_completed: false,
@@ -277,6 +280,13 @@ export function useSettings() {
     await supabase.from('user_settings').update({ calendar_focus_color: val }).eq('user_id', user.id);
   };
 
+  const setCalendarShowNoDate = async (v) => {
+    if (!user) return;
+    const val = !!v;
+    setSettings((s) => ({ ...s, calendar_show_no_date: val }));
+    await supabase.from('user_settings').update({ calendar_show_no_date: val }).eq('user_id', user.id);
+  };
+
   const setFocusTimerShowTotal = async (v) => {
     if (!user) return;
     const val = !!v;
@@ -327,6 +337,7 @@ export function useSettings() {
     setCalendarTwoColumns,
     setCalendarFocusScale,
     setCalendarFocusColor,
+    setCalendarShowNoDate,
     setFocusTimerShowTotal,
     setShowReputationInLists,
     setReputationInCompleted,

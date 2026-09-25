@@ -394,6 +394,7 @@ export default function Dashboard() {
     setCalendarTwoColumns,
     setCalendarFocusScale,
     setCalendarFocusColor,
+    setCalendarShowNoDate,
     setFocusTimerShowTotal,
     setShowReputationInLists,
     setReputationInCompleted,
@@ -2481,6 +2482,14 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+              <label className="dashboard__settings-check">
+                <input
+                  type="checkbox"
+                  checked={settings.calendar_show_no_date}
+                  onChange={(e) => setCalendarShowNoDate(e.target.checked)}
+                />
+                <span>Задачи без даты под списком дня (в режиме 1 день)</span>
+              </label>
             </div>
 
             <div className="dashboard__settings-group">
@@ -2717,6 +2726,7 @@ export default function Dashboard() {
           twoColumns={settings.calendar_two_columns}
           focusScale={settings.calendar_focus_scale}
           focusColor={settings.calendar_focus_color}
+          showNoDate={settings.calendar_show_no_date}
           dayHours={dayHours}
           setDayHours={setDayHours}
           resetDayHours={resetDayHours}

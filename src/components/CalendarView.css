@@ -245,6 +245,105 @@
   margin-top: 12px;
 }
 
+/* The tasks without a date, under the list of a single day. The list of the
+   day already keeps its distance from the timeline. */
+.calendar-day .no-date-list--calendar {
+  margin-top: 50px;
+  padding-bottom: 0;
+}
+
+/* The menu of a block on the timeline. */
+.calendar-menu {
+  visibility: hidden;
+  left: 0;
+  top: 0;
+  min-width: 240px;
+  max-width: min(20rem, calc(100vw - 1rem));
+  max-height: calc(100vh - 1rem);
+  overflow-y: auto;
+}
+
+.calendar-menu__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.45rem 0.75rem 0.1rem;
+  font-size: 0.8125rem;
+}
+
+.calendar-menu__time {
+  flex-shrink: 0;
+  color: var(--text-primary);
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-menu__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.calendar-menu__group {
+  display: block;
+  padding: 0.35rem 0.75rem 0.3rem;
+}
+
+.calendar-menu__group-title {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  opacity: 0.45;
+  margin-bottom: 0.3rem;
+}
+
+.calendar-menu__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.calendar-menu__chip {
+  padding: 0.2rem 0.45rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.calendar-menu__chip:hover:not(:disabled) {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+.calendar-menu__chip--on {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.calendar-menu__chip:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.calendar-menu__picker {
+  padding: 0.1rem 0.5rem 0.35rem;
+}
+
+.calendar-menu__picker .calendar-popover {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+}
+
 .calendar-day__timeline {
   position: relative;
   width: 100%;
