@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useDndMonitor, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { toLocalDateString, formatDayLabel, TASK_COLORS, DEFAULT_TASK_COLOR } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -10,7 +11,7 @@ import { SortableTask } from './SortableTask';
 import { DropSlot } from './DropSlot';
 import { CompletedReputationRow, SortableReputationRow } from './ReputationTaskRow';
 import { mergeDayItems, splitDonePromises } from '../lib/dayItems';
-import { getContainerId } from '../lib/dnd';
+import { getContainerId, getTimelineDropId, parseTimelineDropId } from '../lib/dnd';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import clockIcon from '../assets/times.svg';
@@ -66,6 +67,12 @@ const minToTimeStr = (min) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}:00`
 const fmtSpan = (min) => {
   const a = Math.abs(min);
   return a < 60 ? `${a} мин` : `${String(a / 60).replace('.', ',')} ч`;
+};
+/** How long a task lasts on the timeline: its own slot, or an hour without one. */
+const spanOf = (task) => {
+  const s = timeStrToMin(task.scheduled_time);
+  const e = timeStrToMin(task.scheduled_end_time);
+  return s != null && e != null && e > s ? e - s : 60;
 };
 const addDays = (dateStr, n) => {
   const d = new Date(`${dateStr}T12:00:00`);
@@ -548,6 +555,36 @@ function FocusStrip({ dateStr, dayStartMin, dayEndMin, pxPerMin, color = FOCUS_S
   );
 }
 
+/** Where a task dragged over the timeline would land; it follows the pointer. */
+function TimelineDropGhost({ slotAt, length, dayStartMin, pxPerMin, task }) {
+  const [clientY, setClientY] = useState(null);
+  useEffect(() => {
+    const onMove = (e) => setClientY(e.clientY);
+    window.addEventListener('pointermove', onMove);
+    return () => window.removeEventListener('pointermove', onMove);
+  }, []);
+  if (clientY == null) return null;
+  const { start, end } = slotAt(clientY, length);
+  return (
+    <div
+      className="calendar-event calendar-event--drop"
+      style={{
+        top: (start - dayStartMin) * pxPerMin,
+        height: Math.max(4, (end - start) * pxPerMin),
+        '--ev-color': task.text_color || DEFAULT_TASK_COLOR,
+      }}
+      aria-hidden
+    >
+      <div className="calendar-event__body">
+        <span className="calendar-event__label">
+          <span className="calendar-event__time">{fmtMinutes(start)}–{fmtMinutes(end)}</span>
+          {task.title ? <> • {task.title}</> : null}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function CalendarDayColumn({
   date, tasks, startHour, endHour, customHours, hourHeight, now, showCheckboxes, twoColumns, focusScale, focusColor,
   completedVisible, recentCompletedIds, getListCollapsed, setListCollapsed,
@@ -636,6 +673,19 @@ function CalendarDayColumn({
     const m = snap15(dayStartMin + y / pxPerMin);
     return Math.max(dayStartMin, Math.min(dayEndMin, m));
   };
+
+  // A task dropped from a list starts under the pointer and keeps its length,
+  // pulled back up if the day ends first.
+  const slotAt = (clientY, length) => {
+    const len = Math.min(length, dayEndMin - dayStartMin);
+    const start = Math.min(clientYToMinute(clientY), dayEndMin - len);
+    return { start, end: start + len };
+  };
+  const { setNodeRef: setDropRef, isOver: dropOver, active: dropActive } = useDroppable({
+    id: getTimelineDropId(dateStr),
+    data: { slotAt },
+  });
+  const dropTask = dropOver ? tasks.find((t) => t.id === dropActive?.id) : null;
 
   useEffect(() => {
     if (!dragging) return undefined;
@@ -812,8 +862,7 @@ function CalendarDayColumn({
 
   const laneLayout = layoutLanes(timedEvents);
 
-  return (
-    <section className={`calendar-day${twoColumns ? ' calendar-day--split' : ''}`}>
+  const header = (
       <div className="calendar-day__header">
         <span className="calendar-day__title">{formatDayLabel(dateStr)}</span>
         <DayHoursButton
@@ -834,9 +883,17 @@ function CalendarDayColumn({
           <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
         </button>
       </div>
+  );
+
+  // With the timeline in a column of its own the day's title heads the lists,
+  // so the timeline starts at the top.
+  return (
+    <section className={`calendar-day${twoColumns ? ' calendar-day--split' : ''}`}>
+      {!twoColumns && header}
 
       <div className="calendar-day__body">
         <div className="calendar-day__lists">
+          {twoColumns && header}
           <ul className="calendar-day__notime">
             <SortableContext items={dayItems.map((it) => it.dndId)} strategy={verticalListSortingStrategy}>
               {dayItems.map((item) => (
@@ -934,7 +991,7 @@ function CalendarDayColumn({
 
         <div
           className={`calendar-day__timeline${focusScale ? ' calendar-day__timeline--focus' : ''}`}
-          ref={timelineRef}
+          ref={(el) => { timelineRef.current = el; setDropRef(el); }}
           style={{ height: timelineHeight }}
           onPointerDown={beginTimelineCreate}
         >
@@ -1018,6 +1075,16 @@ function CalendarDayColumn({
             const height = Math.max(4, (e2 - s) * pxPerMin);
             return <div className="calendar-event calendar-event--preview" style={{ top, height }} />;
           })()}
+
+          {dropTask && (
+            <TimelineDropGhost
+              slotAt={slotAt}
+              length={spanOf(dropTask)}
+              dayStartMin={dayStartMin}
+              pxPerMin={pxPerMin}
+              task={dropTask}
+            />
+          )}
 
           {focusScale && (
             <FocusStrip
@@ -1174,6 +1241,48 @@ export function CalendarView({
   const openEventMenu = (e, task, windowStart, windowEnd) => {
     setEventMenu({ taskId: task.id, x: e.clientX, y: e.clientY, windowStart, windowEnd });
   };
+
+  // A task dragged from a list onto a day's timeline takes the slot under the
+  // pointer; one from another list or day moves to the end of that day's list.
+  const dragPointerRef = useRef(null);
+  const trackPointer = useCallback((e) => {
+    dragPointerRef.current = { x: e.clientX, y: e.clientY };
+  }, []);
+  useEffect(() => () => window.removeEventListener('pointermove', trackPointer), [trackPointer]);
+
+  const placeOnTimeline = (task, date, start, end) => {
+    const patch = { scheduled_time: minToTimeStr(start), scheduled_end_time: minToTimeStr(end) };
+    if (task.parent_id || (task.list_type || 'inbox') !== 'inbox' || task.scheduled_date !== date) {
+      Object.assign(patch, {
+        scheduled_date: date,
+        parent_id: null,
+        list_type: 'inbox',
+        project_id: null,
+        position: nextPositionIn(date, !!task.completed_at),
+      });
+    }
+    updateTask(task.id, patch);
+  };
+
+  useDndMonitor({
+    onDragStart: ({ activatorEvent }) => {
+      dragPointerRef.current = activatorEvent && 'clientY' in activatorEvent
+        ? { x: activatorEvent.clientX, y: activatorEvent.clientY }
+        : null;
+      window.addEventListener('pointermove', trackPointer);
+    },
+    onDragEnd: ({ active, over }) => {
+      window.removeEventListener('pointermove', trackPointer);
+      const date = parseTimelineDropId(over?.id);
+      const task = date != null ? tasks.find((t) => t.id === active.id) : null;
+      const slotAt = over?.data.current?.slotAt;
+      const pointer = dragPointerRef.current;
+      if (!task || !slotAt || !pointer) return;
+      const { start, end } = slotAt(pointer.y, spanOf(task));
+      placeOnTimeline(task, date, start, end);
+    },
+    onDragCancel: () => window.removeEventListener('pointermove', trackPointer),
+  });
 
   // One day on screen leaves room under its list for the tasks that still
   // wait for a date, so they can be dragged into it. Those done on the day can

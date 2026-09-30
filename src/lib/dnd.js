@@ -1,3 +1,5 @@
+import { closestCenter } from '@dnd-kit/core';
+
 /**
  * Container ID formats:
  * - main-{date}|completed-{date} — inbox by date (date can be "null" for no-date)
@@ -44,6 +46,39 @@ export function parseContainerId(containerId) {
     };
   }
   return null;
+}
+
+const TIMELINE_PREFIX = 'timeline::';
+
+/** The timeline of a calendar day as a drop target: a task dropped on it gets a slot there. */
+export function getTimelineDropId(date) {
+  return `${TIMELINE_PREFIX}${date}`;
+}
+
+/** The date of a timeline drop target, or null for any other target. */
+export function parseTimelineDropId(id) {
+  if (typeof id !== 'string' || !id.startsWith(TIMELINE_PREFIX)) return null;
+  return id.slice(TIMELINE_PREFIX.length);
+}
+
+/**
+ * A day's timeline is too tall a target for the closest-center rule: it takes
+ * whatever is dropped with the pointer on it, the lists take the rest.
+ */
+export function timelineAwareCollision(args) {
+  const p = args.pointerCoordinates;
+  const listTargets = [];
+  for (const container of args.droppableContainers) {
+    if (parseTimelineDropId(container.id) == null) {
+      listTargets.push(container);
+      continue;
+    }
+    const r = p && container.node.current?.getBoundingClientRect();
+    if (r && p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom) {
+      return [{ id: container.id, data: { droppableContainer: container, value: 0 } }];
+    }
+  }
+  return closestCenter({ ...args, droppableContainers: listTargets });
 }
 
 /** For date-based inbox lists and subtasks. */

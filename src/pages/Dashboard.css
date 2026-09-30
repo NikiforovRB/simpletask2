@@ -404,6 +404,14 @@
   object-fit: contain;
 }
 
+.dashboard__context-menu-item-hint {
+  margin-left: auto;
+  padding-left: 0.75rem;
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .dashboard__context-menu-item:hover,
 .dashboard__context-menu-item--open {
   background: var(--bg-hover-strong);

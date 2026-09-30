@@ -180,7 +180,7 @@
     align-items: flex-start;
     /* Row gap + the timeline's own top margin keep the stacked spacing at 45px
        once the timeline wraps back under the list. */
-    row-gap: 25px;
+    row-gap: calc(45px - 2.35rem);
     column-gap: 1.25rem;
   }
 
@@ -190,11 +190,13 @@
     margin-bottom: 0;
   }
 
+  /* The day's title heads the lists here; the first hour line continues the
+     line under it (buttons 1.75rem + 0.6rem of padding). */
   .calendar-day--split .calendar-day__timeline {
     flex: 1 1 260px;
     min-width: 240px;
     width: auto;
-    margin-top: 20px;
+    margin-top: 2.35rem;
   }
 }
 
@@ -564,6 +566,15 @@
   border-left: 3px solid var(--accent);
   pointer-events: none;
   opacity: 0.8;
+}
+
+/* The slot a task dragged in from a list would take. */
+.calendar-event--drop {
+  z-index: 7;
+  pointer-events: none;
+  outline: 1px dashed var(--ev-color, #5a86ee);
+  outline-offset: -1px;
+  background: color-mix(in srgb, var(--ev-color, #5a86ee) 16%, transparent);
 }
 
 /* Event settings modal */

@@ -38,7 +38,7 @@ import { supabase } from '../lib/supabase';
 import { useTasks } from '../hooks/useTasks';
 import { useSettings, FOCUS_SCALE_COLORS } from '../hooks/useSettings';
 import { useListCollapsed } from '../hooks/useListCollapsed';
-import { useCalendarDayHours } from '../hooks/useCalendarDayHours';
+import { useCalendarDayHours, DEFAULT_DAY_START_HOUR, DEFAULT_DAY_END_HOUR } from '../hooks/useCalendarDayHours';
 import { useReputation } from '../hooks/useReputation';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useProjects } from '../hooks/useProjects';
@@ -55,6 +55,7 @@ import { KanbanCardPanel } from '../components/KanbanCardPanel';
 import { MindMapView } from '../components/MindMapView';
 import { GoalPlanView } from '../components/GoalPlanView';
 import { CalendarView } from '../components/CalendarView';
+import { TaskTimePanel } from '../components/TaskTimePanel';
 import { TodayFocusTotal, FocusQuickStart } from '../components/TodayFocusTotal';
 import { ReputationView } from '../components/ReputationView';
 import { ReputationTaskRow } from '../components/ReputationTaskRow';
@@ -66,7 +67,7 @@ import { FocusAnalytics } from '../components/FocusAnalytics';
 import { useFocus } from '../contexts/FocusContext';
 import { useReminderScheduler } from '../hooks/useReminderScheduler';
 import { registerReminderServiceWorker } from '../lib/reminders';
-import { getContainerId, getContainerIdForBucket, getContainerIdFromTask, parseContainerId } from '../lib/dnd';
+import { getContainerId, getContainerIdForBucket, getContainerIdFromTask, parseContainerId, parseTimelineDropId, timelineAwareCollision } from '../lib/dnd';
 import { anchorForIndex, mergeDayItems, parseRepDndId, splitDonePromises } from '../lib/dayItems';
 import { toLocalDateString } from '../constants';
 import { parseSlotId } from '../components/DropSlot';
@@ -119,6 +120,7 @@ import editNavIcon from '../assets/edit-nav.svg';
 import deleteNavIcon from '../assets/delete-nav2.svg';
 import zavtraIcon from '../assets/zavtra.svg';
 import poslezavtraIcon from '../assets/poslezavtra.svg';
+import timesIcon from '../assets/times.svg';
 import privIcon from '../assets/priv.svg';
 import privNavIcon from '../assets/priv-nav.svg';
 import focusIcon from '../assets/focus.svg';
@@ -1019,6 +1021,12 @@ export default function Dashboard() {
         const position = targetList.length ? Math.max(...targetList.map((t) => t.position ?? 0)) + 1 : 0;
         return { list_type: 'inbox', project_id: null, scheduled_date: dateStr, parent_id: null, position, completed_at };
       }
+      if (destination.type === 'date' && destination.date) {
+        const containerId = getContainerId(destination.date, null, !!completed_at);
+        const targetList = getTasksInContainer(tasks, containerId);
+        const position = targetList.length ? Math.max(...targetList.map((t) => t.position ?? 0)) + 1 : 0;
+        return { list_type: 'inbox', project_id: null, scheduled_date: destination.date, parent_id: null, position, completed_at };
+      }
       if (destination.type === 'plans' || destination.type === 'no_date') {
         const containerId = getContainerId(null, null, !!completed_at);
         const targetList = getTasksInContainer(tasks, containerId);
@@ -1062,6 +1070,42 @@ export default function Dashboard() {
     deleteTask(contextMenu.task.id);
     setContextMenu(null);
   }, [contextMenu, deleteTask]);
+
+  // A timed task is a block on the day's timeline: one from another list or
+  // day moves to the end of that day's list, like with "Сегодня" / "Завтра".
+  const handleAssignTime = useCallback(
+    ({ date, start, end }) => {
+      const task = contextMenu?.task;
+      if (!task) return;
+      const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`;
+      const times = { scheduled_time: hhmm(start), scheduled_end_time: hhmm(end) };
+      const staysPut = !task.parent_id && (task.list_type || 'inbox') === 'inbox' && task.scheduled_date === date;
+      if (staysPut) {
+        updateTask(task.id, times);
+      } else {
+        const payload = getTargetPayload({ type: 'date', date });
+        const sourceContainerId = getContainerIdFromTask(task);
+        updateTask(task.id, { ...payload, ...times });
+        const sourceList = getTasksInContainer(tasks, sourceContainerId).filter((t) => t.id !== task.id);
+        sourceList.forEach((t, i) => updateTask(t.id, { position: i }));
+      }
+      // The timeline draws only the hours of its scale, so it widens to the block.
+      const custom = dayHours[date];
+      const fromHour = custom?.start ?? DEFAULT_DAY_START_HOUR;
+      const toHour = custom?.end ?? DEFAULT_DAY_END_HOUR;
+      const needFrom = Math.min(fromHour, Math.floor(start / 60));
+      const needTo = Math.max(toHour, Math.ceil(end / 60));
+      if (needFrom !== fromHour || needTo !== toHour) setDayHours(date, needFrom, needTo);
+      setContextMenu(null);
+    },
+    [contextMenu, getTargetPayload, tasks, updateTask, dayHours, setDayHours]
+  );
+
+  const handleClearTime = useCallback(() => {
+    if (!contextMenu?.task) return;
+    updateTask(contextMenu.task.id, { scheduled_time: null, scheduled_end_time: null });
+    setContextMenu(null);
+  }, [contextMenu, updateTask]);
 
   const handleContextMenuColor = useCallback((textColor) => {
     if (!contextMenu?.task) return;
@@ -1378,6 +1422,8 @@ export default function Dashboard() {
         return;
       }
       if (!over) return;
+      // The calendar gives a task dropped on a day's timeline its slot there.
+      if (parseTimelineDropId(over.id) != null) return;
       const droppedBelowMiddle = () => {
         const translated = active.rect.current.translated;
         const overMiddleY = over.rect.top + over.rect.height / 2;
@@ -1502,7 +1548,6 @@ export default function Dashboard() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
-
   const handleDragStart = useCallback(
     (event) => {
       if (habits.some((h) => h.id === event.active.id)) {
@@ -1680,7 +1725,7 @@ export default function Dashboard() {
   );
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
+    <DndContext sensors={sensors} collisionDetection={timelineAwareCollision} onDragStart={handleDragStart} onDragEnd={handleDragEndWithClear}>
     <div
       className={`dashboard ${menuOpen && isWideMenu ? 'dashboard--menu-open' : ''} ${viewMode === 'habits' ? 'dashboard--habits' : ''} ${viewMode === 'board' ? 'dashboard--board' : ''} ${viewMode === 'board' && !activeBoardId ? 'dashboard--board-pdf-only' : ''} ${viewMode === 'kanban' ? 'dashboard--kanban' : ''} ${viewMode === 'mindmap' ? 'dashboard--mindmap' : ''} ${viewMode === 'goal_plan' ? 'dashboard--goal-plan' : ''}`}
       style={{
@@ -2335,6 +2380,16 @@ export default function Dashboard() {
             style={{ left: contextMenu.x, top: contextMenu.y }}
             onClick={(e) => e.stopPropagation()}
           >
+            {contextMenu.timeOpen ? (
+              <TaskTimePanel
+                task={contextMenu.task}
+                defaultDate={viewMode === 'calendar' && days.length === 1 ? toLocalDateString(days[0]) : undefined}
+                onApply={handleAssignTime}
+                onClearTime={contextMenu.task.scheduled_time ? handleClearTime : undefined}
+                onBack={() => setContextMenu((prev) => (prev ? { ...prev, timeOpen: false } : prev))}
+              />
+            ) : (
+            <>
             <div className="dashboard__context-menu-colors">
               {[
                 '#ffffff',
@@ -2379,6 +2434,20 @@ export default function Dashboard() {
               <img src={poslezavtraIcon} alt="" className="dashboard__context-menu-item-icon" />
               <span>Послезавтра</span>
             </button>
+            <button
+              type="button"
+              className="dashboard__context-menu-item"
+              onClick={() => setContextMenu((prev) => (prev ? { ...prev, timeOpen: true } : prev))}
+            >
+              <img src={timesIcon} alt="" className="dashboard__context-menu-item-icon" />
+              <span>Назначить время</span>
+              {contextMenu.task.scheduled_time && (
+                <span className="dashboard__context-menu-item-hint">
+                  {String(contextMenu.task.scheduled_time).slice(0, 5)}
+                  {contextMenu.task.scheduled_end_time ? `–${String(contextMenu.task.scheduled_end_time).slice(0, 5)}` : ''}
+                </span>
+              )}
+            </button>
             <div className="dashboard__context-menu-separator" aria-hidden />
             <button type="button" className="dashboard__context-menu-item" onClick={() => handleMoveTaskToDestination({ type: 'no_date' })}>
               <img src={layersIcon} alt="" className="dashboard__context-menu-item-icon" />
@@ -2403,6 +2472,8 @@ export default function Dashboard() {
               <img src={deleteNavIcon} alt="" className="dashboard__context-menu-item-icon" />
               <span>Удалить</span>
             </button>
+            </>
+            )}
           </div>
         </>
       )}
