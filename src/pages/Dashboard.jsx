@@ -39,6 +39,7 @@ import { useTasks } from '../hooks/useTasks';
 import { useSettings, FOCUS_SCALE_COLORS } from '../hooks/useSettings';
 import { useListCollapsed } from '../hooks/useListCollapsed';
 import { useCalendarDayHours, DEFAULT_DAY_START_HOUR, DEFAULT_DAY_END_HOUR } from '../hooks/useCalendarDayHours';
+import { useCarryOverTasks } from '../hooks/useCarryOverTasks';
 import { useReputation } from '../hooks/useReputation';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useProjects } from '../hooks/useProjects';
@@ -376,7 +377,7 @@ function SortableProjectItem({ project, isActive, isHover, iconDefault, iconHove
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
-  const { tasks, addTask, updateTask, deleteTask, toggleComplete, moveTask } = useTasks();
+  const { tasks, loading: tasksLoading, addTask, updateTask, deleteTask, toggleComplete, moveTask } = useTasks();
   const focus = useFocus();
   const {
     settings,
@@ -398,12 +399,23 @@ export default function Dashboard() {
     setCalendarFocusColor,
     setCalendarShowNoDate,
     setCalendarNoDateInCompleted,
+    setCalendarCarryOver,
     setFocusTimerShowTotal,
     setShowReputationInLists,
     setReputationInCompleted,
     setKanbanDateFilter,
+    loading: settingsLoading,
   } = useSettings();
-  const { dayHours, setDayHours, resetDayHours } = useCalendarDayHours();
+  const { dayHours, setDayHours, resetDayHours, loaded: dayHoursLoaded } = useCalendarDayHours();
+  useCarryOverTasks({
+    enabled: settings.calendar_carry_over,
+    ready: !tasksLoading && !settingsLoading && dayHoursLoaded,
+    userId: user?.id,
+    tasks,
+    updateTask,
+    dayHours,
+    setDayHours,
+  });
   const { getCollapsed: getListCollapsed, setCollapsed: setListCollapsed } = useListCollapsed();
   const {
     promises: reputationPromises,
@@ -2554,6 +2566,14 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+              <label className="dashboard__settings-check">
+                <input
+                  type="checkbox"
+                  checked={settings.calendar_carry_over}
+                  onChange={(e) => setCalendarCarryOver(e.target.checked)}
+                />
+                <span>Переносить все невыполненные задачи на сегодня</span>
+              </label>
               <label className="dashboard__settings-check">
                 <input
                   type="checkbox"

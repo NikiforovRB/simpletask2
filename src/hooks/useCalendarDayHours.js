@@ -18,6 +18,9 @@ const clamp = (n, min, max, fallback) => {
 export function useCalendarDayHours() {
   const { user } = useAuth();
   const [byDate, setByDate] = useState({});
+  // Set once the first fetch is over, so nothing widens a day from defaults
+  // that stand in for hours not loaded yet.
+  const [loaded, setLoaded] = useState(false);
 
   const fetchHours = useCallback(async () => {
     if (!user) return;
@@ -25,6 +28,7 @@ export function useCalendarDayHours() {
       .from('calendar_day_hours')
       .select('day_date, start_hour, end_hour')
       .eq('user_id', user.id);
+    setLoaded(true);
     if (error) return;
     const map = {};
     for (const row of data || []) {
@@ -82,5 +86,5 @@ export function useCalendarDayHours() {
     [user?.id, fetchHours],
   );
 
-  return { dayHours: byDate, getDayHours, setDayHours, resetDayHours };
+  return { dayHours: byDate, getDayHours, setDayHours, resetDayHours, loaded };
 }
