@@ -1,0 +1,315 @@
+.food {
+  color-scheme: dark;
+  padding-bottom: 40px;
+}
+
+[data-theme="light"] .food {
+  color-scheme: light;
+}
+
+.food__days {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (min-width: 501px) {
+  .food__days {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  /* A meal is read across its row, from the time to the calories; past this
+     width the two ends drift too far apart. */
+  .food-day {
+    flex: 1 1 400px;
+    min-width: 400px;
+    max-width: 640px;
+  }
+}
+
+.food__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  max-width: 640px;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.food__error-close {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.food__error-close img {
+  width: 1rem;
+  height: 1rem;
+}
+
+.food-day {
+  min-width: 0;
+}
+
+.food-day__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 1.75rem;
+}
+
+.food-day__title {
+  font-size: 0.9375rem;
+  color: var(--text-dim);
+}
+
+.food-day__total {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.food-day__line {
+  margin-top: 15px;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--divider);
+}
+
+.food-day__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.food-day__list li {
+  margin: 0;
+  padding: 0;
+}
+
+.food-meal {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+  column-gap: 0.75rem;
+  align-items: baseline;
+  box-sizing: border-box;
+  width: calc(100% + 1rem);
+  margin: 0 -0.5rem;
+  padding: 0.3rem 0.5rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+@media (hover: hover) {
+  .food-meal:hover {
+    background: var(--bg-hover);
+  }
+}
+
+.food-meal:focus-visible {
+  outline: none;
+  background: var(--bg-hover-strong);
+}
+
+.food-meal__time {
+  font-size: 0.875rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.food-meal__comment {
+  min-width: 0;
+  font-family: 'Gilroy Task', 'Gilroy', system-ui, sans-serif;
+  font-weight: var(--task-font-weight, 500);
+  font-size: calc(0.9375rem * var(--task-font-scale, 1));
+  line-height: calc(1.5rem * var(--task-font-scale, 1));
+  word-break: break-word;
+}
+
+.food-meal__kcal {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.food-meal__unit {
+  color: var(--text-dim);
+}
+
+.food-day__add {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  padding: 0.3rem 0;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.food-day__add:hover {
+  color: var(--text-strong);
+}
+
+.food-day__add img {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.food-form {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 4.5rem auto;
+  gap: 0.4rem;
+  align-items: center;
+  margin: 0.25rem 0;
+}
+
+.food-form--add {
+  margin-top: 0.5rem;
+}
+
+.food-form__input {
+  min-width: 0;
+  box-sizing: border-box;
+  height: 2.1rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  transition: border-color 0.15s ease;
+}
+
+.food-form__input::placeholder {
+  color: var(--text-faint);
+}
+
+.food-form__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.food-form__input--invalid,
+.food-form__input--invalid:focus {
+  border-color: var(--danger);
+}
+
+.food-form__time {
+  width: 6.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.food-form__time::-webkit-calendar-picker-indicator {
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.food-form__comment {
+  font-family: 'Gilroy Task', 'Gilroy', system-ui, sans-serif;
+  font-weight: var(--task-font-weight, 500);
+}
+
+.food-form__kcal {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.food-form__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.food-form__btn {
+  width: 2.1rem;
+  height: 2.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  transition: background 0.15s ease, filter 0.15s ease;
+}
+
+.food-form__btn img,
+.food-form__btn svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.food-form__btn--submit {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.food-form__btn--submit:hover {
+  filter: brightness(1.08);
+}
+
+.food-form__btn--delete:hover {
+  background: var(--danger-soft);
+}
+
+@media (max-width: 500px) {
+  .food-form {
+    grid-template-columns: auto 5rem minmax(0, 1fr);
+  }
+
+  .food-form__comment {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .food-form__actions {
+    justify-self: end;
+  }
+
+  .food-form__input,
+  .food-form__btn {
+    height: 2.5rem;
+  }
+
+  .food-form__btn {
+    width: 2.5rem;
+  }
+
+  /* Smaller than this and iOS zooms the page in on focus. */
+  .food-form__input {
+    font-size: 1rem;
+  }
+}

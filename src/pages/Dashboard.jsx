@@ -50,6 +50,7 @@ import { useMindmap } from '../hooks/useMindmap';
 import { useGoalPlan } from '../hooks/useGoalPlan';
 import { DayCard } from '../components/DayCard';
 import { HabitsView } from '../components/HabitsView';
+import { FoodView } from '../components/FoodView';
 import { BoardView } from '../components/BoardView';
 import { KanbanView } from '../components/KanbanView';
 import { KanbanCardPanel } from '../components/KanbanCardPanel';
@@ -124,6 +125,8 @@ import poslezavtraIcon from '../assets/poslezavtra.svg';
 import timesIcon from '../assets/times.svg';
 import privIcon from '../assets/priv.svg';
 import privNavIcon from '../assets/priv-nav.svg';
+import foodIcon from '../assets/food.svg';
+import foodNavIcon from '../assets/food-nav.svg';
 import focusIcon from '../assets/focus.svg';
 import focusNavIcon from '../assets/focus-nav.svg';
 import sunIcon from '../assets/sun.svg';
@@ -205,6 +208,7 @@ const BUILTIN_MENU_ITEMS = [
   { key: 'no_date', label: 'Задачи без даты' },
   { key: 'someday', label: 'Когда-нибудь' },
   { key: 'habits', label: 'Привычки' },
+  { key: 'food', label: 'Еда' },
   { key: 'focus_analytics', label: 'Фокус' },
 ];
 
@@ -509,7 +513,7 @@ export default function Dashboard() {
       if (!raw) return 'plans';
       const parsed = JSON.parse(raw);
       const v = parsed?.viewMode;
-      return ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'focus_analytics', 'board', 'kanban', 'mindmap', 'project'].includes(v) ? v : 'plans';
+      return ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'food', 'focus_analytics', 'board', 'kanban', 'mindmap', 'project'].includes(v) ? v : 'plans';
     } catch {
       return 'plans';
     }
@@ -606,6 +610,7 @@ export default function Dashboard() {
   const [noDateHover, setNoDateHover] = useState(false);
   const [somedayHover, setSomedayHover] = useState(false);
   const [habitsHover, setHabitsHover] = useState(false);
+  const [foodHover, setFoodHover] = useState(false);
   const [focusHover, setFocusHover] = useState(false);
   const [projectHoverId, setProjectHoverId] = useState(null);
   const [eyeHover, setEyeHover] = useState(false);
@@ -802,7 +807,7 @@ export default function Dashboard() {
   }, [viewMode, activeProjectId, activeBoardId, activeKanbanId, activeMindmapId, projects, projectsLoading, boardItems, boardItemsLoading]);
 
   const handleMenuSelect = useCallback((target) => {
-    const isBuiltinView = ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'focus_analytics'].includes(target);
+    const isBuiltinView = ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'food', 'focus_analytics'].includes(target);
     if (isBuiltinView) {
       setViewMode(target);
       setActiveProjectId(null);
@@ -1768,7 +1773,7 @@ export default function Dashboard() {
             {viewMode === 'mindmap' && (
               <div ref={setMindHeaderLeftSlot} className="dashboard__mind-header-slot" />
             )}
-            {(viewMode === 'plans' || viewMode === 'goal_plan' || viewMode === 'calendar') && (
+            {(viewMode === 'plans' || viewMode === 'goal_plan' || viewMode === 'calendar' || viewMode === 'food') && (
               <>
                 <select
                   value={settings.days_count}
@@ -1860,7 +1865,7 @@ export default function Dashboard() {
                 className="dashboard__board-header-slot dashboard__board-header-slot--right"
               />
             )}
-            {viewMode !== 'habits' && viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'mindmap' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'reputation' && (
+            {viewMode !== 'habits' && viewMode !== 'food' && viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'mindmap' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'reputation' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
@@ -1986,6 +1991,18 @@ export default function Dashboard() {
                 >
                   <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
                   <span>Привычки</span>
+                </button>
+              )}
+              {!isBuiltinHidden('food') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'food' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setFoodHover(true)}
+                  onMouseLeave={() => hasHover && setFoodHover(false)}
+                  onClick={() => handleMenuSelect('food')}
+                >
+                  <img src={viewMode === 'food' || (hasHover && foodHover) ? foodNavIcon : foodIcon} alt="" />
+                  <span>Еда</span>
                 </button>
               )}
               {!isBuiltinHidden('focus_analytics') && (
@@ -2175,6 +2192,18 @@ export default function Dashboard() {
                 >
                   <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
                   <span>Привычки</span>
+                </button>
+              )}
+              {!isBuiltinHidden('food') && (
+                <button
+                  type="button"
+                  className={`dashboard-menu__item ${viewMode === 'food' ? 'dashboard-menu__item--active' : ''}`}
+                  onMouseEnter={() => hasHover && setFoodHover(true)}
+                  onMouseLeave={() => hasHover && setFoodHover(false)}
+                  onClick={() => handleMenuSelect('food')}
+                >
+                  <img src={viewMode === 'food' || (hasHover && foodHover) ? foodNavIcon : foodIcon} alt="" />
+                  <span>Еда</span>
                 </button>
               )}
               {!isBuiltinHidden('focus_analytics') && (
@@ -2660,6 +2689,7 @@ export default function Dashboard() {
                     case 'no_date': return layersIcon;
                     case 'someday': return archiveIcon;
                     case 'habits': return privIcon;
+                    case 'food': return foodIcon;
                     case 'focus_analytics': return focusIcon;
                     default: return folderIcon;
                   }
@@ -2933,6 +2963,10 @@ export default function Dashboard() {
           habitsSidebarWidthPx={settings.habits_sidebar_width_px ?? 220}
           setHabitsSidebarWidthPx={setHabitsSidebarWidthPx}
         />
+      )}
+
+      {viewMode === 'food' && (
+        <FoodView dates={days.map(toLocalDateString)} hasHover={hasHover} />
       )}
 
       {viewMode === 'focus_analytics' && <FocusAnalytics />}
