@@ -54,7 +54,7 @@ export function FoodView({ dates, hasHover }) {
         </div>
       )}
       <div className="food__days">
-        {dates.map((date) => (
+        {[...dates].reverse().map((date) => (
           <FoodDay
             key={date}
             date={date}
