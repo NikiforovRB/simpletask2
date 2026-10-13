@@ -14,9 +14,54 @@ export function genGirlId() {
 }
 
 const SAVE_ERROR = 'Не удалось сохранить. Проверьте подключение и попробуйте ещё раз.';
+const AVATAR_BUCKET = 'girl-avatars';
+const SIGNED_TTL = 3600;
 
 function normalizeRow(row) {
-  return { ...row, dates: Array.isArray(row.dates) ? row.dates : [] };
+  return { ...row, dates: Array.isArray(row.dates) ? row.dates : [], avatar_path: row.avatar_path || '' };
+}
+
+// Signed links to the private avatar photos, shared by every component.
+const avatarUrls = new Map();
+
+function removeAvatarFile(path) {
+  if (!path) return;
+  supabase.storage.from(AVATAR_BUCKET).remove([path]).then(({ error }) => {
+    if (error) console.error('avatar remove error', error);
+  });
+}
+
+/** Returns `urlOf(path)`; links for the given paths are fetched in one batch. */
+export function useAvatarUrls(paths) {
+  const key = [...new Set(paths.filter(Boolean))].sort().join('|');
+  const [, setVersion] = useState(0);
+
+  useEffect(() => {
+    if (!key) return undefined;
+    const soon = Date.now() + 60_000;
+    const missing = key.split('|').filter((p) => !(avatarUrls.get(p)?.expires > soon));
+    if (!missing.length) return undefined;
+    let cancelled = false;
+    supabase.storage
+      .from(AVATAR_BUCKET)
+      .createSignedUrls(missing, SIGNED_TTL)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('avatar urls error', error);
+          return;
+        }
+        const expires = Date.now() + SIGNED_TTL * 1000;
+        for (const item of data || []) {
+          if (item.signedUrl && item.path) avatarUrls.set(item.path, { url: item.signedUrl, expires });
+        }
+        if (!cancelled) setVersion((v) => v + 1);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+
+  return (path) => (path ? avatarUrls.get(path)?.url ?? null : null);
 }
 
 /** The «Девушки» list of the signed-in user (only for the chosen ones). */
@@ -126,7 +171,7 @@ export function useGirls() {
     }
   }, [userId, reload]);
 
-  const deleteGirl = useCallback(async (id) => {
+  const deleteGirl = useCallback(async (id, avatarPath) => {
     if (!userId) return;
     setError(null);
     setRows((prev) => {
@@ -140,8 +185,32 @@ export function useGirls() {
       console.error('girls delete error', err);
       setError(SAVE_ERROR);
       reload();
+      return;
     }
+    removeAvatarFile(avatarPath);
   }, [userId, reload]);
+
+  /** Uploads a new photo (a ready JPEG blob) and drops the previous one. */
+  const setAvatar = useCallback(async (id, blob, oldPath) => {
+    if (!userId) return;
+    const path = `${userId}/${id}-${Date.now().toString(36)}.jpg`;
+    const { error: err } = await supabase.storage
+      .from(AVATAR_BUCKET)
+      .upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' });
+    if (err) {
+      console.error('avatar upload error', err);
+      setError('Не удалось загрузить фото.');
+      return;
+    }
+    avatarUrls.set(path, { url: URL.createObjectURL(blob), expires: Infinity });
+    await updateGirl(id, { avatar_path: path });
+    removeAvatarFile(oldPath);
+  }, [userId, updateGirl]);
+
+  const clearAvatar = useCallback(async (id, oldPath) => {
+    await updateGirl(id, { avatar_path: '' });
+    removeAvatarFile(oldPath);
+  }, [updateGirl]);
 
   return {
     girls,
@@ -151,5 +220,7 @@ export function useGirls() {
     addGirl,
     updateGirl,
     deleteGirl,
+    setAvatar,
+    clearAvatar,
   };
 }
