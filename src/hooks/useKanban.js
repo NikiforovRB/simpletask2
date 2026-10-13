@@ -207,6 +207,12 @@ export function useKanban(boardIds) {
         ? (siblings.length ? Math.min(...siblings.map((c) => c.position ?? 0)) - 1 : 0)
         : nextPosition(siblings),
     };
+    // In a day column the order is due_position, and a card without one goes
+    // after every card placed there by hand.
+    if (atStart && fields.due_date && !('due_position' in fields)) {
+      const sameDay = cardsRef.current.filter((c) => c.board_id === boardId && c.due_date === fields.due_date);
+      row.due_position = sameDay.length ? Math.min(...sameDay.map((c) => c.due_position ?? 0)) - 1 : 0;
+    }
     const { data, error } = await supabase.from('kanban_cards').insert(row).select().single();
     if (error || !data) {
       await fetchAll();

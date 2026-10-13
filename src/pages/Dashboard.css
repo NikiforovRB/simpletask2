@@ -1051,6 +1051,11 @@
   gap: 0.5rem;
 }
 
+.dashboard-menu__mobile-top > .dashboard-menu__project-row {
+  flex: 1;
+  min-width: 0;
+}
+
 .dashboard-menu:not(.dashboard-menu--side) {
   position: relative;
   padding-top: 1rem;

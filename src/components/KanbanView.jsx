@@ -77,8 +77,8 @@ const DEFAULT_COLUMN_COLOR = '#5a86ee';
 const MIN_COLUMN_WIDTH = 180;
 const MAX_COLUMN_WIDTH = 640;
 const COLUMN_WIDTH_STEP = 10;
-/** The outline colours offered straight from the context menu of a card. */
-const QUICK_COLORS = ['#f33737', '#f4ba04', '#15c466', '#5a86ee', '#613aaf'];
+/** The colours offered straight from the context menu of a card. */
+const QUICK_COLORS = ['#f33737', '#f4ba04', '#15c466', '#5a86ee', '#613aaf', '#666666', '#00b5cc', '#c4d636'];
 
 const slotId = (columnId, index) => `kslot::${columnId}::${index}`;
 
@@ -1206,6 +1206,12 @@ function CardContextMenu({
           className: '',
           style: { background: 'var(--text-strong)' },
           swatch: 'var(--text-strong)',
+        })}
+        {swatches(card.bg_color, (c) => onUpdate(card.id, { bg_color: c }), {
+          label: 'Обычный фон',
+          of: 'Цвет фона плашки',
+          className: 'kanban-menu__color--none',
+          swatch: 'var(--border-strong)',
         })}
         {item(lineHeightIcon, 'Быстрое редактирование', () => { onQuickEdit(card.id); onClose(); })}
         {item(editIcon, 'Открыть', () => { onOpen(card.id); onClose(); })}

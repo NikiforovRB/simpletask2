@@ -130,6 +130,8 @@ import foodIcon from '../assets/food.svg';
 import foodNavIcon from '../assets/food-nav.svg';
 import girlsIcon from '../assets/girls.svg';
 import girlsNavIcon from '../assets/girls-nav.svg';
+import funnelIcon from '../assets/funnel.svg';
+import funnelNavIcon from '../assets/funnel-nav.svg';
 import focusIcon from '../assets/focus.svg';
 import focusNavIcon from '../assets/focus-nav.svg';
 import sunIcon from '../assets/sun.svg';
@@ -217,43 +219,44 @@ const BUILTIN_MENU_ITEMS = [
 ];
 
 const BUILTIN_DND_PREFIX = 'builtin:';
+const PROJECT_MENU_PREFIX = 'project:';
 
 /**
- * The built-in sections the user has, in the saved order. A section the saved
- * order doesn't mention (one added later) goes right after the section it
- * follows by default.
+ * The whole menu in the saved order: built-in sections by key, the user's
+ * sections as `project:<id>`. A built-in section the saved order doesn't
+ * mention (one added later) goes right after the one it follows by default; a
+ * project it doesn't mention goes to the end. The projects keep their own
+ * order among themselves (their positions) and only take the slots saved here,
+ * so dragging them within the menu itself still works.
  */
-function orderBuiltinItems(savedKeys, isChosen) {
+function orderMenuEntries(savedKeys, isChosen, projects) {
   const available = BUILTIN_MENU_ITEMS.filter((item) => !item.chosenOnly || isChosen);
   const byKey = new Map(available.map((item) => [item.key, item]));
-  const result = [];
+  const projectKeys = new Set(projects.map((p) => PROJECT_MENU_PREFIX + p.id));
+  const order = [];
   for (const key of savedKeys || []) {
-    const item = byKey.get(key);
-    if (item && !result.includes(item)) result.push(item);
+    if (!order.includes(key) && (byKey.has(key) || projectKeys.has(key))) order.push(key);
   }
   available.forEach((item, idx) => {
-    if (result.includes(item)) return;
+    if (order.includes(item.key)) return;
     let pos = 0;
     for (let j = idx - 1; j >= 0; j--) {
-      const at = result.indexOf(available[j]);
+      const at = order.indexOf(available[j].key);
       if (at >= 0) {
         pos = at + 1;
         break;
       }
     }
-    result.splice(pos, 0, item);
+    order.splice(pos, 0, item.key);
   });
-  return result;
-}
-
-/** Keeps a drag inside the list it started in (built-in sections or user sections). */
-function sameListCollision(args) {
-  const fromBuiltin = String(args.active.id).startsWith(BUILTIN_DND_PREFIX);
-  return closestCenter({
-    ...args,
-    droppableContainers: args.droppableContainers.filter(
-      (c) => String(c.id).startsWith(BUILTIN_DND_PREFIX) === fromBuiltin,
-    ),
+  projects.forEach((p) => {
+    if (!order.includes(PROJECT_MENU_PREFIX + p.id)) order.push(PROJECT_MENU_PREFIX + p.id);
+  });
+  let next = 0;
+  return order.map((key) => {
+    if (byKey.has(key)) return { type: 'builtin', key, item: byKey.get(key) };
+    const project = projects[next++];
+    return { type: 'project', key: PROJECT_MENU_PREFIX + project.id, project };
   });
 }
 
@@ -641,6 +644,8 @@ export default function Dashboard() {
   const [projectHoverId, setProjectHoverId] = useState(null);
   const [eyeHover, setEyeHover] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
+  const [girlsAnalyticsOpen, setGirlsAnalyticsOpen] = useState(false);
+  const [girlsAnalyticsHover, setGirlsAnalyticsHover] = useState(false);
   const [exitHover, setExitHover] = useState(false);
   const [refreshHover, setRefreshHover] = useState(false);
   const [editProjectFabHover, setEditProjectFabHover] = useState(false);
@@ -687,8 +692,8 @@ export default function Dashboard() {
   // buttons in the row so all four behave identically.
   const [addProjectBtnHover, setAddProjectBtnHover] = useState(false);
   const [menuOrderModalOpen, setMenuOrderModalOpen] = useState(false);
+  // Built-in sections as `builtin:<key>`, projects by their id.
   const [menuOrderDraft, setMenuOrderDraft] = useState([]);
-  const [menuBuiltinDraft, setMenuBuiltinDraft] = useState([]);
   const [menuOrderActiveId, setMenuOrderActiveId] = useState(null);
   // Draft visibility map keyed by `menu_hidden::*` list-key (true = hidden).
   // Filled when the modal opens and committed on Save.
@@ -837,6 +842,7 @@ export default function Dashboard() {
 
   const handleMenuSelect = useCallback((target) => {
     const isBuiltinView = BUILTIN_MENU_ITEMS.some((item) => item.key === target);
+    setGirlsAnalyticsOpen(false);
     if (isBuiltinView) {
       setViewMode(target);
       setActiveProjectId(null);
@@ -1691,27 +1697,22 @@ export default function Dashboard() {
 
   const menuOrderSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
-  const builtinMenuItems = useMemo(
-    () => orderBuiltinItems(settings.menu_builtin_order, isChosen),
-    [settings.menu_builtin_order, isChosen],
+  const menuEntries = useMemo(
+    () => orderMenuEntries(settings.menu_builtin_order, isChosen, projects),
+    [settings.menu_builtin_order, isChosen, projects],
   );
 
   const openMenuOrderModal = useCallback(() => {
-    setMenuOrderDraft(projects.map((p) => p.id));
-    setMenuBuiltinDraft(builtinMenuItems.map((item) => BUILTIN_DND_PREFIX + item.key));
+    setMenuOrderDraft(menuEntries.map((e) => (e.type === 'builtin' ? BUILTIN_DND_PREFIX + e.key : e.project.id)));
     // Seed the visibility draft from currently persisted state.
     const draft = {};
-    builtinMenuItems.forEach((item) => {
-      const key = menuHiddenKey('builtin', item.key);
-      draft[key] = !!getListCollapsed?.(key);
-    });
-    projects.forEach((p) => {
-      const key = menuHiddenKey('project', p.id);
+    menuEntries.forEach((e) => {
+      const key = e.type === 'builtin' ? menuHiddenKey('builtin', e.key) : menuHiddenKey('project', e.project.id);
       draft[key] = !!getListCollapsed?.(key);
     });
     setMenuVisDraft(draft);
     setMenuOrderModalOpen(true);
-  }, [projects, builtinMenuItems, getListCollapsed]);
+  }, [menuEntries, getListCollapsed]);
 
   const toggleMenuVisDraft = useCallback((key) => {
     setMenuVisDraft((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -1735,23 +1736,24 @@ export default function Dashboard() {
     setMenuOrderActiveId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const move = (prev) => {
+    setMenuOrderDraft((prev) => {
       const oldIndex = prev.indexOf(active.id);
       const newIndex = prev.indexOf(over.id);
       if (oldIndex < 0 || newIndex < 0) return prev;
       return arrayMove(prev, oldIndex, newIndex);
-    };
-    if (String(active.id).startsWith(BUILTIN_DND_PREFIX)) setMenuBuiltinDraft(move);
-    else setMenuOrderDraft(move);
+    });
   }, []);
 
   const saveMenuOrder = useCallback(async () => {
-    if (projects.length > 1) {
-      await reorderProjects(menuOrderDraft);
+    const projectOrder = menuOrderDraft.filter((id) => !id.startsWith(BUILTIN_DND_PREFIX));
+    if (projects.length > 1 && projectOrder.join() !== projects.map((p) => p.id).join()) {
+      await reorderProjects(projectOrder);
     }
-    const builtinKeys = menuBuiltinDraft.map((id) => id.slice(BUILTIN_DND_PREFIX.length));
-    if (builtinKeys.join() !== builtinMenuItems.map((item) => item.key).join()) {
-      await setMenuBuiltinOrder(builtinKeys);
+    const keys = menuOrderDraft.map((id) => (
+      id.startsWith(BUILTIN_DND_PREFIX) ? id.slice(BUILTIN_DND_PREFIX.length) : PROJECT_MENU_PREFIX + id
+    ));
+    if (keys.join() !== menuEntries.map((e) => e.key).join()) {
+      await setMenuBuiltinOrder(keys);
     }
     // Persist only the visibility flags that actually changed compared to
     // the live state, so we don't generate noise on the user_list_collapsed
@@ -1763,20 +1765,25 @@ export default function Dashboard() {
     });
     if (writes.length) await Promise.all(writes);
     setMenuOrderModalOpen(false);
-  }, [menuOrderDraft, menuBuiltinDraft, builtinMenuItems, menuVisDraft, projects.length, reorderProjects, setMenuBuiltinOrder, getListCollapsed, setListCollapsed]);
+  }, [menuOrderDraft, menuEntries, menuVisDraft, projects, reorderProjects, setMenuBuiltinOrder, getListCollapsed, setListCollapsed]);
 
-  const activeMenuOrderRow = (() => {
-    if (!menuOrderActiveId) return null;
-    const id = String(menuOrderActiveId);
+  /** A row of «Порядок пунктов меню» by its drag id. */
+  const menuOrderRow = (id) => {
     if (id.startsWith(BUILTIN_DND_PREFIX)) {
-      const item = builtinMenuItems.find((it) => BUILTIN_DND_PREFIX + it.key === id);
-      return item ? { icon: item.icon, title: item.label } : null;
+      const key = id.slice(BUILTIN_DND_PREFIX.length);
+      const item = BUILTIN_MENU_ITEMS.find((it) => it.key === key);
+      return item ? { icon: item.icon, title: item.label, visKey: menuHiddenKey('builtin', key) } : null;
     }
     const project = projects.find((p) => p.id === id);
-    return project ? { icon: projectIcons(project.kind || 'project')[0], title: project.title } : null;
-  })();
+    return project
+      ? { icon: projectIcons(project.kind || 'project')[0], title: project.title, visKey: menuHiddenKey('project', id) }
+      : null;
+  };
+  const activeMenuOrderRow = menuOrderActiveId ? menuOrderRow(String(menuOrderActiveId)) : null;
 
-  const visibleBuiltinMenuItems = builtinMenuItems.filter((item) => !isBuiltinHidden(item.key));
+  const visibleMenuEntries = menuEntries.filter((e) => (
+    e.type === 'builtin' ? !isBuiltinHidden(e.key) : !isProjectHidden(e.project.id)
+  ));
 
   const renderBuiltinMenuItem = (item) => {
     const active = viewMode === item.key;
@@ -1792,6 +1799,27 @@ export default function Dashboard() {
         <img src={active || (hasHover && menuHoverKey === item.key) ? item.navIcon : item.icon} alt="" />
         <span>{item.label}</span>
       </button>
+    );
+  };
+
+  const renderMenuEntry = (entry) => {
+    if (entry.type === 'builtin') return renderBuiltinMenuItem(entry.item);
+    const p = entry.project;
+    const kind = p.kind || 'project';
+    const [iconDefault, iconHover] = projectIcons(kind);
+    return (
+      <SortableProjectItem
+        key={p.id}
+        project={p}
+        isActive={isSectionOpen(kind, p.id)}
+        isHover={hasHover && projectHoverId === p.id}
+        iconDefault={iconDefault}
+        iconHover={iconHover}
+        onClick={() => handleMenuSelect(p.id)}
+        onMouseEnter={() => setProjectHoverId(p.id)}
+        onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
+        dirty={kind === 'board' && boardDirtyIds.has(p.id)}
+      />
     );
   };
 
@@ -1937,7 +1965,12 @@ export default function Dashboard() {
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
             )}
-            {viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'mindmap' && viewMode !== 'reputation' && (
+            {viewMode === 'girls' && isChosen && (
+            <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setGirlsAnalyticsHover(true)} onMouseLeave={() => hasHover && setGirlsAnalyticsHover(false)} onClick={() => setGirlsAnalyticsOpen(true)} aria-label="Конверсия" title="Подходы → Знакомства → Свидания">
+              <img src={girlsAnalyticsOpen || (hasHover && girlsAnalyticsHover) ? funnelNavIcon : funnelIcon} alt="" />
+            </button>
+            )}
+            {viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'mindmap' && viewMode !== 'reputation' && viewMode !== 'girls' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setSettingsHover(true)} onMouseLeave={() => hasHover && setSettingsHover(false)} onClick={() => setSettingsOpen((v) => !v)} aria-label="Настройки">
               <img src={hasHover && settingsHover ? settingsNavIcon : settingsIcon} alt="" />
             </button>
@@ -1964,27 +1997,8 @@ export default function Dashboard() {
               title="Перетащите, чтобы изменить ширину"
             />
             <div className="dashboard-menu__body">
-              {visibleBuiltinMenuItems.map(renderBuiltinMenuItem)}
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-                {projects.filter((p) => !isProjectHidden(p.id)).map((p) => {
-                  const kind = p.kind || 'project';
-                  const [iconDefault, iconHover] = projectIcons(kind);
-                  const isActive = isSectionOpen(kind, p.id);
-                  return (
-                    <SortableProjectItem
-                      key={p.id}
-                      project={p}
-                      isActive={isActive}
-                      isHover={hasHover && projectHoverId === p.id}
-                      iconDefault={iconDefault}
-                      iconHover={iconHover}
-                      onClick={() => handleMenuSelect(p.id)}
-                      onMouseEnter={() => setProjectHoverId(p.id)}
-                      onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
-                      dirty={kind === 'board' && boardDirtyIds.has(p.id)}
-                    />
-                  );
-                })}
+                {visibleMenuEntries.map(renderMenuEntry)}
               </SortableContext>
             </div>
             <div className="dashboard-menu__bottom-tools">
@@ -2036,38 +2050,19 @@ export default function Dashboard() {
               style={{ width: '100%' }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="dashboard-menu__mobile-top">
-                {visibleBuiltinMenuItems[0] ? renderBuiltinMenuItem(visibleBuiltinMenuItems[0]) : <span />}
-                <button
-                  type="button"
-                  className="dashboard-menu__close"
-                  onClick={closeMenu}
-                  aria-label="Закрыть меню"
-                >
-                  ×
-                </button>
-              </div>
-              {visibleBuiltinMenuItems.slice(1).map(renderBuiltinMenuItem)}
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-                {projects.filter((p) => !isProjectHidden(p.id)).map((p) => {
-                  const kind = p.kind || 'project';
-                  const [iconDefault, iconHover] = projectIcons(kind);
-                  const isActive = isSectionOpen(kind, p.id);
-                  return (
-                    <SortableProjectItem
-                      key={p.id}
-                      project={p}
-                      isActive={isActive}
-                      isHover={hasHover && projectHoverId === p.id}
-                      iconDefault={iconDefault}
-                      iconHover={iconHover}
-                      onClick={() => handleMenuSelect(p.id)}
-                      onMouseEnter={() => setProjectHoverId(p.id)}
-                      onMouseLeave={() => setProjectHoverId((cur) => (cur === p.id ? null : cur))}
-                      dirty={kind === 'board' && boardDirtyIds.has(p.id)}
-                    />
-                  );
-                })}
+                <div className="dashboard-menu__mobile-top">
+                  {visibleMenuEntries[0] ? renderMenuEntry(visibleMenuEntries[0]) : <span />}
+                  <button
+                    type="button"
+                    className="dashboard-menu__close"
+                    onClick={closeMenu}
+                    aria-label="Закрыть меню"
+                  >
+                    ×
+                  </button>
+                </div>
+                {visibleMenuEntries.slice(1).map(renderMenuEntry)}
               </SortableContext>
               <button
                 type="button"
@@ -2508,43 +2503,22 @@ export default function Dashboard() {
             <div className="dashboard-menu__order-list">
               <DndContext
                 sensors={menuOrderSensors}
-                collisionDetection={sameListCollision}
+                collisionDetection={closestCenter}
                 onDragStart={handleMenuOrderDragStart}
                 onDragEnd={handleMenuOrderDragEnd}
               >
-                <SortableContext items={menuBuiltinDraft} strategy={verticalListSortingStrategy}>
-                  {menuBuiltinDraft.map((id) => {
-                    const item = builtinMenuItems.find((it) => BUILTIN_DND_PREFIX + it.key === id);
-                    if (!item) return null;
-                    const visKey = menuHiddenKey('builtin', item.key);
-                    return (
-                      <SortableMenuOrderRow
-                        key={id}
-                        id={id}
-                        icon={item.icon}
-                        title={item.label}
-                        hidden={!!menuVisDraft[visKey]}
-                        onToggleHidden={() => toggleMenuVisDraft(visKey)}
-                      />
-                    );
-                  })}
-                </SortableContext>
-                {projects.length > 0 && (
-                  <div className="dashboard-menu__order-divider" aria-hidden />
-                )}
                 <SortableContext items={menuOrderDraft} strategy={verticalListSortingStrategy}>
                   {menuOrderDraft.map((id) => {
-                    const p = projects.find((proj) => proj.id === id);
-                    if (!p) return null;
-                    const visKey = menuHiddenKey('project', p.id);
+                    const row = menuOrderRow(id);
+                    if (!row) return null;
                     return (
                       <SortableMenuOrderRow
                         key={id}
                         id={id}
-                        icon={projectIcons(p.kind || 'project')[0]}
-                        title={p.title}
-                        hidden={!!menuVisDraft[visKey]}
-                        onToggleHidden={() => toggleMenuVisDraft(visKey)}
+                        icon={row.icon}
+                        title={row.title}
+                        hidden={!!menuVisDraft[row.visKey]}
+                        onToggleHidden={() => toggleMenuVisDraft(row.visKey)}
                       />
                     );
                   })}
@@ -2785,7 +2759,9 @@ export default function Dashboard() {
         <FoodView dates={days.map(toLocalDateString)} hasHover={hasHover} />
       )}
 
-      {viewMode === 'girls' && isChosen && <GirlsView />}
+      {viewMode === 'girls' && isChosen && (
+        <GirlsView analyticsOpen={girlsAnalyticsOpen} onAnalyticsClose={() => setGirlsAnalyticsOpen(false)} />
+      )}
 
       {viewMode === 'focus_analytics' && <FocusAnalytics />}
 

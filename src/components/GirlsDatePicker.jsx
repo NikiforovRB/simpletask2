@@ -37,6 +37,7 @@ export function GirlsDatePicker({
   value,
   time: initialTime = '',
   withTime = false,
+  timePresets = TIME_PRESETS,
   from: initialFrom = '',
   to: initialTo = '',
   quick = [],
@@ -204,7 +205,7 @@ export function GirlsDatePicker({
                 onChange={(e) => setTime(e.target.value)}
                 aria-label="Время"
               />
-              {TIME_PRESETS.map((t) => (
+              {timePresets.map((t) => (
                 <button
                   key={t}
                   type="button"

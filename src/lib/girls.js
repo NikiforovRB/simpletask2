@@ -98,9 +98,8 @@ export const STATS_MODES = [
   { key: 'month', label: 'Месяцы' },
 ];
 
-/** The last periods (oldest first) with the number of acquaintances in each. */
-export function buildStats(girls, mode, today) {
-  const n = mode === 'month' ? 6 : 8;
+/** The last `n` weeks / months, oldest first. */
+function periodBuckets(mode, today, n) {
   const buckets = [];
   let from = mode === 'month' ? startOfMonth(today) : startOfWeek(today);
   for (let i = 0; i < n; i++) {
@@ -110,10 +109,15 @@ export function buildStats(girls, mode, today) {
       from,
       to,
       label: mode === 'month' ? MONTH_SHORT[d.getMonth()] : `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`,
-      count: 0,
     });
     from = mode === 'month' ? startOfMonth(addDays(from, -1)) : addDays(from, -7);
   }
+  return buckets;
+}
+
+/** The last periods (oldest first) with the number of acquaintances in each. */
+export function buildStats(girls, mode, today) {
+  const buckets = periodBuckets(mode, today, mode === 'month' ? 6 : 8).map((b) => ({ ...b, count: 0 }));
   for (const g of girls) {
     const b = buckets.find((x) => g.met_on >= x.from && g.met_on <= x.to);
     if (b) b.count += 1;
@@ -214,6 +218,62 @@ export function matches(girl, q) {
   if (text.includes(q)) return true;
   const digits = q.replace(/\D/g, '');
   return digits.length >= 3 && String(girl.phone || '').replace(/\D/g, '').includes(digits);
+}
+
+// ---------------------------------------------------------------------------
+// Approaches and the «Подходы → Знакомства → Свидания» funnel
+// ---------------------------------------------------------------------------
+
+export function nowTime() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** Newest first: by day, then time (those without one last), then when it was written down. */
+export function sortApproaches(list) {
+  const key = (a) => `${a.happened_on} ${a.time || '--:--'} ${a.created_at || ''}`;
+  return [...list].sort((a, b) => (key(a) < key(b) ? 1 : -1));
+}
+
+export function approachMatches(approach, girl, q) {
+  if (!q) return true;
+  const text = [approach.place, approach.note, approach.outcome === 'contact' ? 'контакт' : 'отказ', girl?.name || '']
+    .join(' ')
+    .toLowerCase();
+  return text.includes(q);
+}
+
+/**
+ * Approaches made in the range and how far they went: a contact, then at least
+ * one date (planned or past) with her — whenever that date is.
+ */
+export function funnelOf(approaches, girlsById, range) {
+  const result = { approaches: 0, refusals: 0, contacts: 0, dates: 0 };
+  for (const a of approaches) {
+    if (!inRange(a.happened_on, range)) continue;
+    result.approaches += 1;
+    if (a.outcome !== 'contact') {
+      result.refusals += 1;
+      continue;
+    }
+    result.contacts += 1;
+    if (girlsById.get(a.girl_id)?.dates.length) result.dates += 1;
+  }
+  return result;
+}
+
+/** The funnel of each of the last weeks / months, newest first. */
+export function funnelByPeriod(approaches, girlsById, mode, today) {
+  return periodBuckets(mode, today, mode === 'month' ? 6 : 8)
+    .reverse()
+    .map((b) => ({ ...b, ...funnelOf(approaches, girlsById, b) }));
+}
+
+/** «25%», or «—» when there is nothing to divide by. */
+export function percent(part, whole) {
+  if (!whole) return '—';
+  const p = (part / whole) * 100;
+  return `${p >= 10 || p === 0 ? Math.round(p) : Math.round(p * 10) / 10}%`.replace('.', ',');
 }
 
 // ---------------------------------------------------------------------------
