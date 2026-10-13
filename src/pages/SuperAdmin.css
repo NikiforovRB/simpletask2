@@ -205,6 +205,66 @@
   white-space: nowrap;
 }
 
+.superadmin__switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.superadmin__switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.superadmin__switch-track {
+  position: relative;
+  width: 2.1rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: var(--bg-hover-strong);
+  transition: background 0.15s ease;
+}
+
+.superadmin__switch-track::after {
+  content: '';
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.superadmin__switch input:checked + .superadmin__switch-track {
+  background: var(--accent);
+}
+
+.superadmin__switch input:checked + .superadmin__switch-track::after {
+  background: #ffffff;
+  transform: translateX(0.9rem);
+}
+
+.superadmin__switch input:focus-visible + .superadmin__switch-track {
+  outline: 2px solid var(--accent-glow);
+  outline-offset: 2px;
+}
+
+.superadmin__switch input:disabled + .superadmin__switch-track {
+  opacity: 0.5;
+}
+
+.superadmin__switch-label {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 .superadmin__delete-btn {
   background: transparent;
   color: #ea6868;

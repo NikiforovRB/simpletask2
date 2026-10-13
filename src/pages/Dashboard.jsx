@@ -51,6 +51,7 @@ import { useGoalPlan } from '../hooks/useGoalPlan';
 import { DayCard } from '../components/DayCard';
 import { HabitsView } from '../components/HabitsView';
 import { FoodView } from '../components/FoodView';
+import { GirlsView } from '../components/GirlsView';
 import { BoardView } from '../components/BoardView';
 import { KanbanView } from '../components/KanbanView';
 import { KanbanCardPanel } from '../components/KanbanCardPanel';
@@ -127,6 +128,8 @@ import privIcon from '../assets/priv.svg';
 import privNavIcon from '../assets/priv-nav.svg';
 import foodIcon from '../assets/food.svg';
 import foodNavIcon from '../assets/food-nav.svg';
+import girlsIcon from '../assets/girls.svg';
+import girlsNavIcon from '../assets/girls-nav.svg';
 import focusIcon from '../assets/focus.svg';
 import focusNavIcon from '../assets/focus-nav.svg';
 import sunIcon from '../assets/sun.svg';
@@ -197,20 +200,62 @@ function getTasksInContainer(tasks, containerId) {
     .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 }
 
-// Configuration for the built-in menu rows inside «Порядок пунктов меню».
-// Order here is fixed; only visibility can be toggled.
+// The built-in sections of the menu, in their default order. The user can
+// rearrange and hide them in «Порядок пунктов меню».
 const BUILTIN_MENU_ITEMS = [
-  { key: 'today', label: 'Сегодня' },
-  { key: 'plans', label: 'Планы' },
-  { key: 'calendar', label: 'Календарь' },
-  { key: 'goal_plan', label: 'Планы с целями' },
-  { key: 'reputation', label: 'Репутация перед собой' },
-  { key: 'no_date', label: 'Задачи без даты' },
-  { key: 'someday', label: 'Когда-нибудь' },
-  { key: 'habits', label: 'Привычки' },
-  { key: 'food', label: 'Еда' },
-  { key: 'focus_analytics', label: 'Фокус' },
+  { key: 'today', label: 'Сегодня', icon: starIcon, navIcon: starNavIcon },
+  { key: 'plans', label: 'Планы', icon: plansIcon, navIcon: plansNavIcon },
+  { key: 'calendar', label: 'Календарь', icon: calendarIcon, navIcon: calendarNavIcon },
+  { key: 'reputation', label: 'Репутация перед собой', icon: goalIcon, navIcon: goalNavIcon },
+  { key: 'goal_plan', label: 'Планы с целями', icon: goalIcon, navIcon: goalNavIcon },
+  { key: 'no_date', label: 'Задачи без даты', icon: layersIcon, navIcon: layersNavIcon },
+  { key: 'someday', label: 'Когда-нибудь', icon: archiveIcon, navIcon: archiveNavIcon },
+  { key: 'habits', label: 'Привычки', icon: privIcon, navIcon: privNavIcon },
+  { key: 'food', label: 'Еда', icon: foodIcon, navIcon: foodNavIcon },
+  { key: 'girls', label: 'Девушки', icon: girlsIcon, navIcon: girlsNavIcon, chosenOnly: true },
+  { key: 'focus_analytics', label: 'Фокус', icon: focusIcon, navIcon: focusNavIcon },
 ];
+
+const BUILTIN_DND_PREFIX = 'builtin:';
+
+/**
+ * The built-in sections the user has, in the saved order. A section the saved
+ * order doesn't mention (one added later) goes right after the section it
+ * follows by default.
+ */
+function orderBuiltinItems(savedKeys, isChosen) {
+  const available = BUILTIN_MENU_ITEMS.filter((item) => !item.chosenOnly || isChosen);
+  const byKey = new Map(available.map((item) => [item.key, item]));
+  const result = [];
+  for (const key of savedKeys || []) {
+    const item = byKey.get(key);
+    if (item && !result.includes(item)) result.push(item);
+  }
+  available.forEach((item, idx) => {
+    if (result.includes(item)) return;
+    let pos = 0;
+    for (let j = idx - 1; j >= 0; j--) {
+      const at = result.indexOf(available[j]);
+      if (at >= 0) {
+        pos = at + 1;
+        break;
+      }
+    }
+    result.splice(pos, 0, item);
+  });
+  return result;
+}
+
+/** Keeps a drag inside the list it started in (built-in sections or user sections). */
+function sameListCollision(args) {
+  const fromBuiltin = String(args.active.id).startsWith(BUILTIN_DND_PREFIX);
+  return closestCenter({
+    ...args,
+    droppableContainers: args.droppableContainers.filter(
+      (c) => String(c.id).startsWith(BUILTIN_DND_PREFIX) === fromBuiltin,
+    ),
+  });
+}
 
 // Icon pair (default, hover/active) of a user-made section, by its kind.
 const PROJECT_KIND_ICONS = {
@@ -310,19 +355,8 @@ function MenuOrderVisibilityToggle({ hidden, onToggle }) {
   );
 }
 
-function BuiltinMenuOrderRow({ item, hidden, onToggleHidden, icon }) {
-  return (
-    <div className="dashboard-menu__order-row dashboard-menu__order-row--builtin">
-      <img src={icon} alt="" className="dashboard-menu__order-icon" />
-      <span className="dashboard-menu__order-title">{item.label}</span>
-      <MenuOrderVisibilityToggle hidden={hidden} onToggle={onToggleHidden} />
-    </div>
-  );
-}
-
-function SortableMenuOrderRow({ project, hidden, onToggleHidden }) {
-  const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id: project.id });
-  const [icon] = projectIcons(project.kind || 'project');
+function SortableMenuOrderRow({ id, icon, title, hidden, onToggleHidden }) {
+  const { setNodeRef, transform, transition, isDragging, attributes, listeners } = useSortable({ id });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -335,7 +369,7 @@ function SortableMenuOrderRow({ project, hidden, onToggleHidden }) {
       className={`dashboard-menu__order-row ${isDragging ? 'dashboard-menu__order-row--dragging' : ''}`}
     >
       <img src={icon} alt="" className="dashboard-menu__order-icon" />
-      <span className="dashboard-menu__order-title">{project.title}</span>
+      <span className="dashboard-menu__order-title">{title}</span>
       <MenuOrderVisibilityToggle hidden={hidden} onToggle={onToggleHidden} />
       <span
         className="dashboard-menu__order-handle"
@@ -380,7 +414,7 @@ function SortableProjectItem({ project, isActive, isHover, iconDefault, iconHove
 }
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isChosen, chosenLoaded } = useAuth();
   const { tasks, loading: tasksLoading, addTask, updateTask, deleteTask, toggleComplete, moveTask } = useTasks();
   const focus = useFocus();
   const {
@@ -404,6 +438,7 @@ export default function Dashboard() {
     setCalendarShowNoDate,
     setCalendarNoDateInCompleted,
     setCalendarCarryOver,
+    setMenuBuiltinOrder,
     setFocusTimerShowTotal,
     setShowReputationInLists,
     setReputationInCompleted,
@@ -513,7 +548,7 @@ export default function Dashboard() {
       if (!raw) return 'plans';
       const parsed = JSON.parse(raw);
       const v = parsed?.viewMode;
-      return ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'food', 'focus_analytics', 'board', 'kanban', 'mindmap', 'project'].includes(v) ? v : 'plans';
+      return ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'food', 'girls', 'focus_analytics', 'board', 'kanban', 'mindmap', 'project'].includes(v) ? v : 'plans';
     } catch {
       return 'plans';
     }
@@ -602,16 +637,7 @@ export default function Dashboard() {
   const [dateLeftHover, setDateLeftHover] = useState(false);
   const [dateRightHover, setDateRightHover] = useState(false);
   const [menuHover, setMenuHover] = useState(false);
-  const [todayHover, setTodayHover] = useState(false);
-  const [plansHover, setPlansHover] = useState(false);
-  const [calendarMenuHover, setCalendarMenuHover] = useState(false);
-  const [reputationMenuHover, setReputationMenuHover] = useState(false);
-  const [goalPlanHover, setGoalPlanHover] = useState(false);
-  const [noDateHover, setNoDateHover] = useState(false);
-  const [somedayHover, setSomedayHover] = useState(false);
-  const [habitsHover, setHabitsHover] = useState(false);
-  const [foodHover, setFoodHover] = useState(false);
-  const [focusHover, setFocusHover] = useState(false);
+  const [menuHoverKey, setMenuHoverKey] = useState(null);
   const [projectHoverId, setProjectHoverId] = useState(null);
   const [eyeHover, setEyeHover] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
@@ -662,6 +688,7 @@ export default function Dashboard() {
   const [addProjectBtnHover, setAddProjectBtnHover] = useState(false);
   const [menuOrderModalOpen, setMenuOrderModalOpen] = useState(false);
   const [menuOrderDraft, setMenuOrderDraft] = useState([]);
+  const [menuBuiltinDraft, setMenuBuiltinDraft] = useState([]);
   const [menuOrderActiveId, setMenuOrderActiveId] = useState(null);
   // Draft visibility map keyed by `menu_hidden::*` list-key (true = hidden).
   // Filled when the modal opens and committed on Save.
@@ -803,11 +830,13 @@ export default function Dashboard() {
       const firstMap = projects.find((p) => p.kind === 'mindmap');
       if (firstMap) setActiveMindmapId(firstMap.id);
       else setViewMode('plans');
+      return;
     }
-  }, [viewMode, activeProjectId, activeBoardId, activeKanbanId, activeMindmapId, projects, projectsLoading, boardItems, boardItemsLoading]);
+    if (viewMode === 'girls' && chosenLoaded && !isChosen) setViewMode('plans');
+  }, [viewMode, activeProjectId, activeBoardId, activeKanbanId, activeMindmapId, projects, projectsLoading, boardItems, boardItemsLoading, chosenLoaded, isChosen]);
 
   const handleMenuSelect = useCallback((target) => {
-    const isBuiltinView = ['today', 'plans', 'calendar', 'goal_plan', 'reputation', 'no_date', 'someday', 'habits', 'food', 'focus_analytics'].includes(target);
+    const isBuiltinView = BUILTIN_MENU_ITEMS.some((item) => item.key === target);
     if (isBuiltinView) {
       setViewMode(target);
       setActiveProjectId(null);
@@ -1662,11 +1691,17 @@ export default function Dashboard() {
 
   const menuOrderSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  const builtinMenuItems = useMemo(
+    () => orderBuiltinItems(settings.menu_builtin_order, isChosen),
+    [settings.menu_builtin_order, isChosen],
+  );
+
   const openMenuOrderModal = useCallback(() => {
     setMenuOrderDraft(projects.map((p) => p.id));
+    setMenuBuiltinDraft(builtinMenuItems.map((item) => BUILTIN_DND_PREFIX + item.key));
     // Seed the visibility draft from currently persisted state.
     const draft = {};
-    BUILTIN_MENU_ITEMS.forEach((item) => {
+    builtinMenuItems.forEach((item) => {
       const key = menuHiddenKey('builtin', item.key);
       draft[key] = !!getListCollapsed?.(key);
     });
@@ -1676,7 +1711,7 @@ export default function Dashboard() {
     });
     setMenuVisDraft(draft);
     setMenuOrderModalOpen(true);
-  }, [projects, getListCollapsed]);
+  }, [projects, builtinMenuItems, getListCollapsed]);
 
   const toggleMenuVisDraft = useCallback((key) => {
     setMenuVisDraft((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -1700,17 +1735,23 @@ export default function Dashboard() {
     setMenuOrderActiveId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    setMenuOrderDraft((prev) => {
+    const move = (prev) => {
       const oldIndex = prev.indexOf(active.id);
       const newIndex = prev.indexOf(over.id);
       if (oldIndex < 0 || newIndex < 0) return prev;
       return arrayMove(prev, oldIndex, newIndex);
-    });
+    };
+    if (String(active.id).startsWith(BUILTIN_DND_PREFIX)) setMenuBuiltinDraft(move);
+    else setMenuOrderDraft(move);
   }, []);
 
   const saveMenuOrder = useCallback(async () => {
     if (projects.length > 1) {
       await reorderProjects(menuOrderDraft);
+    }
+    const builtinKeys = menuBuiltinDraft.map((id) => id.slice(BUILTIN_DND_PREFIX.length));
+    if (builtinKeys.join() !== builtinMenuItems.map((item) => item.key).join()) {
+      await setMenuBuiltinOrder(builtinKeys);
     }
     // Persist only the visibility flags that actually changed compared to
     // the live state, so we don't generate noise on the user_list_collapsed
@@ -1722,11 +1763,37 @@ export default function Dashboard() {
     });
     if (writes.length) await Promise.all(writes);
     setMenuOrderModalOpen(false);
-  }, [menuOrderDraft, menuVisDraft, projects.length, reorderProjects, getListCollapsed, setListCollapsed]);
+  }, [menuOrderDraft, menuBuiltinDraft, builtinMenuItems, menuVisDraft, projects.length, reorderProjects, setMenuBuiltinOrder, getListCollapsed, setListCollapsed]);
 
-  const activeMenuOrderProject = menuOrderActiveId
-    ? projects.find((p) => p.id === menuOrderActiveId)
-    : null;
+  const activeMenuOrderRow = (() => {
+    if (!menuOrderActiveId) return null;
+    const id = String(menuOrderActiveId);
+    if (id.startsWith(BUILTIN_DND_PREFIX)) {
+      const item = builtinMenuItems.find((it) => BUILTIN_DND_PREFIX + it.key === id);
+      return item ? { icon: item.icon, title: item.label } : null;
+    }
+    const project = projects.find((p) => p.id === id);
+    return project ? { icon: projectIcons(project.kind || 'project')[0], title: project.title } : null;
+  })();
+
+  const visibleBuiltinMenuItems = builtinMenuItems.filter((item) => !isBuiltinHidden(item.key));
+
+  const renderBuiltinMenuItem = (item) => {
+    const active = viewMode === item.key;
+    return (
+      <button
+        key={item.key}
+        type="button"
+        className={`dashboard-menu__item ${active ? 'dashboard-menu__item--active' : ''}`}
+        onMouseEnter={() => hasHover && setMenuHoverKey(item.key)}
+        onMouseLeave={() => hasHover && setMenuHoverKey((cur) => (cur === item.key ? null : cur))}
+        onClick={() => handleMenuSelect(item.key)}
+      >
+        <img src={active || (hasHover && menuHoverKey === item.key) ? item.navIcon : item.icon} alt="" />
+        <span>{item.label}</span>
+      </button>
+    );
+  };
 
   const renderFontMenuButton = () => (
     <button
@@ -1865,7 +1932,7 @@ export default function Dashboard() {
                 className="dashboard__board-header-slot dashboard__board-header-slot--right"
               />
             )}
-            {viewMode !== 'habits' && viewMode !== 'food' && viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'mindmap' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'reputation' && (
+            {viewMode !== 'habits' && viewMode !== 'food' && viewMode !== 'girls' && viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'mindmap' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'reputation' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
             </button>
@@ -1897,126 +1964,7 @@ export default function Dashboard() {
               title="Перетащите, чтобы изменить ширину"
             />
             <div className="dashboard-menu__body">
-              {!isBuiltinHidden('today') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setTodayHover(true)}
-                  onMouseLeave={() => hasHover && setTodayHover(false)}
-                  onClick={() => handleMenuSelect('today')}
-                >
-                  <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
-                  <span>Сегодня</span>
-                </button>
-              )}
-              {!isBuiltinHidden('plans') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'plans' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setPlansHover(true)}
-                  onMouseLeave={() => hasHover && setPlansHover(false)}
-                  onClick={() => handleMenuSelect('plans')}
-                >
-                  <img src={viewMode === 'plans' || (hasHover && plansHover) ? plansNavIcon : plansIcon} alt="" />
-                  <span>Планы</span>
-                </button>
-              )}
-              {!isBuiltinHidden('calendar') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'calendar' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setCalendarMenuHover(true)}
-                  onMouseLeave={() => hasHover && setCalendarMenuHover(false)}
-                  onClick={() => handleMenuSelect('calendar')}
-                >
-                  <img src={viewMode === 'calendar' || (hasHover && calendarMenuHover) ? calendarNavIcon : calendarIcon} alt="" />
-                  <span>Календарь</span>
-                </button>
-              )}
-              {!isBuiltinHidden('reputation') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'reputation' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setReputationMenuHover(true)}
-                  onMouseLeave={() => hasHover && setReputationMenuHover(false)}
-                  onClick={() => handleMenuSelect('reputation')}
-                >
-                  <img src={viewMode === 'reputation' || (hasHover && reputationMenuHover) ? goalNavIcon : goalIcon} alt="" />
-                  <span>Репутация перед собой</span>
-                </button>
-              )}
-              {!isBuiltinHidden('goal_plan') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'goal_plan' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setGoalPlanHover(true)}
-                  onMouseLeave={() => hasHover && setGoalPlanHover(false)}
-                  onClick={() => handleMenuSelect('goal_plan')}
-                >
-                  <img src={viewMode === 'goal_plan' || (hasHover && goalPlanHover) ? goalNavIcon : goalIcon} alt="" />
-                  <span>Планы с целями</span>
-                </button>
-              )}
-              {!isBuiltinHidden('no_date') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'no_date' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setNoDateHover(true)}
-                  onMouseLeave={() => hasHover && setNoDateHover(false)}
-                  onClick={() => handleMenuSelect('no_date')}
-                >
-                  <img src={viewMode === 'no_date' || (hasHover && noDateHover) ? layersNavIcon : layersIcon} alt="" />
-                  <span>Задачи без даты</span>
-                </button>
-              )}
-              {!isBuiltinHidden('someday') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'someday' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setSomedayHover(true)}
-                  onMouseLeave={() => hasHover && setSomedayHover(false)}
-                  onClick={() => handleMenuSelect('someday')}
-                >
-                  <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
-                  <span>Когда-нибудь</span>
-                </button>
-              )}
-              {!isBuiltinHidden('habits') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'habits' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setHabitsHover(true)}
-                  onMouseLeave={() => hasHover && setHabitsHover(false)}
-                  onClick={() => handleMenuSelect('habits')}
-                >
-                  <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
-                  <span>Привычки</span>
-                </button>
-              )}
-              {!isBuiltinHidden('food') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'food' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setFoodHover(true)}
-                  onMouseLeave={() => hasHover && setFoodHover(false)}
-                  onClick={() => handleMenuSelect('food')}
-                >
-                  <img src={viewMode === 'food' || (hasHover && foodHover) ? foodNavIcon : foodIcon} alt="" />
-                  <span>Еда</span>
-                </button>
-              )}
-              {!isBuiltinHidden('focus_analytics') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'focus_analytics' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setFocusHover(true)}
-                  onMouseLeave={() => hasHover && setFocusHover(false)}
-                  onClick={() => handleMenuSelect('focus_analytics')}
-                >
-                  <img src={viewMode === 'focus_analytics' || (hasHover && focusHover) ? focusNavIcon : focusIcon} alt="" />
-                  <span>Фокус</span>
-                </button>
-              )}
+              {visibleBuiltinMenuItems.map(renderBuiltinMenuItem)}
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                 {projects.filter((p) => !isProjectHidden(p.id)).map((p) => {
                   const kind = p.kind || 'project';
@@ -2089,18 +2037,7 @@ export default function Dashboard() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="dashboard-menu__mobile-top">
-                {!isBuiltinHidden('today') ? (
-                  <button
-                    type="button"
-                    className={`dashboard-menu__item ${viewMode === 'today' ? 'dashboard-menu__item--active' : ''}`}
-                    onMouseEnter={() => hasHover && setTodayHover(true)}
-                    onMouseLeave={() => hasHover && setTodayHover(false)}
-                    onClick={() => handleMenuSelect('today')}
-                  >
-                    <img src={viewMode === 'today' || (hasHover && todayHover) ? starNavIcon : starIcon} alt="" />
-                    <span>Сегодня</span>
-                  </button>
-                ) : <span />}
+                {visibleBuiltinMenuItems[0] ? renderBuiltinMenuItem(visibleBuiltinMenuItems[0]) : <span />}
                 <button
                   type="button"
                   className="dashboard-menu__close"
@@ -2110,114 +2047,7 @@ export default function Dashboard() {
                   ×
                 </button>
               </div>
-              {!isBuiltinHidden('plans') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'plans' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setPlansHover(true)}
-                  onMouseLeave={() => hasHover && setPlansHover(false)}
-                  onClick={() => handleMenuSelect('plans')}
-                >
-                  <img src={viewMode === 'plans' || (hasHover && plansHover) ? plansNavIcon : plansIcon} alt="" />
-                  <span>Планы</span>
-                </button>
-              )}
-              {!isBuiltinHidden('calendar') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'calendar' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setCalendarMenuHover(true)}
-                  onMouseLeave={() => hasHover && setCalendarMenuHover(false)}
-                  onClick={() => handleMenuSelect('calendar')}
-                >
-                  <img src={viewMode === 'calendar' || (hasHover && calendarMenuHover) ? calendarNavIcon : calendarIcon} alt="" />
-                  <span>Календарь</span>
-                </button>
-              )}
-              {!isBuiltinHidden('reputation') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'reputation' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setReputationMenuHover(true)}
-                  onMouseLeave={() => hasHover && setReputationMenuHover(false)}
-                  onClick={() => handleMenuSelect('reputation')}
-                >
-                  <img src={viewMode === 'reputation' || (hasHover && reputationMenuHover) ? goalNavIcon : goalIcon} alt="" />
-                  <span>Репутация перед собой</span>
-                </button>
-              )}
-              {!isBuiltinHidden('goal_plan') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'goal_plan' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setGoalPlanHover(true)}
-                  onMouseLeave={() => hasHover && setGoalPlanHover(false)}
-                  onClick={() => handleMenuSelect('goal_plan')}
-                >
-                  <img src={viewMode === 'goal_plan' || (hasHover && goalPlanHover) ? goalNavIcon : goalIcon} alt="" />
-                  <span>Планы с целями</span>
-                </button>
-              )}
-              {!isBuiltinHidden('no_date') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'no_date' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setNoDateHover(true)}
-                  onMouseLeave={() => hasHover && setNoDateHover(false)}
-                  onClick={() => handleMenuSelect('no_date')}
-                >
-                  <img src={viewMode === 'no_date' || (hasHover && noDateHover) ? layersNavIcon : layersIcon} alt="" />
-                  <span>Задачи без даты</span>
-                </button>
-              )}
-              {!isBuiltinHidden('someday') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'someday' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setSomedayHover(true)}
-                  onMouseLeave={() => hasHover && setSomedayHover(false)}
-                  onClick={() => handleMenuSelect('someday')}
-                >
-                  <img src={viewMode === 'someday' || (hasHover && somedayHover) ? archiveNavIcon : archiveIcon} alt="" />
-                  <span>Когда-нибудь</span>
-                </button>
-              )}
-              {!isBuiltinHidden('habits') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'habits' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setHabitsHover(true)}
-                  onMouseLeave={() => hasHover && setHabitsHover(false)}
-                  onClick={() => handleMenuSelect('habits')}
-                >
-                  <img src={viewMode === 'habits' || (hasHover && habitsHover) ? privNavIcon : privIcon} alt="" />
-                  <span>Привычки</span>
-                </button>
-              )}
-              {!isBuiltinHidden('food') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'food' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setFoodHover(true)}
-                  onMouseLeave={() => hasHover && setFoodHover(false)}
-                  onClick={() => handleMenuSelect('food')}
-                >
-                  <img src={viewMode === 'food' || (hasHover && foodHover) ? foodNavIcon : foodIcon} alt="" />
-                  <span>Еда</span>
-                </button>
-              )}
-              {!isBuiltinHidden('focus_analytics') && (
-                <button
-                  type="button"
-                  className={`dashboard-menu__item ${viewMode === 'focus_analytics' ? 'dashboard-menu__item--active' : ''}`}
-                  onMouseEnter={() => hasHover && setFocusHover(true)}
-                  onMouseLeave={() => hasHover && setFocusHover(false)}
-                  onClick={() => handleMenuSelect('focus_analytics')}
-                >
-                  <img src={viewMode === 'focus_analytics' || (hasHover && focusHover) ? focusNavIcon : focusIcon} alt="" />
-                  <span>Фокус</span>
-                </button>
-              )}
+              {visibleBuiltinMenuItems.slice(1).map(renderBuiltinMenuItem)}
               <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                 {projects.filter((p) => !isProjectHidden(p.id)).map((p) => {
                   const kind = p.kind || 'project';
@@ -2676,68 +2506,54 @@ export default function Dashboard() {
           >
             <div className="dashboard__settings-title">Порядок пунктов меню</div>
             <div className="dashboard-menu__order-list">
-              {BUILTIN_MENU_ITEMS.map((item) => {
-                const visKey = menuHiddenKey('builtin', item.key);
-                const hidden = !!menuVisDraft[visKey];
-                const icon = (() => {
-                  switch (item.key) {
-                    case 'today': return starIcon;
-                    case 'plans': return plansIcon;
-                    case 'calendar': return calendarIcon;
-                    case 'goal_plan': return goalIcon;
-                    case 'reputation': return goalIcon;
-                    case 'no_date': return layersIcon;
-                    case 'someday': return archiveIcon;
-                    case 'habits': return privIcon;
-                    case 'food': return foodIcon;
-                    case 'focus_analytics': return focusIcon;
-                    default: return folderIcon;
-                  }
-                })();
-                return (
-                  <BuiltinMenuOrderRow
-                    key={item.key}
-                    item={item}
-                    icon={icon}
-                    hidden={hidden}
-                    onToggleHidden={() => toggleMenuVisDraft(visKey)}
-                  />
-                );
-              })}
-              {projects.length > 0 && (
-                <div className="dashboard-menu__order-divider" aria-hidden />
-              )}
               <DndContext
                 sensors={menuOrderSensors}
-                collisionDetection={closestCenter}
+                collisionDetection={sameListCollision}
                 onDragStart={handleMenuOrderDragStart}
                 onDragEnd={handleMenuOrderDragEnd}
               >
+                <SortableContext items={menuBuiltinDraft} strategy={verticalListSortingStrategy}>
+                  {menuBuiltinDraft.map((id) => {
+                    const item = builtinMenuItems.find((it) => BUILTIN_DND_PREFIX + it.key === id);
+                    if (!item) return null;
+                    const visKey = menuHiddenKey('builtin', item.key);
+                    return (
+                      <SortableMenuOrderRow
+                        key={id}
+                        id={id}
+                        icon={item.icon}
+                        title={item.label}
+                        hidden={!!menuVisDraft[visKey]}
+                        onToggleHidden={() => toggleMenuVisDraft(visKey)}
+                      />
+                    );
+                  })}
+                </SortableContext>
+                {projects.length > 0 && (
+                  <div className="dashboard-menu__order-divider" aria-hidden />
+                )}
                 <SortableContext items={menuOrderDraft} strategy={verticalListSortingStrategy}>
                   {menuOrderDraft.map((id) => {
                     const p = projects.find((proj) => proj.id === id);
                     if (!p) return null;
                     const visKey = menuHiddenKey('project', p.id);
-                    const hidden = !!menuVisDraft[visKey];
                     return (
                       <SortableMenuOrderRow
                         key={id}
-                        project={p}
-                        hidden={hidden}
+                        id={id}
+                        icon={projectIcons(p.kind || 'project')[0]}
+                        title={p.title}
+                        hidden={!!menuVisDraft[visKey]}
                         onToggleHidden={() => toggleMenuVisDraft(visKey)}
                       />
                     );
                   })}
                 </SortableContext>
                 <DragOverlay>
-                  {activeMenuOrderProject ? (
+                  {activeMenuOrderRow ? (
                     <div className="dashboard-menu__order-row dashboard-menu__order-row--overlay">
-                      <img
-                        src={projectIcons(activeMenuOrderProject.kind || 'project')[0]}
-                        alt=""
-                        className="dashboard-menu__order-icon"
-                      />
-                      <span className="dashboard-menu__order-title">{activeMenuOrderProject.title}</span>
+                      <img src={activeMenuOrderRow.icon} alt="" className="dashboard-menu__order-icon" />
+                      <span className="dashboard-menu__order-title">{activeMenuOrderRow.title}</span>
                       <span className="dashboard-menu__order-handle" aria-hidden>
                         <img src={dragIcon} alt="" />
                       </span>
@@ -2968,6 +2784,8 @@ export default function Dashboard() {
       {viewMode === 'food' && (
         <FoodView dates={days.map(toLocalDateString)} hasHover={hasHover} />
       )}
+
+      {viewMode === 'girls' && isChosen && <GirlsView />}
 
       {viewMode === 'focus_analytics' && <FocusAnalytics />}
 

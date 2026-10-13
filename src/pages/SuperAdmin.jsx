@@ -35,6 +35,11 @@ export default function SuperAdmin() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  // «Избранные» — emails with access to the «Девушки» section.
+  const [chosen, setChosen] = useState(() => new Set());
+  const [chosenBusy, setChosenBusy] = useState(() => new Set());
+  const [chosenError, setChosenError] = useState('');
+
   const [pwEditId, setPwEditId] = useState(null);
   const [pwValue, setPwValue] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
@@ -59,6 +64,16 @@ export default function SuperAdmin() {
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setError('');
+    supabase
+      .from('chosen_users')
+      .select('email')
+      .then(({ data, error: err }) => {
+        if (err) setChosenError('Избранные недоступны: выполните миграцию 065.');
+        else {
+          setChosenError('');
+          setChosen(new Set((data ?? []).map((r) => r.email)));
+        }
+      });
     try {
       const data = await callAdmin({ action: 'list' });
       const list = (data?.users ?? []).slice().sort((a, b) => {
@@ -111,6 +126,36 @@ export default function SuperAdmin() {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const toggleChosen = async (u) => {
+    const email = (u.email || '').toLowerCase();
+    if (!email || chosenBusy.has(email)) return;
+    const on = !chosen.has(email);
+    setChosenBusy((prev) => new Set(prev).add(email));
+    setChosen((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(email);
+      else next.delete(email);
+      return next;
+    });
+    const { error: err } = on
+      ? await supabase.from('chosen_users').insert({ email })
+      : await supabase.from('chosen_users').delete().eq('email', email);
+    if (err && err.code !== '23505') {
+      setChosenError(err.message || 'Не удалось изменить доступ');
+      setChosen((prev) => {
+        const next = new Set(prev);
+        if (on) next.delete(email);
+        else next.add(email);
+        return next;
+      });
+    }
+    setChosenBusy((prev) => {
+      const next = new Set(prev);
+      next.delete(email);
+      return next;
+    });
   };
 
   const toggleReveal = (id) => {
@@ -206,6 +251,7 @@ export default function SuperAdmin() {
           </div>
 
           {error && <p className="superadmin__error">{error}</p>}
+          {chosenError && <p className="superadmin__error">{chosenError}</p>}
 
           {loading ? (
             <p className="superadmin__muted">Загрузка...</p>
@@ -219,6 +265,7 @@ export default function SuperAdmin() {
                     <th>Email (логин)</th>
                     <th>Пароль</th>
                     <th>Роль</th>
+                    <th title="Доступ к разделу «Девушки»">Избранный</th>
                     <th>Создан</th>
                     <th aria-label="Действия" />
                   </tr>
@@ -290,6 +337,20 @@ export default function SuperAdmin() {
                         ) : (
                           'пользователь'
                         )}
+                      </td>
+                      <td>
+                        <label className="superadmin__switch" title="Доступ к разделу «Девушки»">
+                          <input
+                            type="checkbox"
+                            checked={chosen.has((u.email || '').toLowerCase())}
+                            disabled={!u.email || chosenBusy.has((u.email || '').toLowerCase())}
+                            onChange={() => toggleChosen(u)}
+                          />
+                          <span className="superadmin__switch-track" aria-hidden="true" />
+                          <span className="superadmin__switch-label">
+                            {chosen.has((u.email || '').toLowerCase()) ? 'да' : 'нет'}
+                          </span>
+                        </label>
                       </td>
                       <td className="superadmin__muted">{formatDate(u.created_at)}</td>
                       <td className="superadmin__row-actions">

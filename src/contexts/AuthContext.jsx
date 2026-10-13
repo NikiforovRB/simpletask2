@@ -31,6 +31,28 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // «Избранные» (see /superadmin) get the «Девушки» section.
+  const [chosen, setChosen] = useState({ userId: null, value: false });
+  const userId = user?.id ?? null;
+  const userEmail = (user?.email ?? '').toLowerCase();
+  useEffect(() => {
+    if (!userId || !userEmail) return undefined;
+    let cancelled = false;
+    supabase
+      .from('chosen_users')
+      .select('email')
+      .eq('email', userEmail)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!cancelled) setChosen({ userId, value: !error && !!data });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, userEmail]);
+  const chosenLoaded = !!userId && chosen.userId === userId;
+  const isChosen = chosenLoaded && chosen.value;
+
   const signIn = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
@@ -56,7 +78,7 @@ export function AuthProvider({ children }) {
 
   const isSuperAdmin = (user?.email ?? '').toLowerCase() === SUPERADMIN_EMAIL;
 
-  const value = { user, loading, signIn, signUp, signOut, isSuperAdmin };
+  const value = { user, loading, signIn, signUp, signOut, isSuperAdmin, isChosen, chosenLoaded };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

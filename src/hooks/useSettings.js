@@ -36,6 +36,10 @@ function normalizeMap(v) {
   return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
 }
 
+function normalizeKeyList(v) {
+  return Array.isArray(v) ? v.filter((k) => typeof k === 'string') : [];
+}
+
 // Colours offered for the filled areas on the calendar focus scale.
 export const FOCUS_SCALE_COLORS = ['#15c466', '#5a86ee'];
 
@@ -79,6 +83,7 @@ export function useSettings() {
     show_reputation_in_lists: false,
     reputation_in_completed: false,
     kanban_date_filters: {},
+    menu_builtin_order: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -121,6 +126,7 @@ export function useSettings() {
           show_reputation_in_lists: data.show_reputation_in_lists === true,
           reputation_in_completed: data.reputation_in_completed === true,
           kanban_date_filters: normalizeMap(data.kanban_date_filters),
+          menu_builtin_order: normalizeKeyList(data.menu_builtin_order),
         });
       } else if (!error && !data) {
         await supabase.from('user_settings').insert({
@@ -162,6 +168,7 @@ export function useSettings() {
           show_reputation_in_lists: false,
           reputation_in_completed: false,
           kanban_date_filters: {},
+          menu_builtin_order: [],
         });
       }
       setLoading(false);
@@ -307,6 +314,13 @@ export function useSettings() {
     await supabase.from('user_settings').update({ calendar_carry_over: val }).eq('user_id', user.id);
   };
 
+  const setMenuBuiltinOrder = async (keys) => {
+    if (!user) return;
+    const val = normalizeKeyList(keys);
+    setSettings((s) => ({ ...s, menu_builtin_order: val }));
+    await supabase.from('user_settings').update({ menu_builtin_order: val }).eq('user_id', user.id);
+  };
+
   const setFocusTimerShowTotal = async (v) => {
     if (!user) return;
     const val = !!v;
@@ -360,6 +374,7 @@ export function useSettings() {
     setCalendarShowNoDate,
     setCalendarNoDateInCompleted,
     setCalendarCarryOver,
+    setMenuBuiltinOrder,
     setFocusTimerShowTotal,
     setShowReputationInLists,
     setReputationInCompleted,
