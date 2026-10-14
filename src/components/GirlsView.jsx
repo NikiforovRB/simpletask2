@@ -85,6 +85,7 @@ const DEFAULT_VIEW = {
   tab: 'approach',
   sort: { meet: 'new', dating: 'upcoming' },
   stats: { open: true, mode: 'week' },
+  plannerDays: 7,
 };
 
 function loadView() {
@@ -99,7 +100,8 @@ function loadView() {
       open: typeof v?.stats?.open === 'boolean' ? v.stats.open : DEFAULT_VIEW.stats.open,
       mode: v?.stats?.mode === 'month' ? 'month' : 'week',
     };
-    return { tab, sort, stats };
+    const plannerDays = Number.isInteger(v?.plannerDays) && v.plannerDays >= 1 && v.plannerDays <= 7 ? v.plannerDays : DEFAULT_VIEW.plannerDays;
+    return { tab, sort, stats, plannerDays };
   } catch {
     return DEFAULT_VIEW;
   }
@@ -481,6 +483,8 @@ export function GirlsView({ store, analyticsOpen = false, onAnalyticsClose, plan
           tasks={tasks}
           items={plan}
           today={today}
+          dayCount={view.plannerDays}
+          onDayCount={(n) => setView((v) => ({ ...v, plannerDays: n }))}
           urlOf={urlOf}
           loaded={loaded && tasksLoaded}
           tasksReady={tasksReady}

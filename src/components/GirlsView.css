@@ -1814,6 +1814,47 @@
   font-size: 0.875rem;
 }
 
+.planner__days {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-elev);
+}
+
+.planner__days-label {
+  padding: 0 0.45rem 0 0.4rem;
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+}
+
+.planner__days-btn {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.planner__days-btn:hover {
+  color: var(--text-strong);
+}
+
+.planner__days-btn--on,
+.planner__days-btn--on:hover {
+  background: var(--bg-app);
+  color: var(--text-strong);
+  box-shadow: var(--shadow-sm);
+}
+
 .planner__warn {
   margin: 0 0 0.85rem;
   padding: 0.6rem 0.85rem;
@@ -1833,9 +1874,11 @@
   overscroll-behavior-x: contain;
 }
 
+/* Fewer days — wider columns, up to a limit. */
 .planner__col {
-  --col-bg: #0f0f0f;
-  flex: 0 0 15.5rem;
+  --col-bg: #121212;
+  flex: 1 0 15.5rem;
+  max-width: 22rem;
   min-width: 0;
   box-sizing: border-box;
   display: flex;
@@ -1844,7 +1887,6 @@
   padding: 0.5rem;
   border-radius: 14px;
   background: var(--col-bg);
-  box-shadow: inset 0 0 0 1px var(--border-muted);
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -1981,22 +2023,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-}
-
-.planner__col-none {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 2.75rem;
-  border: 1px dashed var(--border-strong);
-  border-radius: 10px;
-  color: var(--text-faint);
-  font-size: 0.8125rem;
-}
-
-.planner__col--over .planner__col-none {
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 .plan-card {
@@ -2627,14 +2653,33 @@
   .planner__col {
     flex: none;
     width: 100%;
-  }
-
-  .planner__col--empty .planner__col-list {
-    display: none;
+    max-width: none;
   }
 
   .planner__title {
     font-size: 1.125rem;
+  }
+
+  .planner__head {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .planner__heading {
+    flex: 1 1 100%;
+  }
+
+  .planner__head > .girl-editor__spacer {
+    display: none;
+  }
+
+  .planner__days {
+    flex: 1 1 100%;
+  }
+
+  .planner__days-btn {
+    flex: 1;
+    width: auto;
   }
 
   .girls-follow__text {

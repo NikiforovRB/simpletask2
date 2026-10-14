@@ -16,7 +16,7 @@ import {
 } from '../lib/girls';
 import { Avatar, CheckIcon, PhoneIcon, PlusIcon, TaskKindIcon, TelegramIcon } from './GirlsIcons';
 
-const PLANNER_DAYS = 7;
+const DAY_COUNTS = [1, 2, 3, 4, 5, 6, 7];
 // Silent this long — the girl is marked in «Без плана».
 const STALE_DAYS = 7;
 
@@ -34,18 +34,33 @@ function onEnter(fn) {
 }
 
 /**
- * The plan for the week: what to write, whom to call, which dates — by day.
- * Cards are dragged between the days; a girl from «Без плана» dragged onto a
- * day gets something planned for that day.
+ * The plan for `dayCount` days from today: what to write, whom to call, which
+ * dates. Everything further on is in «Позже». Cards are dragged between the
+ * days; a girl from «Без плана» dragged onto a day gets something planned for it.
  */
-export function GirlsPlanner({ girls, tasks, items, today, urlOf, loaded, tasksReady, onCreate, onOpen, onToggleDone, onMove, onMoveAll }) {
+export function GirlsPlanner({
+  girls,
+  tasks,
+  items,
+  today,
+  dayCount,
+  onDayCount,
+  urlOf,
+  loaded,
+  tasksReady,
+  onCreate,
+  onOpen,
+  onToggleDone,
+  onMove,
+  onMoveAll,
+}) {
   const [active, setActive] = useState(null);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
   );
 
-  const days = Array.from({ length: PLANNER_DAYS }, (_, i) => addDays(today, i));
+  const days = Array.from({ length: dayCount }, (_, i) => addDays(today, i));
   const lastDay = days[days.length - 1];
   const sorted = [...items].sort(compareItems);
   const overdue = sorted.filter((it) => !it.done && it.day < today);
@@ -97,6 +112,22 @@ export function GirlsPlanner({ girls, tasks, items, today, urlOf, loaded, tasksR
         <div className="planner__heading">
           <span className="planner__title">Планер</span>
           <span className="planner__summary">{summary}</span>
+        </div>
+        <span className="girl-editor__spacer" />
+        <div className="planner__days" role="radiogroup" aria-label="Сколько дней показывать">
+          <span className="planner__days-label">Дней</span>
+          {DAY_COUNTS.map((n) => (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={dayCount === n}
+              className={`planner__days-btn ${dayCount === n ? 'planner__days-btn--on' : ''}`}
+              onClick={() => onDayCount(n)}
+            >
+              {n}
+            </button>
+          ))}
         </div>
         {girls.some((g) => !g.archived) && (
           <button type="button" className="girls__add" onClick={() => onCreate({ day: today })}>
@@ -208,9 +239,8 @@ export function GirlsPlanner({ girls, tasks, items, today, urlOf, loaded, tasksR
 
 function Column({ dropId, className = '', title, sub, count, footer, onAdd, children }) {
   const { setNodeRef, isOver } = useDroppable({ id: dropId || `static:${title}`, disabled: !dropId });
-  const empty = children.length === 0;
   return (
-    <section ref={setNodeRef} className={`planner__col ${className} ${isOver ? 'planner__col--over' : ''} ${empty ? 'planner__col--empty' : ''}`}>
+    <section ref={setNodeRef} className={`planner__col ${className} ${isOver ? 'planner__col--over' : ''}`}>
       <header className="planner__col-head">
         <span className="planner__col-title">{title}</span>
         {sub && <span className="planner__col-sub">{sub}</span>}
@@ -222,7 +252,7 @@ function Column({ dropId, className = '', title, sub, count, footer, onAdd, chil
           </button>
         )}
       </header>
-      <div className="planner__col-list">{empty ? <span className="planner__col-none">Пусто</span> : children}</div>
+      {children.length > 0 && <div className="planner__col-list">{children}</div>}
       {footer}
     </section>
   );
