@@ -22,10 +22,22 @@ function normalizeRow(row) {
 }
 
 const APPROACHES = 'girl_approaches';
+const TASKS = 'girl_tasks';
 
 function normalizeApproach(row) {
   return { ...row, time: row.time || null, girl_id: row.girl_id || null, place: row.place || '', note: row.note || '' };
 }
+
+function normalizeTask(row) {
+  return { ...row, time: row.time || null, note: row.note || '', done_at: row.done_at || null };
+}
+
+const withoutRow = (id) => (prev) => {
+  if (!prev[id]) return prev;
+  const next = { ...prev };
+  delete next[id];
+  return next;
+};
 
 const byId = (rows, normalize) => {
   const next = {};
@@ -109,6 +121,9 @@ export function useGirls() {
   const [approachRows, setApproachRows] = useState({});
   // { userId, ok } — ok is false while the table is missing (migration 067 not applied).
   const [approachesState, setApproachesState] = useState(null);
+  const [taskRows, setTaskRows] = useState({});
+  // The same for girl_tasks (migration 068).
+  const [tasksState, setTasksState] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -138,6 +153,16 @@ export function useGirls() {
         setApproachRows(err ? {} : byId(data, normalizeApproach));
         setApproachesState({ userId, ok: !err });
       });
+    supabase
+      .from(TASKS)
+      .select('*')
+      .eq('user_id', userId)
+      .then(({ data, error: err }) => {
+        if (cancelled) return;
+        if (err) console.error('girl tasks load error', err);
+        setTaskRows(err ? {} : byId(data, normalizeTask));
+        setTasksState({ userId, ok: !err });
+      });
     return () => {
       cancelled = true;
     };
@@ -147,9 +172,11 @@ export function useGirls() {
     if (!userId) return undefined;
     const girlsChannel = subscribeRows('girls', 'girls', userId, normalizeRow, setRows);
     const approachesChannel = subscribeRows('girl_approaches', APPROACHES, userId, normalizeApproach, setApproachRows);
+    const tasksChannel = subscribeRows('girl_tasks', TASKS, userId, normalizeTask, setTaskRows);
     return () => {
       supabase.removeChannel(girlsChannel);
       supabase.removeChannel(approachesChannel);
+      supabase.removeChannel(tasksChannel);
     };
   }, [userId]);
 
@@ -161,6 +188,11 @@ export function useGirls() {
   const approaches = useMemo(
     () => (userId ? Object.values(approachRows).filter((r) => r.user_id === userId) : []),
     [approachRows, userId],
+  );
+
+  const tasks = useMemo(
+    () => (userId ? Object.values(taskRows).filter((r) => r.user_id === userId) : []),
+    [taskRows, userId],
   );
 
   const reload = useCallback(async () => {
@@ -175,6 +207,13 @@ export function useGirls() {
     const { data, error: err } = await supabase.from(APPROACHES).select('*').eq('user_id', userId);
     if (err) return;
     setApproachRows(byId(data, normalizeApproach));
+  }, [userId]);
+
+  const reloadTasks = useCallback(async () => {
+    if (!userId) return;
+    const { data, error: err } = await supabase.from(TASKS).select('*').eq('user_id', userId);
+    if (err) return;
+    setTaskRows(byId(data, normalizeTask));
   }, [userId]);
 
   const addGirl = useCallback(async (fields) => {
@@ -227,6 +266,12 @@ export function useGirls() {
       reload();
       return;
     }
+    // The database drops her tasks along with her.
+    setTaskRows((prev) => {
+      const next = {};
+      for (const [k, t] of Object.entries(prev)) if (t.girl_id !== id) next[k] = t;
+      return next;
+    });
     removeAvatarFile(avatarPath);
   }, [userId, reload]);
 
@@ -303,9 +348,57 @@ export function useGirls() {
     }
   }, [userId, reloadApproaches]);
 
+  const addTask = useCallback(async (fields) => {
+    if (!userId) return null;
+    const now = new Date().toISOString();
+    const row = normalizeTask({ done_at: null, ...fields, id: genGirlId(), user_id: userId, created_at: now, updated_at: now });
+    setError(null);
+    setTaskRows((prev) => ({ ...prev, [row.id]: row }));
+    const { data, error: err } = await supabase.from(TASKS).insert(row).select().single();
+    if (err) {
+      console.error('girl task insert error', err);
+      setError(SAVE_ERROR);
+      setTaskRows(withoutRow(row.id));
+      return null;
+    }
+    if (data) setTaskRows((prev) => ({ ...prev, [data.id]: normalizeTask(data) }));
+    return row.id;
+  }, [userId]);
+
+  const updateTask = useCallback(async (id, patch) => {
+    if (!userId) return;
+    const updates = { ...patch, updated_at: new Date().toISOString() };
+    setError(null);
+    setTaskRows((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...updates } } : prev));
+    const { error: err } = await supabase.from(TASKS).update(updates).eq('id', id).eq('user_id', userId);
+    if (err) {
+      console.error('girl task update error', err);
+      setError(SAVE_ERROR);
+      reloadTasks();
+    }
+  }, [userId, reloadTasks]);
+
+  const deleteTask = useCallback(async (id) => {
+    if (!userId) return;
+    setError(null);
+    setTaskRows(withoutRow(id));
+    const { error: err } = await supabase.from(TASKS).delete().eq('id', id).eq('user_id', userId);
+    if (err) {
+      console.error('girl task delete error', err);
+      setError(SAVE_ERROR);
+      reloadTasks();
+    }
+  }, [userId, reloadTasks]);
+
   return {
     girls,
     loaded: !!userId && loadedFor === userId,
+    tasks,
+    tasksLoaded: !!userId && tasksState?.userId === userId,
+    tasksReady: !!userId && tasksState?.userId === userId && tasksState.ok,
+    addTask,
+    updateTask,
+    deleteTask,
     approaches,
     approachesLoaded: !!userId && approachesState?.userId === userId,
     approachesReady: !!userId && approachesState?.userId === userId && approachesState.ok,

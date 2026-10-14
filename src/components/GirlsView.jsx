@@ -1,37 +1,63 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { useGirls, useAvatarUrls, genGirlId } from '../hooks/useGirls';
+import { useAvatarUrls, genGirlId } from '../hooks/useGirls';
 import { useModalClose } from '../hooks/useModalClose';
+import { toLocalDateString } from '../constants';
 import {
   DATE_PRESETS,
   addDays,
+  agoLabel,
   approachMatches,
-  avatarColor,
-  dateKey,
+  compareItems,
+  daysBetween,
   filterRange,
   formatDate,
   formatDateTime,
   formatRange,
+  formatWhen,
   funnelOf,
   inRange,
+  lastContactOf,
   lastPastDate,
   matches,
   nextDate,
   nowTime,
+  pendingByGirl,
   percent,
   phoneHref,
+  planItems,
   plural,
+  quickDays,
+  relativeDay,
   sortApproaches,
+  sortDates,
   sortGirls,
   squareJpeg,
   stageOf,
+  taskKind,
   telegramLink,
   todayStr,
 } from '../lib/girls';
-import telegramIcon from '../assets/telegram.png';
+import {
+  Avatar,
+  CalendarIcon,
+  CameraIcon,
+  CheckIcon,
+  CloseIcon,
+  PhoneIcon,
+  PlusIcon,
+  SearchIcon,
+  TaskKindIcon,
+  TelegramIcon,
+} from './GirlsIcons';
 import { GirlsAnalytics } from './GirlsAnalytics';
 import { GirlsDatePicker } from './GirlsDatePicker';
+import { GirlsPlanner } from './GirlsPlanner';
 import { GirlsStats } from './GirlsStats';
+import { GirlTaskEditor } from './GirlTaskEditor';
 import './GirlsView.css';
+
+const CONTACT_KINDS = ['message', 'call'];
+const ALL_KINDS = ['message', 'call', 'date'];
 
 const VIEW_KEY = 'girls_view_v1';
 
@@ -80,74 +106,20 @@ function loadView() {
 }
 
 // ---------------------------------------------------------------------------
-// Icons
-// ---------------------------------------------------------------------------
-
-function Icon({ children, className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {children}
-    </svg>
-  );
-}
-
-const PhoneIcon = () => (
-  <Icon>
-    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
-  </Icon>
-);
-const TelegramIcon = () => <img className="girl-tg-icon" src={telegramIcon} alt="" draggable={false} />;
-const SearchIcon = () => (
-  <Icon className="girls__search-icon">
-    <circle cx="11" cy="11" r="7" />
-    <path d="m20 20-3.5-3.5" />
-  </Icon>
-);
-const PlusIcon = () => (
-  <Icon>
-    <path d="M12 5v14M5 12h14" />
-  </Icon>
-);
-const CloseIcon = () => (
-  <Icon>
-    <path d="M18 6 6 18M6 6l12 12" />
-  </Icon>
-);
-const CheckIcon = () => (
-  <Icon>
-    <path d="M20 6 9 17l-5-5" />
-  </Icon>
-);
-const CalendarIcon = () => (
-  <Icon className="girl-input__icon">
-    <rect x="3" y="5" width="18" height="16" rx="2" />
-    <path d="M16 3v4M8 3v4M3 10h18" />
-  </Icon>
-);
-const CameraIcon = () => (
-  <Icon>
-    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-    <circle cx="12" cy="13" r="3.5" />
-  </Icon>
-);
-
-function Avatar({ name, url, className = '' }) {
-  if (url) return <img className={`girl-avatar girl-avatar--photo ${className}`} src={url} alt="" draggable={false} />;
-  return (
-    <span className={`girl-avatar ${className}`} style={{ background: avatarColor(name) }} aria-hidden="true">
-      {name.trim().charAt(0).toUpperCase() || '?'}
-    </span>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // View
 // ---------------------------------------------------------------------------
 
-export function GirlsView({ analyticsOpen = false, onAnalyticsClose }) {
+/** `store` — useGirls() of the dashboard (it also counts what's due for the header). */
+export function GirlsView({ store, analyticsOpen = false, onAnalyticsClose, plannerOpen = false }) {
   const {
     girls,
     loaded,
+    tasks,
+    tasksLoaded,
+    tasksReady,
+    addTask,
+    updateTask,
+    deleteTask,
     approaches,
     approachesLoaded,
     approachesReady,
@@ -161,7 +133,7 @@ export function GirlsView({ analyticsOpen = false, onAnalyticsClose }) {
     addApproach,
     updateApproach,
     deleteApproach,
-  } = useGirls();
+  } = store;
   const [view, setView] = useState(loadView);
   const [query, setQuery] = useState('');
   const [dateFilter, setDateFilter] = useState({ key: 'all' });
@@ -174,8 +146,13 @@ export function GirlsView({ analyticsOpen = false, onAnalyticsClose }) {
   // the fields to start from (when coming back from her card).
   const [approachEdit, setApproachEdit] = useState(null);
   const [ownAnalytics, setOwnAnalytics] = useState(false);
+  // A planned thing: { key } — an existing one, { seed } — a new one.
+  const [taskEdit, setTaskEdit] = useState(null);
+  // «What's next» after a done contact: { girlId, name, kind }.
+  const [followUp, setFollowUp] = useState(null);
   const [notice, setNotice] = useState(null);
   const noticeTimer = useRef(null);
+  const followTimer = useRef(null);
   const today = todayStr();
   const urlOf = useAvatarUrls(girls.map((g) => g.avatar_path));
 
@@ -187,7 +164,13 @@ export function GirlsView({ analyticsOpen = false, onAnalyticsClose }) {
     }
   }, [view]);
 
-  useEffect(() => () => clearTimeout(noticeTimer.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(noticeTimer.current);
+      clearTimeout(followTimer.current);
+    },
+    [],
+  );
 
   const tab = view.tab;
   const sort = view.sort[tab];
@@ -213,6 +196,10 @@ export function GirlsView({ analyticsOpen = false, onAnalyticsClose }) {
     }
   }
   const funnel = funnelOf(approaches, girlsById, range);
+
+  const plan = planItems(girls, tasks, today);
+  const pending = pendingByGirl(plan);
+  const activeGirls = girls.filter((g) => !g.archived).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 
   const allPlaces = useMemo(
     () =>
@@ -270,7 +257,78 @@ export function GirlsView({ analyticsOpen = false, onAnalyticsClose }) {
     onAnalyticsClose?.();
   };
 
-  const handleSave = async (fields, avatar) => {
+  // --- Planner -------------------------------------------------------------
+
+  const editingItem = taskEdit?.key ? plan.find((it) => it.key === taskEdit.key) : null;
+  const taskRow = (fields) => ({ kind: fields.kind, due_on: fields.day, time: fields.time, note: fields.note });
+
+  const saveTask = (item, fields) => {
+    setTaskEdit(null);
+    const girl = girlsById.get(fields.girlId);
+    if (!girl) return;
+    if (fields.kind !== 'date') {
+      if (item) updateTask(item.id, taskRow(fields));
+      else addTask({ girl_id: girl.id, ...taskRow(fields) });
+      return;
+    }
+    const entry = { date: fields.day, time: fields.time, note: fields.note };
+    const dates = item
+      ? girl.dates.map((d) => (d.id === item.id ? { ...d, ...entry } : d))
+      : [...girl.dates, { id: genGirlId(), ...entry }];
+    updateGirl(girl.id, { dates: sortDates(dates) });
+    if (stageOf(girl) === 'meet') showNotice(`${girl.name} — теперь в «Свиданиях»`);
+  };
+
+  const moveItem = (item, day) => {
+    if (item.source === 'date') {
+      updateGirl(item.girl.id, { dates: sortDates(item.girl.dates.map((d) => (d.id === item.id ? { ...d, date: day } : d))) });
+    } else {
+      updateTask(item.id, { due_on: day });
+    }
+  };
+
+  const deleteItem = (item) => {
+    setTaskEdit(null);
+    if (item.source === 'date') updateGirl(item.girl.id, { dates: item.girl.dates.filter((d) => d.id !== item.id) });
+    else deleteTask(item.id);
+  };
+
+  const offerFollowUp = (girl, kind) => {
+    clearTimeout(followTimer.current);
+    setFollowUp({ girlId: girl.id, name: girl.name, kind });
+    followTimer.current = setTimeout(() => setFollowUp(null), 20000);
+  };
+
+  /** A done contact; if nothing else is planned with her — «what's next?». */
+  const toggleDone = (item) => {
+    const done = !item.done;
+    updateTask(item.id, { done_at: done ? new Date().toISOString() : null });
+    if (!done) return;
+    const rest = (pending.get(item.girl.id) || []).filter((it) => it.key !== item.key);
+    if (rest.length === 0) offerFollowUp(item.girl, item.kind);
+  };
+
+  const planFollowUp = (day) => {
+    const f = followUp;
+    clearTimeout(followTimer.current);
+    setFollowUp(null);
+    if (!f) return;
+    addTask({ girl_id: f.girlId, kind: f.kind, due_on: day, time: null, note: '' });
+    showNotice(`${f.name}: ${taskKind(f.kind).label.toLowerCase()} — ${relativeDay(day, today).toLowerCase()}`);
+  };
+
+  const planDateAfter = () => {
+    const f = followUp;
+    clearTimeout(followTimer.current);
+    setFollowUp(null);
+    if (f) setTaskEdit({ seed: { girlId: f.girlId, kind: 'date', day: addDays(today, 1) } });
+  };
+
+  const openPlan = (seed) => setTaskEdit({ seed });
+
+  // --- Girls ---------------------------------------------------------------
+
+  const handleSave = async (fields, avatar, newTasks = []) => {
     const stage = fields.dates.length > 0 ? 'dating' : 'meet';
     if (editing?.isNew) {
       const from = editing.approach;
@@ -278,6 +336,7 @@ export function GirlsView({ analyticsOpen = false, onAnalyticsClose }) {
       const id = await addGirl(fields);
       if (!id) return;
       if (avatar?.blob) setAvatar(id, avatar.blob, '');
+      for (const t of newTasks) addTask({ girl_id: id, kind: t.kind, due_on: t.due_on, time: t.time, note: t.note });
       if (from) {
         const link = { ...approachFields(from.draft), outcome: 'contact', girl_id: id };
         if (from.id) updateApproach(from.id, link);
@@ -361,14 +420,22 @@ export function GirlsView({ analyticsOpen = false, onAnalyticsClose }) {
     return (
       <ul className="girls__list">
         {list.map((g) => (
-          <GirlCard key={g.id} girl={g} url={urlOf(g.avatar_path)} today={today} onOpen={() => setEditing({ id: g.id })} />
+          <GirlCard
+            key={g.id}
+            girl={g}
+            url={urlOf(g.avatar_path)}
+            today={today}
+            plan={pending.get(g.id)}
+            onOpen={() => setEditing({ id: g.id })}
+            onOpenTask={(it) => setTaskEdit({ key: it.key })}
+          />
         ))}
       </ul>
     );
   };
 
   return (
-    <div className="girls">
+    <div className={`girls ${plannerOpen ? 'girls--planner' : ''}`}>
       {error && (
         <div className="girls__banner girls__banner--error" role="alert">
           <span>{error}</span>
@@ -385,141 +452,190 @@ export function GirlsView({ analyticsOpen = false, onAnalyticsClose }) {
           </button>
         </div>
       )}
-
-      {loaded && girls.length > 0 && (
-        <GirlsStats
-          girls={girls}
-          today={today}
-          mode={view.stats.mode}
-          open={view.stats.open}
-          onMode={(mode) => setStats({ mode })}
-          onToggle={() => setStats({ open: !view.stats.open })}
-          activeRange={range}
-          onPickRange={setPeriod}
-        />
-      )}
-
-      <div className="girls__tabs" role="tablist">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.key}
-            className={`girls__tab ${tab === t.key ? 'girls__tab--active' : ''}`}
-            onClick={() => switchTab(t.key)}
-          >
-            <span>{t.label}</span>
-            <span className="girls__tab-count">{counts[t.key]}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="girls__toolbar">
-        <label className="girls__search">
-          <SearchIcon />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Поиск"
-            aria-label="Поиск"
-          />
-        </label>
-        {SORTS[tab] && (
-          <select
-            className="girls__sort"
-            value={sort}
-            onChange={(e) => setView((v) => ({ ...v, sort: { ...v.sort, [tab]: e.target.value } }))}
-            aria-label="Сортировка"
-          >
-            {SORTS[tab].map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-        )}
-        {canAdd && (
-          <button type="button" className="girls__add" onClick={openAdd}>
-            <PlusIcon />
-            <span>Добавить</span>
-          </button>
-        )}
-      </div>
-
-      <div className="girls__chips" role="group" aria-label={tab === 'approach' ? 'Дата подхода' : 'Дата знакомства'}>
-        {DATE_PRESETS.map((p) => (
-          <button
-            key={p.key}
-            type="button"
-            className={`girls__chip ${dateFilter.key === p.key ? 'girls__chip--on' : ''}`}
-            onClick={() => setDateFilter({ key: p.key })}
-          >
-            {p.label}
-          </button>
-        ))}
-        {dateFilter.key === 'range' ? (
-          <span className="girls__chip girls__chip--on girls__chip--range">
-            <button type="button" className="girls__chip-main" onClick={() => setPeriodPicker(true)}>
-              <CalendarIcon />
-              {formatRange(range.from, range.to)}
-            </button>
-            <button type="button" className="girls__chip-clear" onClick={() => setPeriod(null)} aria-label="Сбросить период">
-              <CloseIcon />
-            </button>
+      {followUp && (
+        <div className="girls__banner girls-follow" role="status">
+          <span className="girls-follow__text">
+            {followUp.name}: когда {followUp.kind === 'call' ? 'позвонить' : 'написать'} снова?
           </span>
-        ) : (
-          <button type="button" className="girls__chip" onClick={() => setPeriodPicker(true)}>
-            <CalendarIcon />
-            Период
-          </button>
-        )}
-      </div>
-
-      {tab === 'approach' && funnel.approaches > 0 && (
-        <button type="button" className="girls-conv" onClick={() => setOwnAnalytics(true)}>
-          <span className="girls-conv__step">
-            <b>{funnel.approaches}</b> {plural(funnel.approaches, 'подход', 'подхода', 'подходов')}
-          </span>
-          <span className="girls-conv__arrow" aria-hidden="true">→</span>
-          <span className="girls-conv__step">
-            <b>{funnel.contacts}</b> {plural(funnel.contacts, 'знакомство', 'знакомства', 'знакомств')}
-            <small>{percent(funnel.contacts, funnel.approaches)}</small>
-          </span>
-          <span className="girls-conv__arrow" aria-hidden="true">→</span>
-          <span className="girls-conv__step">
-            <b>{funnel.dates}</b> {plural(funnel.dates, 'свидание', 'свидания', 'свиданий')}
-            <small>{percent(funnel.dates, funnel.contacts)}</small>
-          </span>
-        </button>
-      )}
-
-      {renderList()}
-
-      {archivedList.length > 0 && (
-        <div className="girls__archive">
-          <button type="button" className="girls__archive-toggle" onClick={() => setShowArchive((v) => !v)}>
-            {showArchive ? 'Скрыть архив' : 'Архив'} · {archivedList.length}
-          </button>
-          {showArchive && (
-            <ul className="girls__list girls__list--archived">
-              {archivedList.map((g) => (
-                <GirlCard key={g.id} girl={g} url={urlOf(g.avatar_path)} today={today} onOpen={() => setEditing({ id: g.id })} />
+          <div className="girls-follow__chips">
+            {quickDays(today)
+              .slice(1)
+              .map((q) => (
+                <button key={q.label} type="button" className="girls__chip" onClick={() => planFollowUp(q.value)}>
+                  {q.label}
+                </button>
               ))}
-            </ul>
-          )}
+            <button type="button" className="girls__chip" onClick={planDateAfter}>
+              Свидание…
+            </button>
+          </div>
+          <button type="button" className="girls__banner-close" onClick={() => setFollowUp(null)} aria-label="Закрыть">
+            <CloseIcon />
+          </button>
         </div>
       )}
 
-      {canAdd && (
-        <button
-          type="button"
-          className="girls__fab"
-          onClick={openAdd}
-          aria-label={tab === 'approach' ? 'Записать подход' : 'Добавить знакомство'}
-        >
-          <PlusIcon />
-        </button>
+      {plannerOpen && (
+        <GirlsPlanner
+          girls={girls}
+          tasks={tasks}
+          items={plan}
+          today={today}
+          urlOf={urlOf}
+          loaded={loaded && tasksLoaded}
+          tasksReady={tasksReady}
+          onCreate={openPlan}
+          onOpen={(it) => setTaskEdit({ key: it.key })}
+          onToggleDone={toggleDone}
+          onMove={moveItem}
+          onMoveAll={(list, day) => list.forEach((it) => moveItem(it, day))}
+        />
       )}
+
+      {!plannerOpen && (
+        <>
+          {loaded && girls.length > 0 && (
+            <GirlsStats
+              girls={girls}
+              today={today}
+              mode={view.stats.mode}
+              open={view.stats.open}
+              onMode={(mode) => setStats({ mode })}
+              onToggle={() => setStats({ open: !view.stats.open })}
+              activeRange={range}
+              onPickRange={setPeriod}
+            />
+          )}
+
+          <div className="girls__tabs" role="tablist">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.key}
+                className={`girls__tab ${tab === t.key ? 'girls__tab--active' : ''}`}
+                onClick={() => switchTab(t.key)}
+              >
+                <span>{t.label}</span>
+                <span className="girls__tab-count">{counts[t.key]}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="girls__toolbar">
+            <label className="girls__search">
+              <SearchIcon />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Поиск"
+                aria-label="Поиск"
+              />
+            </label>
+            {SORTS[tab] && (
+              <select
+                className="girls__sort"
+                value={sort}
+                onChange={(e) => setView((v) => ({ ...v, sort: { ...v.sort, [tab]: e.target.value } }))}
+                aria-label="Сортировка"
+              >
+                {SORTS[tab].map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            )}
+            {canAdd && (
+              <button type="button" className="girls__add" onClick={openAdd}>
+                <PlusIcon />
+                <span>Добавить</span>
+              </button>
+            )}
+          </div>
+
+          <div className="girls__chips" role="group" aria-label={tab === 'approach' ? 'Дата подхода' : 'Дата знакомства'}>
+            {DATE_PRESETS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                className={`girls__chip ${dateFilter.key === p.key ? 'girls__chip--on' : ''}`}
+                onClick={() => setDateFilter({ key: p.key })}
+              >
+                {p.label}
+              </button>
+            ))}
+            {dateFilter.key === 'range' ? (
+              <span className="girls__chip girls__chip--on girls__chip--range">
+                <button type="button" className="girls__chip-main" onClick={() => setPeriodPicker(true)}>
+                  <CalendarIcon />
+                  {formatRange(range.from, range.to)}
+                </button>
+                <button type="button" className="girls__chip-clear" onClick={() => setPeriod(null)} aria-label="Сбросить период">
+                  <CloseIcon />
+                </button>
+              </span>
+            ) : (
+              <button type="button" className="girls__chip" onClick={() => setPeriodPicker(true)}>
+                <CalendarIcon />
+                Период
+              </button>
+            )}
+          </div>
+
+          {tab === 'approach' && funnel.approaches > 0 && (
+            <button type="button" className="girls-conv" onClick={() => setOwnAnalytics(true)}>
+              <span className="girls-conv__step">
+                <b>{funnel.approaches}</b> {plural(funnel.approaches, 'подход', 'подхода', 'подходов')}
+              </span>
+              <span className="girls-conv__arrow" aria-hidden="true">→</span>
+              <span className="girls-conv__step">
+                <b>{funnel.contacts}</b> {plural(funnel.contacts, 'знакомство', 'знакомства', 'знакомств')}
+                <small>{percent(funnel.contacts, funnel.approaches)}</small>
+              </span>
+              <span className="girls-conv__arrow" aria-hidden="true">→</span>
+              <span className="girls-conv__step">
+                <b>{funnel.dates}</b> {plural(funnel.dates, 'свидание', 'свидания', 'свиданий')}
+                <small>{percent(funnel.dates, funnel.contacts)}</small>
+              </span>
+            </button>
+          )}
+
+          {renderList()}
+
+          {archivedList.length > 0 && (
+            <div className="girls__archive">
+              <button type="button" className="girls__archive-toggle" onClick={() => setShowArchive((v) => !v)}>
+                {showArchive ? 'Скрыть архив' : 'Архив'} · {archivedList.length}
+              </button>
+              {showArchive && (
+                <ul className="girls__list girls__list--archived">
+                  {archivedList.map((g) => (
+                    <GirlCard key={g.id} girl={g} url={urlOf(g.avatar_path)} today={today} onOpen={() => setEditing({ id: g.id })} />
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {plannerOpen
+        ? activeGirls.length > 0 && (
+            <button type="button" className="girls__fab" onClick={() => openPlan({ day: today })} aria-label="Запланировать">
+              <PlusIcon />
+            </button>
+          )
+        : canAdd && (
+            <button
+              type="button"
+              className="girls__fab"
+              onClick={openAdd}
+              aria-label={tab === 'approach' ? 'Записать подход' : 'Добавить знакомство'}
+            >
+              <PlusIcon />
+            </button>
+          )}
 
       {periodPicker && (
         <GirlsDatePicker
@@ -588,6 +704,11 @@ export function GirlsView({ analyticsOpen = false, onAnalyticsClose }) {
           avatarUrl={editingGirl ? urlOf(editingGirl.avatar_path) : null}
           today={today}
           places={allPlaces}
+          tasks={editingGirl ? tasks.filter((t) => t.girl_id === editingGirl.id) : []}
+          tasksReady={tasksReady}
+          onAddTask={(row) => addTask({ girl_id: editingGirl.id, ...row })}
+          onUpdateTask={updateTask}
+          onDeleteTask={deleteTask}
           onSave={handleSave}
           onClose={() => {
             setEditing(null);
@@ -607,11 +728,60 @@ export function GirlsView({ analyticsOpen = false, onAnalyticsClose }) {
           }}
         />
       )}
+
+      {taskEdit && (taskEdit.seed || editingItem) && (
+        <GirlTaskEditor
+          key={taskEdit.key || `new:${taskEdit.seed.girlId || ''}:${taskEdit.seed.kind || ''}:${taskEdit.seed.day || ''}`}
+          item={editingItem}
+          seed={taskEdit.seed}
+          girls={activeGirls}
+          kinds={tasksReady ? ALL_KINDS : ['date']}
+          today={today}
+          onSave={(fields) => saveTask(editingItem, fields)}
+          onToggleDone={
+            editingItem?.source === 'task'
+              ? () => {
+                  setTaskEdit(null);
+                  toggleDone(editingItem);
+                }
+              : undefined
+          }
+          onDelete={() => deleteItem(editingItem)}
+          onOpenGirl={(id) => {
+            setTaskEdit(null);
+            setEditing({ id });
+          }}
+          onClose={() => setTaskEdit(null)}
+        />
+      )}
     </div>
   );
 }
 
-function GirlCard({ girl, url, today, onOpen }) {
+/** The nearest planned thing with her: icon, when, comment. */
+function GirlCardPlan({ plan, today, onOpen }) {
+  const next = plan[0];
+  const late = next.day < today;
+  return (
+    <button
+      type="button"
+      className={`girl-card__task girl-card__task--${next.kind} ${late ? 'girl-card__task--late' : next.day === today ? 'girl-card__task--today' : ''}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen(next);
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+      title={late ? `${taskKind(next.kind).label} — просрочено` : taskKind(next.kind).label}
+    >
+      <TaskKindIcon kind={next.kind} />
+      <span className="girl-card__task-when">{formatWhen(next.day, next.time, today)}</span>
+      <span className={`girl-card__task-note ${next.note ? '' : 'girl-card__task-note--kind'}`}>{next.note || taskKind(next.kind).label}</span>
+      {plan.length > 1 && <span className="girl-card__task-more">+{plan.length - 1}</span>}
+    </button>
+  );
+}
+
+function GirlCard({ girl, url, today, plan, onOpen, onOpenTask }) {
   const tel = phoneHref(girl.phone);
   const tg = telegramLink(girl.telegram);
   const next = nextDate(girl, today);
@@ -641,7 +811,7 @@ function GirlCard({ girl, url, today, onOpen }) {
           </div>
           {meta.length > 0 && <div className="girl-card__meta">{meta.join(' · ')}</div>}
           {girl.comment.trim() && <div className="girl-card__comment">{girl.comment}</div>}
-          {girl.dates.length > 0 && (
+          {!plan?.length && girl.dates.length > 0 && (
             <div className={`girl-card__date ${next ? 'girl-card__date--next' : ''}`}>
               {next
                 ? `Свидание ${formatDateTime(next.date, next.time)}`
@@ -669,6 +839,11 @@ function GirlCard({ girl, url, today, onOpen }) {
                 <TelegramIcon />
               </a>
             )}
+          </div>
+        )}
+        {plan?.length > 0 && (
+          <div className="girl-card__plan">
+            <GirlCardPlan plan={plan} today={today} onOpen={onOpenTask} />
           </div>
         )}
       </div>
@@ -914,7 +1089,22 @@ function draftOf(girl, today, prefill) {
   };
 }
 
-function GirlEditor({ girl, prefill, avatarUrl, today, places, onSave, onClose, onArchive, onDelete }) {
+function GirlEditor({
+  girl,
+  prefill,
+  avatarUrl,
+  today,
+  places,
+  tasks,
+  tasksReady,
+  onAddTask,
+  onUpdateTask,
+  onDeleteTask,
+  onSave,
+  onClose,
+  onArchive,
+  onDelete,
+}) {
   const isNew = !girl;
   const [initial] = useState(() => draftOf(girl, today, prefill));
   const [draft, setDraft] = useState(initial);
@@ -925,10 +1115,14 @@ function GirlEditor({ girl, prefill, avatarUrl, today, places, onSave, onClose, 
   const [photoState, setPhotoState] = useState(null);
   // null | { kind: 'met' } | { kind: 'date', id } | { kind: 'new' }
   const [picker, setPicker] = useState(null);
+  // A new girl's plans wait for her card to be saved.
+  const [newTasks, setNewTasks] = useState([]);
+  // null | { id } | { seed: true }
+  const [taskEdit, setTaskEdit] = useState(null);
   const ids = useId();
   const nameRef = useRef(null);
   const fileRef = useRef(null);
-  const dirty = avatar !== null || JSON.stringify(draft) !== JSON.stringify(initial);
+  const dirty = avatar !== null || newTasks.length > 0 || JSON.stringify(draft) !== JSON.stringify(initial);
 
   useEffect(() => {
     const preview = avatar?.preview;
@@ -984,12 +1178,10 @@ function GirlEditor({ girl, prefill, avatarUrl, today, places, onSave, onClose, 
         telegram: draft.telegram.trim(),
         place: draft.place.trim(),
         comment: draft.comment.trim(),
-        dates: draft.dates
-          .filter((d) => d.date)
-          .sort((a, b) => (dateKey(a) < dateKey(b) ? -1 : 1))
-          .map((d) => ({ id: d.id, date: d.date, time: d.time || null, note: d.note.trim() })),
+        dates: sortDates(draft.dates.filter((d) => d.date)).map((d) => ({ id: d.id, date: d.date, time: d.time || null, note: d.note.trim() })),
       },
       avatar,
+      newTasks,
     );
   };
 
@@ -999,6 +1191,49 @@ function GirlEditor({ girl, prefill, avatarUrl, today, places, onSave, onClose, 
   };
 
   useModalClose(requestClose);
+
+  // --- Связь ---------------------------------------------------------------
+
+  const contactGirl = { id: girl?.id ?? 'new', name: draft.name.trim() || 'Без имени', phone: draft.phone, telegram: draft.telegram, dates: [] };
+  const asItem = (t) => ({
+    key: `task:${t.id}`,
+    source: 'task',
+    id: t.id,
+    kind: t.kind,
+    girl: contactGirl,
+    day: t.due_on,
+    time: t.time,
+    note: t.note,
+    done: !!t.done_at,
+    createdAt: t.created_at,
+  });
+  const canPlan = tasksReady && !girl?.archived;
+  const planned = (isNew ? newTasks : tasks.filter((t) => !t.done_at)).map(asItem).sort(compareItems);
+  const history = tasks.filter((t) => t.done_at).sort((a, b) => (a.done_at < b.done_at ? 1 : -1));
+  const lastContact = girl ? lastContactOf(girl, tasks, today) : null;
+  const editingTask = taskEdit?.id ? planned.find((it) => it.id === taskEdit.id) : null;
+
+  const addPlanned = (row) => {
+    if (isNew) setNewTasks((list) => [...list, { id: genGirlId(), ...row, created_at: new Date().toISOString() }]);
+    else onAddTask(row);
+  };
+
+  const saveTask = ({ kind, day, time, note }) => {
+    const row = { kind, due_on: day, time, note };
+    const id = taskEdit?.id;
+    setTaskEdit(null);
+    if (!id) addPlanned(row);
+    else if (isNew) setNewTasks((list) => list.map((t) => (t.id === id ? { ...t, ...row } : t)));
+    else onUpdateTask(id, row);
+  };
+
+  const removeTask = (id) => {
+    setTaskEdit(null);
+    if (isNew) setNewTasks((list) => list.filter((t) => t.id !== id));
+    else onDeleteTask(id);
+  };
+
+  const markDone = (id, done) => onUpdateTask(id, { done_at: done ? new Date().toISOString() : null });
 
   const tel = phoneHref(draft.phone);
   const tg = telegramLink(draft.telegram);
@@ -1159,6 +1394,82 @@ function GirlEditor({ girl, prefill, avatarUrl, today, places, onSave, onClose, 
             />
           </label>
 
+          {tasksReady && (canPlan || planned.length > 0 || history.length > 0) && (
+            <section className="girl-editor__dates girl-contacts">
+              <div className="girl-editor__section-title">
+                Связь
+                {planned.length > 0 && <span className="girl-editor__section-count">{planned.length}</span>}
+                {lastContact && (
+                  <span className="girl-contacts__last">
+                    {lastContact.kind === 'met' ? 'знакомство' : 'последняя'} {agoLabel(daysBetween(lastContact.day, today))}
+                  </span>
+                )}
+              </div>
+              {planned.map((it) => (
+                <div key={it.id} className={`girl-task ${!isNew && it.day < today ? 'girl-task--late' : ''}`}>
+                  <button type="button" className="girl-task__main" onClick={() => setTaskEdit({ id: it.id })}>
+                    <span className={`plan-card__kind plan-card__kind--${it.kind} girl-task__kind`}>
+                      <TaskKindIcon kind={it.kind} />
+                    </span>
+                    <span className="girl-task__when">{formatWhen(it.day, it.time, today)}</span>
+                    <span className={`girl-task__note ${it.note ? '' : 'girl-task__note--kind'}`}>{it.note || taskKind(it.kind).label}</span>
+                  </button>
+                  {isNew ? (
+                    <button type="button" className="girl-date__remove" onClick={() => removeTask(it.id)} aria-label="Убрать" title="Убрать">
+                      <CloseIcon />
+                    </button>
+                  ) : (
+                    <button type="button" className="plan-card__check" onClick={() => markDone(it.id, true)} aria-label="Выполнено" title="Выполнено">
+                      <CheckIcon />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {canPlan && (
+                <div className="girl-contacts__quick">
+                  <span className="girl-contacts__label">Написать:</span>
+                  {quickDays(today).map((q) => (
+                    <button
+                      key={q.label}
+                      type="button"
+                      className="girls__chip"
+                      onClick={() => addPlanned({ kind: 'message', due_on: q.value, time: null, note: '' })}
+                    >
+                      {q.label.toLowerCase()}
+                    </button>
+                  ))}
+                  <button type="button" className="girls__chip" onClick={() => setTaskEdit({ seed: true })}>
+                    <PlusIcon />
+                    Другое
+                  </button>
+                </div>
+              )}
+              {history.length > 0 && (
+                <details className="girl-contacts__history">
+                  <summary>История · {history.length}</summary>
+                  <ul className="girl-contacts__history-list">
+                    {history.map((t) => (
+                      <li key={t.id} className="girl-history">
+                        <TaskKindIcon kind={t.kind} />
+                        <span className="girl-history__when">{formatDate(toLocalDateString(new Date(t.done_at)))}</span>
+                        <span className="girl-history__note">{t.note || taskKind(t.kind).label}</span>
+                        <button
+                          type="button"
+                          className="girl-history__undo"
+                          onClick={() => markDone(t.id, false)}
+                          aria-label="Вернуть в план"
+                          title="Вернуть в план"
+                        >
+                          Вернуть
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </section>
+          )}
+
           <section className="girl-editor__dates">
             <div className="girl-editor__section-title">
               Свидания
@@ -1268,6 +1579,27 @@ function GirlEditor({ girl, prefill, avatarUrl, today, places, onSave, onClose, 
             setPicker(null);
           }}
           onClose={() => setPicker(null)}
+        />
+      )}
+      {taskEdit && (taskEdit.seed || editingTask) && (
+        <GirlTaskEditor
+          key={taskEdit.id || 'new'}
+          item={editingTask}
+          seed={{ girlId: contactGirl.id, kind: 'message', day: today }}
+          girls={[contactGirl]}
+          kinds={CONTACT_KINDS}
+          today={today}
+          onSave={saveTask}
+          onToggleDone={
+            editingTask && !isNew
+              ? () => {
+                  setTaskEdit(null);
+                  markDone(editingTask.id, true);
+                }
+              : undefined
+          }
+          onDelete={() => removeTask(editingTask.id)}
+          onClose={() => setTaskEdit(null)}
         />
       )}
     </div>

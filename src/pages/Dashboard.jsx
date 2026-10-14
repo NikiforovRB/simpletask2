@@ -52,6 +52,8 @@ import { DayCard } from '../components/DayCard';
 import { HabitsView } from '../components/HabitsView';
 import { FoodView } from '../components/FoodView';
 import { GirlsView } from '../components/GirlsView';
+import { useGirls } from '../hooks/useGirls';
+import { dueCount, planItems } from '../lib/girls';
 import { BoardView } from '../components/BoardView';
 import { KanbanView } from '../components/KanbanView';
 import { KanbanCardPanel } from '../components/KanbanCardPanel';
@@ -132,6 +134,8 @@ import girlsIcon from '../assets/girls.svg';
 import girlsNavIcon from '../assets/girls-nav.svg';
 import funnelIcon from '../assets/funnel.svg';
 import funnelNavIcon from '../assets/funnel-nav.svg';
+import plannerIcon from '../assets/planner.svg';
+import plannerNavIcon from '../assets/planner-nav.svg';
 import focusIcon from '../assets/focus.svg';
 import focusNavIcon from '../assets/focus-nav.svg';
 import sunIcon from '../assets/sun.svg';
@@ -419,6 +423,7 @@ function SortableProjectItem({ project, isActive, isHover, iconDefault, iconHove
 export default function Dashboard() {
   const { user, signOut, isChosen, chosenLoaded } = useAuth();
   const { tasks, loading: tasksLoading, addTask, updateTask, deleteTask, toggleComplete, moveTask } = useTasks();
+  const girlsStore = useGirls();
   const focus = useFocus();
   const {
     settings,
@@ -646,6 +651,8 @@ export default function Dashboard() {
   const [settingsHover, setSettingsHover] = useState(false);
   const [girlsAnalyticsOpen, setGirlsAnalyticsOpen] = useState(false);
   const [girlsAnalyticsHover, setGirlsAnalyticsHover] = useState(false);
+  const [girlsPlannerOpen, setGirlsPlannerOpen] = useState(false);
+  const [girlsPlannerHover, setGirlsPlannerHover] = useState(false);
   const [exitHover, setExitHover] = useState(false);
   const [refreshHover, setRefreshHover] = useState(false);
   const [editProjectFabHover, setEditProjectFabHover] = useState(false);
@@ -843,6 +850,7 @@ export default function Dashboard() {
   const handleMenuSelect = useCallback((target) => {
     const isBuiltinView = BUILTIN_MENU_ITEMS.some((item) => item.key === target);
     setGirlsAnalyticsOpen(false);
+    setGirlsPlannerOpen(false);
     if (isBuiltinView) {
       setViewMode(target);
       setActiveProjectId(null);
@@ -1174,6 +1182,8 @@ export default function Dashboard() {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const todayKey = toLocalDateString(today);
+  const girlsDue = isChosen ? dueCount(planItems(girlsStore.girls, girlsStore.tasks, todayKey), todayKey) : 0;
   const baseDate = new Date(today);
   baseDate.setDate(baseDate.getDate() + dateOffset);
   const days =
@@ -1798,6 +1808,9 @@ export default function Dashboard() {
       >
         <img src={active || (hasHover && menuHoverKey === item.key) ? item.navIcon : item.icon} alt="" />
         <span>{item.label}</span>
+        {item.key === 'girls' && girlsDue > 0 && (
+          <span className="dashboard-menu__count" title="На сегодня">{girlsDue}</span>
+        )}
       </button>
     );
   };
@@ -1963,6 +1976,12 @@ export default function Dashboard() {
             {viewMode !== 'habits' && viewMode !== 'food' && viewMode !== 'girls' && viewMode !== 'board' && viewMode !== 'kanban' && viewMode !== 'mindmap' && viewMode !== 'goal_plan' && viewMode !== 'focus_analytics' && viewMode !== 'reputation' && (
             <button type="button" className="dashboard__icon-btn" onMouseEnter={() => hasHover && setEyeHover(true)} onMouseLeave={() => hasHover && setEyeHover(false)} onClick={toggleCompletedVisibleForList} aria-label={completedVisible ? 'Скрыть выполненные' : 'Показать выполненные'}>
               <img src={completedVisible ? (hasHover && eyeHover ? eyeoffNavIcon : eyeoffIcon) : hasHover && eyeHover ? eyeNavIcon : eyeIcon} alt="" />
+            </button>
+            )}
+            {viewMode === 'girls' && isChosen && (
+            <button type="button" className={`dashboard__icon-btn ${girlsDue > 0 ? 'dashboard__icon-btn--badge' : ''}`} onMouseEnter={() => hasHover && setGirlsPlannerHover(true)} onMouseLeave={() => hasHover && setGirlsPlannerHover(false)} onClick={() => setGirlsPlannerOpen((v) => !v)} aria-label={girlsDue > 0 ? `Планер: на сегодня ${girlsDue}` : 'Планер'} aria-pressed={girlsPlannerOpen} title="Планер: сообщения, звонки, свидания">
+              <img src={girlsPlannerOpen || (hasHover && girlsPlannerHover) ? plannerNavIcon : plannerIcon} alt="" />
+              {girlsDue > 0 && <span className="dashboard__icon-badge">{girlsDue > 99 ? '99+' : girlsDue}</span>}
             </button>
             )}
             {viewMode === 'girls' && isChosen && (
@@ -2760,7 +2779,12 @@ export default function Dashboard() {
       )}
 
       {viewMode === 'girls' && isChosen && (
-        <GirlsView analyticsOpen={girlsAnalyticsOpen} onAnalyticsClose={() => setGirlsAnalyticsOpen(false)} />
+        <GirlsView
+          store={girlsStore}
+          analyticsOpen={girlsAnalyticsOpen}
+          onAnalyticsClose={() => setGirlsAnalyticsOpen(false)}
+          plannerOpen={girlsPlannerOpen}
+        />
       )}
 
       {viewMode === 'focus_analytics' && <FocusAnalytics />}

@@ -277,6 +277,127 @@ export function percent(part, whole) {
 }
 
 // ---------------------------------------------------------------------------
+// Planner: contacts (girl_tasks) and dates (girls.dates) as one list
+// ---------------------------------------------------------------------------
+
+export const TASK_KINDS = [
+  { key: 'message', label: 'Написать', hint: 'О чём написать, что предложить' },
+  { key: 'call', label: 'Позвонить', hint: 'О чём поговорить' },
+  { key: 'date', label: 'Свидание', hint: 'Где, во сколько, что не забыть' },
+];
+
+export const taskKind = (key) => TASK_KINDS.find((k) => k.key === key) || TASK_KINDS[0];
+
+export const quickDays = (today) => [
+  { label: 'Сегодня', value: today },
+  { label: 'Завтра', value: addDays(today, 1) },
+  { label: 'Через 3 дня', value: addDays(today, 3) },
+  { label: 'Через неделю', value: addDays(today, 7) },
+];
+
+const WEEKDAY_FULL = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+
+export const daysBetween = (from, to) => Math.round((parseDay(to) - parseDay(from)) / 86_400_000);
+
+/** «Сегодня», «Завтра», «Вчера» or «10 октября, сб». */
+export function relativeDay(day, today) {
+  const n = daysBetween(today, day);
+  if (n === 0) return 'Сегодня';
+  if (n === 1) return 'Завтра';
+  if (n === -1) return 'Вчера';
+  return formatDate(day);
+}
+
+export const formatWhen = (day, time, today) => (time ? `${relativeDay(day, today)} • ${time}` : relativeDay(day, today));
+
+/** «14 окт». */
+export function shortDay(s) {
+  const d = parseDay(s);
+  return `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+}
+
+export const sortDates = (dates) => [...dates].sort((a, b) => (dateKey(a) < dateKey(b) ? -1 : 1));
+
+/** A planner column title: «Сегодня», «Завтра», then the day of the week. */
+export const dayTitle = (day, today) => (daysBetween(today, day) <= 1 ? relativeDay(day, today) : WEEKDAY_FULL[parseDay(day).getDay()]);
+
+export function agoLabel(days) {
+  if (days <= 0) return 'сегодня';
+  if (days === 1) return 'вчера';
+  return `${days} ${plural(days, 'день', 'дня', 'дней')} назад`;
+}
+
+/**
+ * Everything planned with the girls who aren't archived: every contact task
+ * (done ones too — they are the history) and the dates from today on.
+ */
+export function planItems(girls, tasks, today) {
+  const byId = new Map(girls.map((g) => [g.id, g]));
+  const items = [];
+  for (const t of tasks) {
+    const girl = byId.get(t.girl_id);
+    if (!girl || girl.archived) continue;
+    items.push({
+      key: `task:${t.id}`,
+      source: 'task',
+      id: t.id,
+      kind: t.kind,
+      girl,
+      day: t.due_on,
+      time: t.time,
+      note: t.note,
+      done: !!t.done_at,
+      doneAt: t.done_at,
+      createdAt: t.created_at,
+    });
+  }
+  for (const girl of girls) {
+    if (girl.archived) continue;
+    for (const d of girl.dates) {
+      if (!d.date || d.date < today) continue;
+      items.push({ key: `date:${d.id}`, source: 'date', id: d.id, kind: 'date', girl, day: d.date, time: d.time || null, note: d.note || '', done: false });
+    }
+  }
+  return items;
+}
+
+/** By day; within a day the ones without a time first, then by time. */
+export function compareItems(a, b) {
+  if (a.day !== b.day) return a.day < b.day ? -1 : 1;
+  if (!!a.time !== !!b.time) return a.time ? 1 : -1;
+  if (a.time !== b.time) return a.time < b.time ? -1 : 1;
+  return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
+}
+
+/** Not done yet, by girl, the nearest first (an overdue one comes before everything). */
+export function pendingByGirl(items) {
+  const map = new Map();
+  for (const it of [...items].sort(compareItems)) {
+    if (it.done) continue;
+    if (!map.has(it.girl.id)) map.set(it.girl.id, []);
+    map.get(it.girl.id).push(it);
+  }
+  return map;
+}
+
+/** What is to be done today: today's and the overdue ones (the header counter). */
+export const dueCount = (items, today) => items.filter((it) => !it.done && it.day <= today).length;
+
+/** The last time she was in touch: a done contact, a past date, or the day they met. */
+export function lastContactOf(girl, tasks, today) {
+  let best = { day: girl.met_on, kind: 'met' };
+  for (const t of tasks) {
+    if (t.girl_id !== girl.id || !t.done_at) continue;
+    const day = toLocalDateString(new Date(t.done_at));
+    if (day > best.day) best = { day, kind: t.kind };
+  }
+  for (const d of girl.dates) {
+    if (d.date && d.date < today && d.date > best.day) best = { day: d.date, kind: 'date' };
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------------------
 // Avatar photos
 // ---------------------------------------------------------------------------
 
