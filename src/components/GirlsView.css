@@ -1588,7 +1588,7 @@
   justify-content: center;
   padding: 0;
   border: none;
-  border-radius: 50%;
+  border-radius: 10px;
   background: none;
   color: var(--text-primary);
   font-family: inherit;
@@ -2752,6 +2752,7 @@
   padding: 0 0.85rem 0.75rem;
   overflow-y: auto;
   overscroll-behavior: contain;
+  overflow-anchor: none;
 }
 
 .history__day {
@@ -2761,8 +2762,14 @@
 }
 
 /* A short story sits at the bottom, by the line to write in, as in a chat. */
-.history__day:first-child {
+.history__feed > :first-child {
   margin-top: auto;
+}
+
+/* Reaching it adds older entries on top. */
+.history__more {
+  flex-shrink: 0;
+  height: 1px;
 }
 
 .history__day-title {
@@ -3381,8 +3388,9 @@
     padding-right: 0.5rem;
   }
 
+  /* Clear of the rounded corners of the screen, whether or not the phone reports them. */
   .history__composer {
-    padding: 0.55rem 0.6rem calc(0.6rem + env(safe-area-inset-bottom));
+    padding: 0.55rem 0.6rem calc(0.6rem + max(30px, env(safe-area-inset-bottom)));
   }
 
   .history__input {

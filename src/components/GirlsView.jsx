@@ -362,12 +362,13 @@ export function GirlsView({ store, analyticsOpen = false, onAnalyticsClose, plan
   const historyGirl = historyId ? girlsById.get(historyId) : null;
 
   /** Written down in her history: a day ahead — a plan, today or earlier — done. */
-  const addEntry = (girl, { kind, day, time, note }) => {
+  // `plan` — to be done even if the day has come; otherwise a day so far is a contact that happened.
+  const addEntry = (girl, { kind, day, time, note, plan = false }) => {
     if (kind === 'date') {
       addDate(girl, { date: day, time, note });
       return;
     }
-    addTask({ girl_id: girl.id, kind, due_on: day, time, note, done_at: day <= today ? new Date().toISOString() : null });
+    addTask({ girl_id: girl.id, kind, due_on: day, time, note, done_at: !plan && day <= today ? new Date().toISOString() : null });
   };
 
   const editEntry = (girl, entry, { kind, day, time, note, done }) => {

@@ -10,7 +10,6 @@ import {
   historyOf,
   lastContactOf,
   phoneHref,
-  quickDays,
   relativeDay,
   taskKind,
   telegramLink,
@@ -24,11 +23,18 @@ const pickerQuick = (today) => [
   { label: 'Сегодня', value: today },
   { label: 'Завтра', value: addDays(today, 1) },
 ];
+const planQuick = (today) => [
+  { label: 'Завтра', value: addDays(today, 1) },
+  { label: 'Послезавтра', value: addDays(today, 2) },
+  { label: 'Через неделю', value: addDays(today, 7) },
+];
 // With a keyboard Enter sends and Shift+Enter makes a new line; on a phone Enter is just a new line.
 const enterSends = () => window.matchMedia?.('(hover: hover) and (pointer: fine)').matches ?? true;
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 // How long it slides away (see history-out in the CSS).
 const CLOSE_MS = 260;
+// Entries drawn at first; scrolling up to the oldest of them adds as many more.
+const PAGE = 50;
 
 /**
  * The whole story with her as one feed, the oldest on top: the meeting, every
@@ -36,7 +42,7 @@ const CLOSE_MS = 260;
  * bottom — a line to write a new one down (a day ahead makes it a plan).
  * Any entry opens for editing in place.
  *
- * `kinds` — what can be written down; `onAdd({ kind, day, time, note })`,
+ * `kinds` — what can be written down; `onAdd({ kind, day, time, note, plan? })`,
  * `onEdit(entry, { kind, day, time, note, done })`, `onDelete(entry)`,
  * `onToggle(entry, done)`.
  */
@@ -45,10 +51,16 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
   const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState(() => ({ kind: kinds.includes('message') ? 'message' : kinds[0], day: today, time: '', note: '' }));
   const [picker, setPicker] = useState(false);
+  const [planPicker, setPlanPicker] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [shown, setShown] = useState(PAGE);
   const feedRef = useRef(null);
   const inputRef = useRef(null);
+  const moreRef = useRef(null);
   const seen = useRef(null);
+  // Set while older entries are being added on top: how far the view was from the bottom.
+  const older = useRef(null);
+  const hasMore = past.length > shown;
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -62,12 +74,16 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
     return () => clearTimeout(t);
   }, [closing]);
 
-  // Opens at the newest; whatever appears later is scrolled to and lit up for a moment.
+  // Opens at the newest; whatever appears later is scrolled to and lit up for a moment,
+  // except the older ones added on top: those just keep the view where it was.
   useLayoutEffect(() => {
     const feed = feedRef.current;
     if (!feed) return;
     const nodes = [...feed.querySelectorAll('[data-entry]')];
-    if (seen.current) {
+    if (older.current !== null) {
+      feed.scrollTop = feed.scrollHeight - older.current;
+      older.current = null;
+    } else if (seen.current) {
       const fresh = nodes.filter((n) => !seen.current.has(n.dataset.entry));
       for (const n of fresh) n.classList.add('history-entry--new');
       fresh[fresh.length - 1]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -77,6 +93,24 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
     seen.current = new Set(nodes.map((n) => n.dataset.entry));
   });
 
+  // Observed anew after every page, so a page too short to scroll brings the next one at once.
+  useEffect(() => {
+    const feed = feedRef.current;
+    const more = moreRef.current;
+    if (!feed || !more) return undefined;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        older.current = feed.scrollHeight - feed.scrollTop;
+        setShown((n) => n + PAGE);
+      },
+      { root: feed, rootMargin: '300px 0px 0px 0px' },
+    );
+    io.observe(more);
+    return () => io.disconnect();
+  }, [shown, hasMore]);
+
   useLayoutEffect(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -85,7 +119,7 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
   }, [draft.note]);
 
   const days = [];
-  for (const e of past) {
+  for (const e of hasMore ? past.slice(past.length - shown) : past) {
     const last = days[days.length - 1];
     if (last?.day === e.day) last.entries.push(e);
     else days.push({ day: e.day, entries: [e] });
@@ -163,6 +197,7 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
         </header>
 
         <div className="history__feed" ref={feedRef}>
+          {hasMore && <div className="history__more" ref={moreRef} aria-hidden="true" />}
           {days.map(({ day, entries }) => (
             <section key={day} className="history__day">
               <div className="history__day-title">{relativeDay(day, today)}</div>
@@ -179,18 +214,21 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
                 {kinds.includes('message') && (
                   <span className="history__nothing-chips">
                     Написать:
-                    {quickDays(today)
-                      .slice(1)
+                    {planQuick(today)
+                      .slice(0, 2)
                       .map((q) => (
                         <button
                           key={q.label}
                           type="button"
                           className="girls__chip"
-                          onClick={() => onAdd({ kind: 'message', day: q.value, time: null, note: '' })}
+                          onClick={() => onAdd({ kind: 'message', day: q.value, time: null, note: '', plan: true })}
                         >
-                          {q.label.toLowerCase()}
+                          {q.label}
                         </button>
                       ))}
+                    <button type="button" className="girls__chip" onClick={() => setPlanPicker(true)}>
+                      Выбрать дату
+                    </button>
                   </span>
                 )}
               </div>
@@ -270,6 +308,20 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
             inputRef.current?.focus();
           }}
           onClose={() => setPicker(false)}
+        />
+      )}
+
+      {planPicker && (
+        <GirlsDatePicker
+          title="Когда написать"
+          withTime
+          value={addDays(today, 1)}
+          quick={planQuick(today)}
+          onApply={({ date, time }) => {
+            setPlanPicker(false);
+            onAdd({ kind: 'message', day: date, time: time || null, note: '', plan: true });
+          }}
+          onClose={() => setPlanPicker(false)}
         />
       )}
     </div>
