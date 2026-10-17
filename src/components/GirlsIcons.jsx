@@ -61,6 +61,19 @@ export const CalendarIcon = () => (
   </Icon>
 );
 
+export const SendIcon = () => (
+  <Icon>
+    <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" />
+  </Icon>
+);
+
+export const MetIcon = () => (
+  <Icon>
+    <circle cx="12" cy="8" r="3.5" />
+    <path d="M5 20a7 7 0 0 1 14 0" />
+  </Icon>
+);
+
 export const CameraIcon = () => (
   <Icon>
     <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
@@ -72,6 +85,7 @@ export const CameraIcon = () => (
 export function TaskKindIcon({ kind }) {
   if (kind === 'call') return <PhoneIcon />;
   if (kind === 'date') return <HeartIcon />;
+  if (kind === 'met') return <MetIcon />;
   return <MessageIcon />;
 }
 

@@ -1944,3 +1944,6 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- 069: «Планер» — порядок карточек внутри дня
+alter table public.girl_tasks add column if not exists position double precision;

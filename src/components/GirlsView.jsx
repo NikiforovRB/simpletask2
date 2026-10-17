@@ -1,7 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useAvatarUrls, genGirlId } from '../hooks/useGirls';
 import { useModalClose } from '../hooks/useModalClose';
-import { toLocalDateString } from '../constants';
 import {
   DATE_PRESETS,
   addDays,
@@ -24,6 +23,7 @@ import {
   pendingByGirl,
   percent,
   phoneHref,
+  placeInDay,
   planItems,
   plural,
   quickDays,
@@ -49,6 +49,7 @@ import {
   TaskKindIcon,
   TelegramIcon,
 } from './GirlsIcons';
+import { GirlHistory } from './GirlHistory';
 import { GirlsAnalytics } from './GirlsAnalytics';
 import { GirlsDatePicker } from './GirlsDatePicker';
 import { GirlsPlanner } from './GirlsPlanner';
@@ -58,6 +59,13 @@ import './GirlsView.css';
 
 const CONTACT_KINDS = ['message', 'call'];
 const ALL_KINDS = ['message', 'call', 'date'];
+
+/** A date entry with `patch`; one moved to another day loses its place in the planner day. */
+function patchDateEntry(d, patch) {
+  const next = { ...d, ...patch };
+  if (patch.date && patch.date !== d.date) delete next.pos;
+  return next;
+}
 
 const VIEW_KEY = 'girls_view_v1';
 
@@ -152,6 +160,8 @@ export function GirlsView({ store, analyticsOpen = false, onAnalyticsClose, plan
   const [taskEdit, setTaskEdit] = useState(null);
   // «What's next» after a done contact: { girlId, name, kind }.
   const [followUp, setFollowUp] = useState(null);
+  // The whole story with her (GirlHistory): her id.
+  const [historyId, setHistoryId] = useState(null);
   const [notice, setNotice] = useState(null);
   const noticeTimer = useRef(null);
   const followTimer = useRef(null);
@@ -264,28 +274,55 @@ export function GirlsView({ store, analyticsOpen = false, onAnalyticsClose, plan
   const editingItem = taskEdit?.key ? plan.find((it) => it.key === taskEdit.key) : null;
   const taskRow = (fields) => ({ kind: fields.kind, due_on: fields.day, time: fields.time, note: fields.note });
 
+  const addDate = (girl, entry) => {
+    updateGirl(girl.id, { dates: sortDates([...girl.dates, { id: genGirlId(), ...entry }]) });
+    if (stageOf(girl) === 'meet') showNotice(`${girl.name} — теперь в «Свиданиях»`);
+  };
+
   const saveTask = (item, fields) => {
     setTaskEdit(null);
     const girl = girlsById.get(fields.girlId);
     if (!girl) return;
     if (fields.kind !== 'date') {
-      if (item) updateTask(item.id, taskRow(fields));
+      if (item) updateTask(item.id, { ...taskRow(fields), ...(item.day !== fields.day ? { position: null } : {}) });
       else addTask({ girl_id: girl.id, ...taskRow(fields) });
       return;
     }
     const entry = { date: fields.day, time: fields.time, note: fields.note };
-    const dates = item
-      ? girl.dates.map((d) => (d.id === item.id ? { ...d, ...entry } : d))
-      : [...girl.dates, { id: genGirlId(), ...entry }];
-    updateGirl(girl.id, { dates: sortDates(dates) });
-    if (stageOf(girl) === 'meet') showNotice(`${girl.name} — теперь в «Свиданиях»`);
+    if (!item) {
+      addDate(girl, entry);
+      return;
+    }
+    updateGirl(girl.id, { dates: sortDates(girl.dates.map((d) => (d.id === item.id ? patchDateEntry(d, entry) : d))) });
   };
 
+  /** To another day, to the end of its plan («Перенести всё на сегодня»). */
   const moveItem = (item, day) => {
     if (item.source === 'date') {
-      updateGirl(item.girl.id, { dates: sortDates(item.girl.dates.map((d) => (d.id === item.id ? { ...d, date: day } : d))) });
+      updateGirl(item.girl.id, { dates: sortDates(item.girl.dates.map((d) => (d.id === item.id ? patchDateEntry(d, { date: day }) : d))) });
     } else {
-      updateTask(item.id, { due_on: day });
+      updateTask(item.id, { due_on: day, position: null });
+    }
+  };
+
+  /** Dropped into `day` where `ordered` (the day's cards, in the new order) says. */
+  const placeItem = (item, day, ordered) => {
+    const positions = placeInDay(ordered, item.key);
+    const dates = new Map();
+    for (const it of ordered) {
+      const pos = positions.get(it.key);
+      const moved = it.key === item.key && item.day !== day;
+      if (pos === undefined && !moved) continue;
+      if (it.source === 'task') {
+        updateTask(it.id, { ...(moved ? { due_on: day } : {}), ...(pos !== undefined ? { position: pos } : {}) });
+        continue;
+      }
+      const g = dates.get(it.girl.id) || { girl: it.girl, patches: new Map() };
+      g.patches.set(it.id, { ...(moved ? { date: day } : {}), ...(pos !== undefined ? { pos } : {}) });
+      dates.set(it.girl.id, g);
+    }
+    for (const { girl, patches } of dates.values()) {
+      updateGirl(girl.id, { dates: sortDates(girl.dates.map((d) => (patches.has(d.id) ? { ...d, ...patches.get(d.id) } : d))) });
     }
   };
 
@@ -301,13 +338,54 @@ export function GirlsView({ store, analyticsOpen = false, onAnalyticsClose, plan
     followTimer.current = setTimeout(() => setFollowUp(null), 20000);
   };
 
+  /**
+   * Ticked off. It happened today, so one planned for another day moves to
+   * today — the history then shows when it really was.
+   */
+  const completeTask = (id, day, done) => {
+    const patch = { done_at: done ? new Date().toISOString() : null };
+    if (done && day !== today) Object.assign(patch, { due_on: today, time: null, position: null });
+    updateTask(id, patch);
+  };
+
   /** A done contact; if nothing else is planned with her — «what's next?». */
   const toggleDone = (item) => {
     const done = !item.done;
-    updateTask(item.id, { done_at: done ? new Date().toISOString() : null });
+    completeTask(item.id, item.day, done);
     if (!done) return;
     const rest = (pending.get(item.girl.id) || []).filter((it) => it.key !== item.key);
     if (rest.length === 0) offerFollowUp(item.girl, item.kind);
+  };
+
+  // --- History ------------------------------------------------------------
+
+  const historyGirl = historyId ? girlsById.get(historyId) : null;
+
+  /** Written down in her history: a day ahead — a plan, today or earlier — done. */
+  const addEntry = (girl, { kind, day, time, note }) => {
+    if (kind === 'date') {
+      addDate(girl, { date: day, time, note });
+      return;
+    }
+    addTask({ girl_id: girl.id, kind, due_on: day, time, note, done_at: day <= today ? new Date().toISOString() : null });
+  };
+
+  const editEntry = (girl, entry, { kind, day, time, note, done }) => {
+    if (entry.source === 'date') {
+      updateGirl(girl.id, { dates: sortDates(girl.dates.map((d) => (d.id === entry.id ? patchDateEntry(d, { date: day, time, note }) : d))) });
+      return;
+    }
+    const task = tasks.find((t) => t.id === entry.id);
+    if (!task) return;
+    const patch = { kind, due_on: day, time, note };
+    if (day !== task.due_on) patch.position = null;
+    if (done !== !!task.done_at) patch.done_at = done ? new Date().toISOString() : null;
+    updateTask(task.id, patch);
+  };
+
+  const deleteEntry = (girl, entry) => {
+    if (entry.source === 'date') updateGirl(girl.id, { dates: girl.dates.filter((d) => d.id !== entry.id) });
+    else deleteTask(entry.id);
   };
 
   const planFollowUp = (day) => {
@@ -429,7 +507,7 @@ export function GirlsView({ store, analyticsOpen = false, onAnalyticsClose, plan
             today={today}
             plan={pending.get(g.id)}
             onOpen={() => setEditing({ id: g.id })}
-            onOpenTask={(it) => setTaskEdit({ key: it.key })}
+            onOpenHistory={() => setHistoryId(g.id)}
           />
         ))}
       </ul>
@@ -489,9 +567,9 @@ export function GirlsView({ store, analyticsOpen = false, onAnalyticsClose, plan
           loaded={loaded && tasksLoaded}
           tasksReady={tasksReady}
           onCreate={openPlan}
-          onOpen={(it) => setTaskEdit({ key: it.key })}
+          onHistory={setHistoryId}
           onToggleDone={toggleDone}
-          onMove={moveItem}
+          onPlace={placeItem}
           onMoveAll={(list, day) => list.forEach((it) => moveItem(it, day))}
         />
       )}
@@ -712,7 +790,9 @@ export function GirlsView({ store, analyticsOpen = false, onAnalyticsClose, plan
           tasksReady={tasksReady}
           onAddTask={(row) => addTask({ girl_id: editingGirl.id, ...row })}
           onUpdateTask={updateTask}
+          onCompleteTask={completeTask}
           onDeleteTask={deleteTask}
+          onOpenHistory={() => setHistoryId(editingGirl.id)}
           onSave={handleSave}
           onClose={() => {
             setEditing(null);
@@ -758,11 +838,31 @@ export function GirlsView({ store, analyticsOpen = false, onAnalyticsClose, plan
           onClose={() => setTaskEdit(null)}
         />
       )}
+
+      {historyGirl && (
+        <GirlHistory
+          key={historyGirl.id}
+          girl={historyGirl}
+          tasks={tasks}
+          today={today}
+          url={urlOf(historyGirl.avatar_path)}
+          kinds={tasksReady ? ALL_KINDS : ['date']}
+          onAdd={(fields) => addEntry(historyGirl, fields)}
+          onEdit={(entry, fields) => editEntry(historyGirl, entry, fields)}
+          onDelete={(entry) => deleteEntry(historyGirl, entry)}
+          onToggle={(entry, done) => completeTask(entry.id, entry.day, done)}
+          onOpenGirl={() => {
+            setHistoryId(null);
+            setEditing({ id: historyGirl.id });
+          }}
+          onClose={() => setHistoryId(null)}
+        />
+      )}
     </div>
   );
 }
 
-/** The nearest planned thing with her: icon, when, comment. */
+/** The nearest planned thing with her: icon, when, comment. Opens the whole story with her. */
 function GirlCardPlan({ plan, today, onOpen }) {
   const next = plan[0];
   const late = next.day < today;
@@ -772,10 +872,10 @@ function GirlCardPlan({ plan, today, onOpen }) {
       className={`girl-card__task girl-card__task--${next.kind} ${late ? 'girl-card__task--late' : next.day === today ? 'girl-card__task--today' : ''}`}
       onClick={(e) => {
         e.stopPropagation();
-        onOpen(next);
+        onOpen();
       }}
       onKeyDown={(e) => e.stopPropagation()}
-      title={late ? `${taskKind(next.kind).label} — просрочено` : taskKind(next.kind).label}
+      title={`${taskKind(next.kind).label}${late ? ' — просрочено' : ''} · история`}
     >
       <TaskKindIcon kind={next.kind} />
       <span className="girl-card__task-when">{formatWhen(next.day, next.time, today)}</span>
@@ -785,7 +885,7 @@ function GirlCardPlan({ plan, today, onOpen }) {
   );
 }
 
-function GirlCard({ girl, url, today, plan, onOpen, onOpenTask }) {
+function GirlCard({ girl, url, today, plan, onOpen, onOpenHistory }) {
   const tel = phoneHref(girl.phone);
   const tg = telegramLink(girl.telegram);
   const next = nextDate(girl, today);
@@ -847,7 +947,7 @@ function GirlCard({ girl, url, today, plan, onOpen, onOpenTask }) {
         )}
         {plan?.length > 0 && (
           <div className="girl-card__plan">
-            <GirlCardPlan plan={plan} today={today} onOpen={onOpenTask} />
+            <GirlCardPlan plan={plan} today={today} onOpen={onOpenHistory} />
           </div>
         )}
       </div>
@@ -1089,7 +1189,13 @@ function draftOf(girl, today, prefill) {
     telegram: girl?.telegram ?? '',
     place: girl?.place ?? prefill?.place ?? '',
     comment: girl?.comment ?? prefill?.comment ?? '',
-    dates: (girl?.dates ?? []).map((d) => ({ id: d.id || genGirlId(), date: d.date || '', time: d.time || '', note: d.note || '' })),
+    dates: (girl?.dates ?? []).map((d) => ({
+      id: d.id || genGirlId(),
+      date: d.date || '',
+      time: d.time || '',
+      note: d.note || '',
+      pos: typeof d.pos === 'number' ? d.pos : null,
+    })),
   };
 }
 
@@ -1103,7 +1209,9 @@ function GirlEditor({
   tasksReady,
   onAddTask,
   onUpdateTask,
+  onCompleteTask,
   onDeleteTask,
+  onOpenHistory,
   onSave,
   onClose,
   onArchive,
@@ -1165,6 +1273,7 @@ function GirlEditor({
     }
   };
 
+  /** False when something has to be filled in first. */
   const save = () => {
     const errors = {};
     if (!draft.name.trim()) errors.name = true;
@@ -1172,7 +1281,7 @@ function GirlEditor({
       setInvalid(errors);
       setConfirm(null);
       nameRef.current?.focus();
-      return;
+      return false;
     }
     onSave(
       {
@@ -1182,11 +1291,28 @@ function GirlEditor({
         telegram: draft.telegram.trim(),
         place: draft.place.trim(),
         comment: draft.comment.trim(),
-        dates: sortDates(draft.dates.filter((d) => d.date)).map((d) => ({ id: d.id, date: d.date, time: d.time || null, note: d.note.trim() })),
+        dates: sortDates(draft.dates.filter((d) => d.date)).map((d) => ({
+          id: d.id,
+          date: d.date,
+          time: d.time || null,
+          note: d.note.trim(),
+          ...(d.pos != null ? { pos: d.pos } : {}),
+        })),
       },
       avatar,
       newTasks,
     );
+    return true;
+  };
+
+  // The history writes straight into her card, so unsaved edits are saved first.
+  const openHistory = () => {
+    if (dirty) {
+      if (!save()) return;
+    } else {
+      onClose();
+    }
+    onOpenHistory();
   };
 
   const requestClose = () => {
@@ -1213,7 +1339,7 @@ function GirlEditor({
   });
   const canPlan = tasksReady && !girl?.archived;
   const planned = (isNew ? newTasks : tasks.filter((t) => !t.done_at)).map(asItem).sort(compareItems);
-  const history = tasks.filter((t) => t.done_at).sort((a, b) => (a.done_at < b.done_at ? 1 : -1));
+  const history = tasks.filter((t) => t.done_at);
   const lastContact = girl ? lastContactOf(girl, tasks, today) : null;
   const editingTask = taskEdit?.id ? planned.find((it) => it.id === taskEdit.id) : null;
 
@@ -1237,7 +1363,7 @@ function GirlEditor({
     else onDeleteTask(id);
   };
 
-  const markDone = (id, done) => onUpdateTask(id, { done_at: done ? new Date().toISOString() : null });
+  const markDone = (it) => onCompleteTask(it.id, it.day, true);
 
   const tel = phoneHref(draft.phone);
   const tg = telegramLink(draft.telegram);
@@ -1423,7 +1549,7 @@ function GirlEditor({
                       <CloseIcon />
                     </button>
                   ) : (
-                    <button type="button" className="plan-card__check" onClick={() => markDone(it.id, true)} aria-label="Выполнено" title="Выполнено">
+                    <button type="button" className="plan-card__check" onClick={() => markDone(it)} aria-label="Выполнено" title="Выполнено">
                       <CheckIcon />
                     </button>
                   )}
@@ -1448,28 +1574,11 @@ function GirlEditor({
                   </button>
                 </div>
               )}
-              {history.length > 0 && (
-                <details className="girl-contacts__history">
-                  <summary>История · {history.length}</summary>
-                  <ul className="girl-contacts__history-list">
-                    {history.map((t) => (
-                      <li key={t.id} className="girl-history">
-                        <TaskKindIcon kind={t.kind} />
-                        <span className="girl-history__when">{formatDate(toLocalDateString(new Date(t.done_at)))}</span>
-                        <span className="girl-history__note">{t.note || taskKind(t.kind).label}</span>
-                        <button
-                          type="button"
-                          className="girl-history__undo"
-                          onClick={() => markDone(t.id, false)}
-                          aria-label="Вернуть в план"
-                          title="Вернуть в план"
-                        >
-                          Вернуть
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
+              {!isNew && (
+                <button type="button" className="girl-contacts__all" onClick={openHistory}>
+                  <span>Вся история{history.length > 0 ? ` · ${history.length} ${plural(history.length, 'запись', 'записи', 'записей')}` : ''}</span>
+                  <span aria-hidden="true">→</span>
+                </button>
               )}
             </section>
           )}
@@ -1598,7 +1707,7 @@ function GirlEditor({
             editingTask && !isNew
               ? () => {
                   setTaskEdit(null);
-                  markDone(editingTask.id, true);
+                  markDone(editingTask);
                 }
               : undefined
           }

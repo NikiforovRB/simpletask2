@@ -1868,39 +1868,32 @@
 .planner__board {
   display: flex;
   align-items: flex-start;
-  gap: 0.6rem;
+  gap: 1rem;
   padding-bottom: 0.75rem;
   overflow-x: auto;
   overscroll-behavior-x: contain;
 }
 
+/* While dragging every column reaches down to the longest one: all of it is a drop target. */
+.planner__board--dragging {
+  align-items: stretch;
+}
+
 /* Fewer days — wider columns, up to a limit. */
 .planner__col {
-  --col-bg: #121212;
   flex: 1 0 15.5rem;
   max-width: 22rem;
   min-width: 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
-  padding: 0.5rem;
-  border-radius: 14px;
-  background: var(--col-bg);
-  transition: background 0.15s ease, box-shadow 0.15s ease;
+  gap: 0.35rem;
+  transition: opacity 0.2s ease;
 }
 
-[data-theme="light"] .planner__col {
-  --col-bg: #f3f3f3;
-}
-
-.planner__col--today {
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.planner__col--over {
-  background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent);
+/* «Просрочено» and «Позже» take no drops. */
+.planner__board--dragging .planner__col--static {
+  opacity: 0.45;
 }
 
 .planner__col--late .planner__col-title {
@@ -1912,7 +1905,6 @@
   align-items: center;
   gap: 0.4rem;
   min-height: 2rem;
-  padding: 0 0 0 0.3rem;
 }
 
 .planner__col-title {
@@ -1922,7 +1914,17 @@
   white-space: nowrap;
 }
 
-.planner__col--today .planner__col-title {
+.planner__col--today .planner__col-title,
+.planner__col--over .planner__col-title {
+  color: var(--accent);
+}
+
+.planner__col-count {
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.planner__col--over .planner__col-count {
+  background: var(--accent-soft);
   color: var(--accent);
 }
 
@@ -2002,14 +2004,13 @@
 }
 
 .planner__idle .plan-card {
-  --plan-bg: #111111;
-  --plan-hover: #181818;
+  --plan-bg: #191919;
+  --plan-hover: #202020;
 }
 
 [data-theme="light"] .planner__idle .plan-card {
-  --plan-bg: #f3f3f3;
-  --plan-hover: #ececec;
-  box-shadow: none;
+  --plan-bg: #f6f6f6;
+  --plan-hover: #efefef;
 }
 
 .planner__idle-empty {
@@ -2020,14 +2021,68 @@
 }
 
 .planner__col-list {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
 }
 
+.planner__col-list--empty {
+  display: none;
+}
+
+.planner__board--dragging .planner__col-list {
+  display: flex;
+  flex: 1;
+  padding-bottom: 14px;
+}
+
+@media (min-width: 601px) {
+  .planner__board--dragging .planner__col-list {
+    min-height: 4rem;
+  }
+}
+
+/* Where the card will land: a blue line in a gap the cards under it open up. */
+.planner__drop-line {
+  position: absolute;
+  top: -1.5px;
+  left: 4px;
+  right: 0;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+  pointer-events: none;
+  transform-origin: left center;
+  transition: transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1);
+  animation: planner-line-in 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.planner__drop-line::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -4px;
+  width: 9px;
+  height: 9px;
+  box-sizing: border-box;
+  margin-top: -4.5px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--bg-app);
+}
+
+@keyframes planner-line-in {
+  from {
+    opacity: 0;
+    scale: 0.4 1;
+  }
+}
+
 .plan-card {
-  --plan-bg: #1a1a1a;
-  --plan-hover: #212121;
+  --plan-bg: #222222;
+  --plan-hover: #292929;
   position: relative;
   display: flex;
   align-items: flex-start;
@@ -2040,13 +2095,37 @@
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s ease, opacity 0.15s ease;
+  transition:
+    background 0.15s ease,
+    opacity 0.15s ease,
+    transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
 [data-theme="light"] .plan-card {
-  --plan-bg: #ffffff;
-  --plan-hover: #fafafa;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --plan-bg: #f2f2f2;
+  --plan-hover: #ebebeb;
+}
+
+.plan-card--shift {
+  transform: translateY(14px);
+}
+
+/* Just dropped here. */
+.plan-card--landed {
+  animation: plan-card-landed 0.75s ease-out;
+}
+
+@keyframes plan-card-landed {
+  from {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 0 6px var(--accent-soft);
+  }
+  to {
+    box-shadow:
+      0 0 0 2px transparent,
+      0 0 0 12px transparent;
+  }
 }
 
 @media (hover: hover) {
@@ -2074,13 +2153,55 @@
 }
 
 .plan-card--dragging {
-  opacity: 0.35;
+  opacity: 0.3;
 }
 
+/* The card in hand: lifted and tilted; settles flat as it is let go. */
 .plan-card--overlay {
-  width: 14.5rem;
-  box-shadow: var(--shadow-elev);
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  background: var(--plan-hover);
+  box-shadow:
+    0 16px 32px rgba(0, 0, 0, 0.5),
+    0 0 0 1px var(--accent-glow);
+  transform: rotate(-2deg) scale(1.03);
   cursor: grabbing;
+  animation: plan-card-lift 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition:
+    transform 0.26s cubic-bezier(0.2, 0.9, 0.3, 1),
+    box-shadow 0.26s ease;
+}
+
+[data-theme="light"] .plan-card--overlay {
+  box-shadow:
+    0 16px 32px rgba(0, 0, 0, 0.16),
+    0 0 0 1px var(--accent-glow);
+}
+
+@keyframes plan-card-lift {
+  from {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+.planner__overlay--drop .plan-card--overlay {
+  transform: none;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-card,
+  .planner__drop-line {
+    transition: none;
+    animation: none;
+  }
+
+  .plan-card--overlay {
+    transform: none;
+    animation: none;
+  }
 }
 
 .plan-card__pic {
@@ -2246,13 +2367,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  border: none;
   border-radius: 50%;
+  background: none;
   color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.plan-card--idle:hover .plan-card__plus {
+.plan-card__plus:hover {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.girls .plan-card__plus svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 /* Task editor */
@@ -2385,84 +2516,484 @@
   font-size: 0.8125rem;
 }
 
-.girl-contacts__history summary {
-  width: fit-content;
-  padding: 0.2rem 0;
-  color: var(--text-dim);
-  font-size: 0.8125rem;
+.girl-contacts__all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  height: 2.4rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  text-align: left;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.girl-contacts__history summary:hover {
+.girl-contacts__all:hover {
+  background: var(--accent-soft);
   color: var(--text-strong);
 }
 
-.girl-contacts__history-list {
-  list-style: none;
-  margin: 0.35rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+/* History: the whole story with her */
+
+.girl-editor__overlay.girl-editor__overlay--history {
+  z-index: 155;
 }
 
-.girl-history {
-  display: flex;
-  align-items: center;
+.girl-editor.history {
+  width: min(540px, 100%);
+  height: min(46rem, calc(100dvh - 2rem));
+  overflow: hidden;
+}
+
+.history__head {
   gap: 0.5rem;
-  min-height: 2rem;
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
+  padding: 0.7rem 0.75rem 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--divider);
 }
 
-.girls .girl-history svg {
-  width: 0.9rem;
-  height: 0.9rem;
-  color: var(--text-dim);
-}
-
-.girl-history__when {
-  flex-shrink: 0;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.girl-history__note {
+.history__who {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.3rem 0.6rem 0.3rem 0.3rem;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.history__who:hover {
+  background: var(--bg-hover);
+}
+
+.girls .history__avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.history__who-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.history__name {
   overflow: hidden;
+  color: var(--text-strong);
+  font-size: 1.05rem;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.girl-history__undo {
-  flex-shrink: 0;
-  padding: 0.2rem 0.4rem;
-  border: none;
-  border-radius: 6px;
-  background: none;
+.history__sub {
+  overflow: hidden;
   color: var(--text-dim);
-  font-family: inherit;
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history__actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.history__feed {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0.85rem 0.75rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.history__day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.history__day-title {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.85rem 0.5rem 0.35rem;
+  background: var(--bg-surface);
+  color: var(--text-dim);
   font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.history__day--plan {
+  margin-top: 0.6rem;
+  border-top: 1px solid var(--divider);
+}
+
+.history-entry {
+  display: flex;
+  align-items: flex-start;
+  border-radius: 12px;
+}
+
+.history-entry--new {
+  animation: history-entry-new 1.4s ease-out;
+}
+
+@keyframes history-entry-new {
+  from {
+    background: var(--accent-soft);
+  }
+}
+
+.history-entry__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.5rem;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: background 0.15s ease;
 }
 
-.girl-history:hover .girl-history__undo,
-.girl-history__undo:focus-visible {
-  opacity: 1;
+.history-entry__main:hover {
+  background: var(--bg-hover);
 }
 
-.girl-history__undo:hover {
+.girls .history-entry__icon {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.girls .history-entry__icon svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.plan-card__kind--met {
+  --kind: var(--text-dim);
+}
+
+/* Not happened yet: an outlined icon. */
+.history-entry--plan .history-entry__icon {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--kind);
+  color: var(--kind);
+}
+
+.history-entry__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-top: 0.1rem;
+}
+
+.history-entry__note {
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.history-entry__note--empty {
+  color: var(--text-muted);
+}
+
+.history-entry__meta {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-entry--late .history-entry__meta {
+  color: var(--danger);
+}
+
+.history-entry__check {
+  flex-shrink: 0;
+  margin: 0.5rem 0.5rem 0 0.25rem;
+}
+
+.history__nothing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  padding: 0.35rem 0.5rem;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+}
+
+.history__nothing-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* An entry opened for editing */
+
+.history-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0.2rem 0;
+  padding: 0.75rem;
+  border-radius: 14px;
+  background: var(--bg-elev);
+  animation: history-edit-in 0.16s ease;
+}
+
+@keyframes history-edit-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.history-edit .girl-input {
+  background: var(--bg-surface);
+}
+
+.history-edit__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.history-edit__row .girl-input--button {
+  flex: 1;
+}
+
+.girls__chip.history-edit__done {
+  height: 2.6rem;
+  background: var(--bg-surface);
+}
+
+.girls__chip.history-edit__done.girls__chip--on {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--text-strong);
+}
+
+.girls__chip.history-edit__done svg {
+  color: var(--success);
+}
+
+.girl-input--area.history-edit__note {
+  min-height: 4rem;
+}
+
+.history-edit__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* The line at the bottom */
+
+.history__composer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem 0.85rem;
+  border-top: 1px solid var(--divider);
+}
+
+.history__composer-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.history__kinds {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.history__kind {
+  --kind: var(--kind-message);
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.7rem 0 0.55rem;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.history__kind--call {
+  --kind: var(--kind-call);
+}
+
+.history__kind--date {
+  --kind: var(--kind-date);
+}
+
+.history__kind:hover {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+
+.history__kind--on,
+.history__kind--on:hover {
+  background: color-mix(in srgb, var(--kind) 18%, transparent);
+  color: var(--text-strong);
+}
+
+.girls .history__kind svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.history__kind--on svg {
+  color: var(--kind);
+}
+
+.history__when {
+  max-width: 100%;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  padding: 0 0.75rem;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.history__when span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history__when:hover {
   background: var(--bg-hover-strong);
   color: var(--text-strong);
 }
 
-@media (hover: none) {
-  .girl-history__undo {
-    opacity: 1;
-  }
+.history__when--plan,
+.history__when--plan:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.girls .history__when .girl-input__icon {
+  flex-shrink: 0;
+  width: 0.9rem;
+  height: 0.9rem;
+  color: currentColor;
+}
+
+.history__line {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.history__input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 2.75rem;
+  max-height: 10rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elev);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  resize: none;
+  overflow-y: auto;
+  transition: border-color 0.15s ease;
+}
+
+.history__input::placeholder {
+  color: var(--text-faint);
+}
+
+.history__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.history__send {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.history__send:hover {
+  filter: brightness(1.1);
+}
+
+.history__send:active {
+  transform: scale(0.94);
+}
+
+.girls .history__send svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  stroke-width: 2.4;
 }
 
 /* «What's next» after a done contact */
@@ -2693,5 +3224,42 @@
   .girls-follow__chips {
     order: 2;
     flex: 1 1 100%;
+  }
+
+  .planner__board {
+    gap: 1.1rem;
+  }
+
+  .girl-editor.history {
+    width: 100%;
+    height: 100dvh;
+  }
+
+  .girl-editor__head.history__head {
+    padding-top: calc(0.6rem + env(safe-area-inset-top));
+    padding-left: 0.6rem;
+  }
+
+  .history__feed {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .history__composer {
+    padding: 0.55rem 0.6rem calc(0.6rem + env(safe-area-inset-bottom));
+  }
+
+  .history__input {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .history__kind:not(.history__kind--on) span {
+    display: none;
+  }
+
+  .history__kind:not(.history__kind--on) {
+    padding: 0 0.55rem;
   }
 }

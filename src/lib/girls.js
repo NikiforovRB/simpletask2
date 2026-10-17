@@ -349,16 +349,67 @@ export function planItems(girls, tasks, today) {
       done: !!t.done_at,
       doneAt: t.done_at,
       createdAt: t.created_at,
+      pos: typeof t.position === 'number' ? t.position : null,
     });
   }
   for (const girl of girls) {
     if (girl.archived) continue;
     for (const d of girl.dates) {
       if (!d.date || d.date < today) continue;
-      items.push({ key: `date:${d.id}`, source: 'date', id: d.id, kind: 'date', girl, day: d.date, time: d.time || null, note: d.note || '', done: false });
+      items.push({
+        key: `date:${d.id}`,
+        source: 'date',
+        id: d.id,
+        kind: 'date',
+        girl,
+        day: d.date,
+        time: d.time || null,
+        note: d.note || '',
+        done: false,
+        pos: typeof d.pos === 'number' ? d.pos : null,
+      });
     }
   }
   return items;
+}
+
+/**
+ * Inside a planner day: the done ones last; the ones arranged by hand (`pos`)
+ * in that order, then the rest by time.
+ */
+export function compareInDay(a, b) {
+  if (a.done !== b.done) return a.done ? 1 : -1;
+  const ap = a.pos != null;
+  const bp = b.pos != null;
+  if (ap && bp && a.pos !== b.pos) return a.pos - b.pos;
+  if (ap !== bp) return ap ? -1 : 1;
+  return compareItems(a, b);
+}
+
+const POS_STEP = 1024;
+
+/**
+ * New `pos` values once the card `key` was put into `ordered` (the whole day,
+ * in its new order): just that card when it fits between its neighbours,
+ * otherwise the day is numbered anew. A Map key → pos of what changed.
+ */
+export function placeInDay(ordered, key) {
+  const i = ordered.findIndex((it) => it.key === key);
+  const rest = ordered.filter((_, j) => j !== i);
+  const arranged = rest.every((it, j) => it.pos != null && (j === 0 || it.pos > rest[j - 1].pos));
+  if (arranged) {
+    const prev = ordered[i - 1]?.pos;
+    const next = ordered[i + 1]?.pos;
+    const lo = prev ?? (next != null ? next - POS_STEP : 0);
+    const hi = next ?? lo + 2 * POS_STEP;
+    if (hi - lo > 1e-6) return new Map([[key, (lo + hi) / 2]]);
+  }
+  const out = new Map();
+  ordered.forEach((it, j) => {
+    const pos = (j + 1) * POS_STEP;
+    if (it.key === key || it.pos !== pos) out.set(it.key, pos);
+  });
+  return out;
 }
 
 /** By day; within a day the ones without a time first, then by time. */
@@ -383,18 +434,85 @@ export function pendingByGirl(items) {
 /** What is to be done today: today's and the overdue ones (the header counter). */
 export const dueCount = (items, today) => items.filter((it) => !it.done && it.day <= today).length;
 
+/** The day a done contact happened on: its own day, unless that is still ahead. */
+const doneDay = (t, today) => (t.due_on && t.due_on <= today ? t.due_on : toLocalDateString(new Date(t.done_at)));
+
 /** The last time she was in touch: a done contact, a past date, or the day they met. */
 export function lastContactOf(girl, tasks, today) {
   let best = { day: girl.met_on, kind: 'met' };
   for (const t of tasks) {
     if (t.girl_id !== girl.id || !t.done_at) continue;
-    const day = toLocalDateString(new Date(t.done_at));
+    const day = doneDay(t, today);
     if (day > best.day) best = { day, kind: t.kind };
   }
   for (const d of girl.dates) {
     if (d.date && d.date < today && d.date > best.day) best = { day: d.date, kind: 'date' };
   }
   return best;
+}
+
+// ---------------------------------------------------------------------------
+// The whole story with her: what was and what is planned
+// ---------------------------------------------------------------------------
+
+export const HISTORY_KINDS = [
+  { key: 'message', label: 'Сообщение', past: 'Что написал', plan: 'О чём написать' },
+  { key: 'call', label: 'Звонок', past: 'О чём говорили', plan: 'О чём поговорить' },
+  { key: 'date', label: 'Свидание', past: 'Где были, как прошло', plan: 'Где, во сколько' },
+];
+
+export const historyKind = (key) =>
+  key === 'met' ? { key: 'met', label: 'Знакомство' } : HISTORY_KINDS.find((k) => k.key === key) || HISTORY_KINDS[0];
+
+const clockOf = (iso) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+/**
+ * `past` — the meeting, done contacts and dates gone by, oldest first; `planned`
+ * — contacts not done yet (the overdue ones too) and dates from today on.
+ * `clock` orders a day: the time set by hand, or when a contact was ticked off.
+ */
+export function historyOf(girl, tasks, today) {
+  const past = [{ key: 'met', source: 'met', kind: 'met', day: girl.met_on, time: null, clock: '', note: girl.place || '', done: true }];
+  const planned = [];
+  for (const t of tasks) {
+    if (t.girl_id !== girl.id) continue;
+    const done = !!t.done_at;
+    const day = done ? doneDay(t, today) : t.due_on;
+    const ticked = done && toLocalDateString(new Date(t.done_at)) === day ? clockOf(t.done_at) : '';
+    (done ? past : planned).push({
+      key: `task:${t.id}`,
+      source: 'task',
+      id: t.id,
+      kind: t.kind,
+      day,
+      time: t.time,
+      clock: t.time || ticked,
+      note: t.note,
+      done,
+      createdAt: t.created_at,
+    });
+  }
+  for (const d of girl.dates) {
+    if (!d.date) continue;
+    const done = d.date < today;
+    (done ? past : planned).push({
+      key: `date:${d.id}`,
+      source: 'date',
+      id: d.id,
+      kind: 'date',
+      day: d.date,
+      time: d.time || null,
+      clock: d.time || '',
+      note: d.note || '',
+      done,
+    });
+  }
+  const order = (e) => `${e.day} ${e.source === 'met' ? '' : `~${e.clock}`} ${e.createdAt || ''}`;
+  const byOrder = (a, b) => (order(a) < order(b) ? -1 : order(a) > order(b) ? 1 : 0);
+  return { past: past.sort(byOrder), planned: planned.sort(byOrder) };
 }
 
 // ---------------------------------------------------------------------------
