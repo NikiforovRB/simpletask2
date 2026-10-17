@@ -21,9 +21,10 @@ export const MessageIcon = () => (
   </Icon>
 );
 
+// Sits a little low in its box: the lobes outweigh the tip, so centred by the box it looks high.
 export const HeartIcon = () => (
   <Icon>
-    <path d="M19.5 12.6 12 20l-7.5-7.4A5 5 0 0 1 12 6a5 5 0 0 1 7.5 6.6z" />
+    <path d="M19.5 13.35 12 20.75l-7.5-7.4A5 5 0 0 1 12 6.75a5 5 0 0 1 7.5 6.6z" />
   </Icon>
 );
 
@@ -67,10 +68,17 @@ export const SendIcon = () => (
   </Icon>
 );
 
+// Low in its box for the same reason as the heart: the head outweighs the open shoulders.
 export const MetIcon = () => (
   <Icon>
-    <circle cx="12" cy="8" r="3.5" />
-    <path d="M5 20a7 7 0 0 1 14 0" />
+    <circle cx="12" cy="8.5" r="3.5" />
+    <path d="M5 20.5a7 7 0 0 1 14 0" />
+  </Icon>
+);
+
+export const ChevronDownIcon = () => (
+  <Icon>
+    <path d="m6 9 6 6 6-6" />
   </Icon>
 );
 

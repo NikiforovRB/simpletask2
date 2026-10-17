@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -27,7 +27,7 @@ import {
   taskKind,
   telegramLink,
 } from '../lib/girls';
-import { Avatar, CheckIcon, PhoneIcon, PlusIcon, TaskKindIcon, TelegramIcon } from './GirlsIcons';
+import { Avatar, CheckIcon, ChevronDownIcon, PhoneIcon, PlusIcon, TaskKindIcon, TelegramIcon } from './GirlsIcons';
 
 const DAY_COUNTS = [1, 2, 3, 4, 5, 6, 7];
 // Silent this long — the girl is marked in «Без плана».
@@ -94,6 +94,89 @@ function dropTarget(active, over, byDay) {
   else if (prev) top = prev.offsetTop + prev.offsetHeight + SHIFT / 2;
   const noop = !!item && item.day === day && all.findIndex((it) => it.key === item.key) === index;
   return { day, index, top: Math.round(top), noop };
+}
+
+/** How many days the planner shows: the number, and a list of them on a click. */
+function DayCount({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const buttonRef = useRef(null);
+  const listRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    listRef.current?.querySelector('[aria-selected="true"]')?.focus();
+    const onDown = (e) => {
+      if (!rootRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [open]);
+
+  const close = () => {
+    setOpen(false);
+    buttonRef.current?.focus();
+  };
+
+  const onListKey = (e) => {
+    const options = [...listRef.current.querySelectorAll('[role="option"]')];
+    const i = options.indexOf(document.activeElement);
+    const to = { ArrowDown: Math.min(i + 1, options.length - 1), ArrowUp: Math.max(i - 1, 0), Home: 0, End: options.length - 1 }[e.key];
+    if (to !== undefined) {
+      e.preventDefault();
+      options[to].focus();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    } else if (e.key === 'Tab') {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="planner__days" ref={rootRef}>
+      <button
+        ref={buttonRef}
+        type="button"
+        className={`planner__days-btn ${open ? 'planner__days-btn--open' : ''}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Дней в планере: ${value}`}
+        title="Сколько дней показывать"
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+          e.preventDefault();
+          setOpen(true);
+        }}
+      >
+        <span>{value}</span>
+        <ChevronDownIcon />
+      </button>
+      {open && (
+        <div className="planner__days-menu" role="listbox" aria-label="Сколько дней показывать" ref={listRef} onKeyDown={onListKey}>
+          {DAY_COUNTS.map((n) => (
+            <button
+              key={n}
+              type="button"
+              role="option"
+              aria-selected={n === value}
+              className={`planner__days-option ${n === value ? 'planner__days-option--on' : ''}`}
+              onClick={() => {
+                onChange(n);
+                close();
+              }}
+            >
+              <span className="planner__days-num">{n}</span>
+              <span className="planner__days-word">{plural(n, 'день', 'дня', 'дней')}</span>
+              {n === value && <CheckIcon />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** The cards of a list glide to their new places when the list changes (not while dragging). */
@@ -284,21 +367,7 @@ export function GirlsPlanner({
           <span className="planner__summary">{summary}</span>
         </div>
         <span className="girl-editor__spacer" />
-        <div className="planner__days" role="radiogroup" aria-label="Сколько дней показывать">
-          <span className="planner__days-label">Дней</span>
-          {DAY_COUNTS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              role="radio"
-              aria-checked={dayCount === n}
-              className={`planner__days-btn ${dayCount === n ? 'planner__days-btn--on' : ''}`}
-              onClick={() => onDayCount(n)}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
+        <DayCount value={dayCount} onChange={onDayCount} />
         {girls.some((g) => !g.archived) && (
           <button type="button" className="girls__add" onClick={() => onCreate({ day: today })}>
             <PlusIcon />

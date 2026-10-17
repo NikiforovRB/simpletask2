@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useModalClose } from '../hooks/useModalClose';
 import {
   HISTORY_KINDS,
@@ -26,6 +26,9 @@ const pickerQuick = (today) => [
 ];
 // With a keyboard Enter sends and Shift+Enter makes a new line; on a phone Enter is just a new line.
 const enterSends = () => window.matchMedia?.('(hover: hover) and (pointer: fine)').matches ?? true;
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+// How long it slides away (see history-out in the CSS).
+const CLOSE_MS = 260;
 
 /**
  * The whole story with her as one feed, the oldest on top: the meeting, every
@@ -42,10 +45,22 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
   const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState(() => ({ kind: kinds.includes('message') ? 'message' : kinds[0], day: today, time: '', note: '' }));
   const [picker, setPicker] = useState(false);
+  const [closing, setClosing] = useState(false);
   const feedRef = useRef(null);
   const inputRef = useRef(null);
   const seen = useRef(null);
-  useModalClose(() => (editing ? setEditing(null) : onClose()));
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+  const close = () => (reducedMotion() ? onClose() : setClosing(true));
+  useModalClose(() => (editing ? setEditing(null) : close()));
+
+  useEffect(() => {
+    if (!closing) return;
+    const t = setTimeout(() => onCloseRef.current(), CLOSE_MS);
+    return () => clearTimeout(t);
+  }, [closing]);
 
   // Opens at the newest; whatever appears later is scrolled to and lit up for a moment.
   useLayoutEffect(() => {
@@ -66,7 +81,7 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
     const el = inputRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight + 2}px`;
+    el.style.height = `${el.scrollHeight}px`;
   }, [draft.note]);
 
   const days = [];
@@ -115,12 +130,7 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
     );
 
   return (
-    <div
-      className="girl-editor__overlay girl-editor__overlay--history"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <div className={`girl-editor__overlay girl-editor__overlay--history ${closing ? 'girl-editor__overlay--closing' : ''}`}>
       <div className="girl-editor history" role="dialog" aria-modal="true" aria-label={`История — ${girl.name}`}>
         <header className="girl-editor__head history__head">
           <button type="button" className="history__who" onClick={onOpenGirl} title="Открыть карточку">
@@ -141,7 +151,7 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
                 <PhoneIcon />
               </a>
             )}
-            <button type="button" className="girl-editor__close" onClick={onClose} aria-label="Закрыть">
+            <button type="button" className="girl-editor__close" onClick={close} aria-label="Закрыть">
               <CloseIcon />
             </button>
           </div>

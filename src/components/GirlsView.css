@@ -1815,44 +1815,116 @@
 }
 
 .planner__days {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 10px;
-  background: var(--bg-elev);
-}
-
-.planner__days-label {
-  padding: 0 0.45rem 0 0.4rem;
-  color: var(--text-dim);
-  font-size: 0.8125rem;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .planner__days-btn {
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.6rem 0 0.85rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--bg-elev);
+  color: var(--text-strong);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.planner__days-btn:hover,
+.planner__days-btn--open {
+  background: color-mix(in srgb, var(--bg-elev), var(--text-strong) 7%);
+}
+
+.girls .planner__days-btn svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--text-dim);
+  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.planner__days-btn--open svg {
+  transform: rotate(180deg);
+}
+
+.planner__days-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 9.5rem;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-elev);
+  transform-origin: top right;
+  animation: planner-days-in 0.16s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+[data-theme="light"] .planner__days-menu {
+  background: #ffffff;
+}
+
+@keyframes planner-days-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+}
+
+.planner__days-option {
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.6rem;
   border: none;
   border-radius: 8px;
   background: none;
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-family: inherit;
   font-size: 0.875rem;
-  font-variant-numeric: tabular-nums;
+  text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.12s ease;
 }
 
-.planner__days-btn:hover {
-  color: var(--text-strong);
+.planner__days-option:hover,
+.planner__days-option:focus-visible {
+  outline: none;
+  background: var(--bg-hover);
 }
 
-.planner__days-btn--on,
-.planner__days-btn--on:hover {
-  background: var(--bg-app);
+.planner__days-num {
+  min-width: 0.75rem;
   color: var(--text-strong);
-  box-shadow: var(--shadow-sm);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.planner__days-word {
+  flex: 1;
+}
+
+.planner__days-option--on .planner__days-word {
+  color: var(--text-secondary);
+}
+
+.girls .planner__days-option svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--accent);
+  stroke-width: 2.4;
 }
 
 .planner__warn {
@@ -2472,8 +2544,8 @@
 }
 
 .girls .girl-task__kind svg {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 .girl-task__when {
@@ -2542,19 +2614,77 @@
 
 /* History: the whole story with her */
 
+/* The whole screen, slid in from the right; the feed is a column in the middle. */
 .girl-editor__overlay.girl-editor__overlay--history {
   z-index: 155;
+  padding: 0;
+  align-items: stretch;
+  justify-content: flex-end;
+  animation: history-backdrop-in 0.36s ease;
+}
+
+.girl-editor__overlay--history.girl-editor__overlay--closing {
+  pointer-events: none;
+  animation: history-backdrop-out 0.26s ease forwards;
+}
+
+@keyframes history-backdrop-in {
+  from {
+    background-color: transparent;
+  }
+}
+
+@keyframes history-backdrop-out {
+  to {
+    background-color: transparent;
+  }
 }
 
 .girl-editor.history {
-  width: min(540px, 100%);
-  height: min(46rem, calc(100dvh - 2rem));
+  --history-col: 46rem;
+  --history-field: #252525;
+  --history-field-focus: #2c2c2c;
+  width: 100%;
+  height: 100dvh;
+  max-height: none;
   overflow: hidden;
+  border-radius: 0;
+  box-shadow: -16px 0 40px rgba(0, 0, 0, 0.35);
+  animation: history-in 0.36s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[data-theme="light"] .girl-editor.history {
+  --history-field: #f0f0f0;
+  --history-field-focus: #e9e9e9;
+  box-shadow: -16px 0 40px rgba(0, 0, 0, 0.12);
+}
+
+.girl-editor__overlay--closing .girl-editor.history {
+  animation: history-out 0.26s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes history-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes history-out {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .girl-editor__overlay.girl-editor__overlay--history,
+  .girl-editor.history {
+    animation: none;
+  }
 }
 
 .history__head {
   gap: 0.5rem;
-  padding: 0.7rem 0.75rem 0.7rem 0.85rem;
+  padding: 0.7rem max(0.75rem, calc((100% - var(--history-col)) / 2)) 0.7rem max(0.85rem, calc((100% - var(--history-col)) / 2));
   border-bottom: 1px solid var(--divider);
 }
 
@@ -2620,7 +2750,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 0.85rem 0.75rem;
+  padding: 0 max(0.85rem, calc((100% - var(--history-col)) / 2)) 0.75rem;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -2629,6 +2759,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+}
+
+/* A short story sits at the bottom, by the line to write in, as in a chat. */
+.history__day:first-child {
+  margin-top: auto;
 }
 
 .history__day-title {
@@ -2693,8 +2828,8 @@
 }
 
 .girls .history-entry__icon svg {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 .plan-card__kind--met {
@@ -2770,8 +2905,16 @@
   margin: 0.2rem 0;
   padding: 0.75rem;
   border-radius: 14px;
-  background: var(--bg-elev);
+  --history-field: #282828;
+  --history-field-focus: #2f2f2f;
+  background: #1a1a1a;
   animation: history-edit-in 0.16s ease;
+}
+
+[data-theme="light"] .history-edit {
+  --history-field: #ffffff;
+  --history-field-focus: #ffffff;
+  background: #f1f1f1;
 }
 
 @keyframes history-edit-in {
@@ -2782,7 +2925,14 @@
 }
 
 .history-edit .girl-input {
-  background: var(--bg-surface);
+  border: none;
+  background: var(--history-field);
+  transition: background 0.15s ease;
+}
+
+.history-edit .girl-input:focus,
+.history-edit .girl-input--button:hover {
+  background: var(--history-field-focus);
 }
 
 .history-edit__row {
@@ -2797,7 +2947,8 @@
 
 .girls__chip.history-edit__done {
   height: 2.6rem;
-  background: var(--bg-surface);
+  border: none;
+  background: var(--history-field);
 }
 
 .girls__chip.history-edit__done.girls__chip--on {
@@ -2827,7 +2978,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 0.6rem 0.85rem 0.85rem;
+  padding: 0.6rem max(0.85rem, calc((100% - var(--history-col)) / 2)) 0.85rem;
   border-top: 1px solid var(--divider);
 }
 
@@ -2944,26 +3095,26 @@
   box-sizing: border-box;
   min-height: 2.75rem;
   max-height: 10rem;
-  padding: 0.65rem 0.9rem;
-  border: 1px solid var(--border);
+  padding: 0.7rem 0.95rem;
+  border: none;
   border-radius: 14px;
-  background: var(--bg-elev);
+  background: var(--history-field);
   color: var(--text-primary);
   font-family: inherit;
   font-size: 0.9375rem;
   line-height: 1.4;
   resize: none;
   overflow-y: auto;
-  transition: border-color 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 .history__input::placeholder {
-  color: var(--text-faint);
+  color: var(--text-dim);
 }
 
 .history__input:focus {
   outline: none;
-  border-color: var(--accent);
+  background: var(--history-field-focus);
 }
 
 .history__send {
@@ -3197,20 +3348,11 @@
   }
 
   .planner__heading {
-    flex: 1 1 100%;
+    flex: 1 1 0;
   }
 
   .planner__head > .girl-editor__spacer {
     display: none;
-  }
-
-  .planner__days {
-    flex: 1 1 100%;
-  }
-
-  .planner__days-btn {
-    flex: 1;
-    width: auto;
   }
 
   .girls-follow__text {
@@ -3228,11 +3370,6 @@
 
   .planner__board {
     gap: 1.1rem;
-  }
-
-  .girl-editor.history {
-    width: 100%;
-    height: 100dvh;
   }
 
   .girl-editor__head.history__head {
