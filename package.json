@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "db:status": "node scripts/db-migrate.mjs status",
+    "db:sql": "node scripts/db-migrate.mjs sql"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

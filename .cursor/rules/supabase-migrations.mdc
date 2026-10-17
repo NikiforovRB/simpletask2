@@ -1,0 +1,17 @@
+---
+description: How database migrations are written and applied (Supabase)
+globs: supabase/**
+alwaysApply: false
+---
+
+# Supabase migrations
+
+- A schema change is a new file `supabase/migrations/NNN_name.sql` (next free number, three digits). Also append it to `supabase/full_schema_setup.sql` under a header like `-- 069: «Описание»`.
+- Apply it yourself, do not ask the user to run SQL by hand:
+  - `npm run db:migrate -- --dry-run` — what is pending;
+  - `npm run db:migrate` — applies pending files in order, each as one transaction, and records it in `supabase_migrations.schema_migrations`;
+  - `npm run db:status` — applied / pending;
+  - `npm run db:sql -- "select …"` — ad-hoc query to verify the result.
+- Before applying a migration that destroys data (`drop table`, `drop column`, `delete`, `truncate`, a lossy type change), show the SQL to the user and wait for confirmation. There is only one (production) database.
+- Never edit a migration that is already applied — write a new one.
+- The token is `SUPABASE_ACCESS_TOKEN` in `.env.local` (gitignored). Never print it, commit it, or give it a `VITE_` prefix.
