@@ -2614,7 +2614,7 @@
 
 /* History: the whole story with her */
 
-/* The whole screen, slid in from the right; the feed is a column in the middle. */
+/* A panel the full height of the screen, slid in from the right. */
 .girl-editor__overlay.girl-editor__overlay--history {
   z-index: 155;
   padding: 0;
@@ -2641,10 +2641,9 @@
 }
 
 .girl-editor.history {
-  --history-col: 46rem;
   --history-field: #252525;
   --history-field-focus: #2c2c2c;
-  width: 100%;
+  width: min(46rem, 100%);
   height: 100dvh;
   max-height: none;
   overflow: hidden;
@@ -2684,7 +2683,7 @@
 
 .history__head {
   gap: 0.5rem;
-  padding: 0.7rem max(0.75rem, calc((100% - var(--history-col)) / 2)) 0.7rem max(0.85rem, calc((100% - var(--history-col)) / 2));
+  padding: 0.7rem 0.75rem 0.7rem 0.85rem;
   border-bottom: 1px solid var(--divider);
 }
 
@@ -2750,7 +2749,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 max(0.85rem, calc((100% - var(--history-col)) / 2)) 0.75rem;
+  padding: 0 0.85rem 0.75rem;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -2978,7 +2977,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 0.6rem max(0.85rem, calc((100% - var(--history-col)) / 2)) 0.85rem;
+  padding: 0.6rem 0.85rem 0.85rem;
   border-top: 1px solid var(--divider);
 }
 

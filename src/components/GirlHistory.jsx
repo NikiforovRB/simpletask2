@@ -130,7 +130,12 @@ export function GirlHistory({ girl, tasks, today, url, kinds, onAdd, onEdit, onD
     );
 
   return (
-    <div className={`girl-editor__overlay girl-editor__overlay--history ${closing ? 'girl-editor__overlay--closing' : ''}`}>
+    <div
+      className={`girl-editor__overlay girl-editor__overlay--history ${closing ? 'girl-editor__overlay--closing' : ''}`}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) close();
+      }}
+    >
       <div className="girl-editor history" role="dialog" aria-modal="true" aria-label={`История — ${girl.name}`}>
         <header className="girl-editor__head history__head">
           <button type="button" className="history__who" onClick={onOpenGirl} title="Открыть карточку">
