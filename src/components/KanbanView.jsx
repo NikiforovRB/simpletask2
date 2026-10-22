@@ -33,9 +33,13 @@ import {
   dateFilterLimit,
   dueInDays,
   formatDueDate,
+  formatMoney,
   formatStamp,
   isOverdue,
   labelTextColor,
+  moneyLine,
+  moneyTotal,
+  taskMoney,
 } from '../lib/kanbanCards';
 import { ARCHIVE_DAYS } from '../hooks/useKanban';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -71,6 +75,7 @@ import settingsIcon from '../assets/settings.svg';
 import settingsNavIcon from '../assets/settings-nav.svg';
 import archiveIcon from '../assets/archive.svg';
 import archiveNavIcon from '../assets/archive-nav.svg';
+import moneyIcon from '../assets/money.svg';
 import './KanbanView.css';
 
 const DEFAULT_COLUMN_COLOR = '#5a86ee';
@@ -334,43 +339,56 @@ export function LabelPicker({
   );
 }
 
-/** A task line as it is previewed on a card (read-only apart from the tick). */
-function CardTaskLine({ task, subtasks, showSubtasks, onToggle, depth = 0 }) {
+/**
+ * A task line as it is previewed on a card (read-only apart from the tick).
+ * On a «Деньги» card the tick gives way to the amount the line opens with, or
+ * to what its subtasks add up to, shown dimmer, when it has none of its own.
+ */
+function CardTaskLine({ task, subtasks, showSubtasks, onToggle, money = false, depth = 0 }) {
   const children = subtasks(task.id);
   // The spacing a task was given in the plans — a wide gap or a divider — is
   // kept on the card, scaled down to the size of the preview.
   const top = task.top_style ?? 0;
+  const line = money ? moneyLine(task.title) : null;
+  const sum = money && line.amount === null ? taskMoney(task, subtasks) : line?.amount ?? null;
+  const done = !!task.completed_at;
   return (
     <>
-      <li className={`kanban-card__task kanban-card__task--depth-${depth} kanban-card__task--top-${top}`}>
-        <button
-          type="button"
-          className={`kanban-card__task-check ${task.completed_at ? 'kanban-card__task-check--done' : ''}`}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle?.(task);
-          }}
-          aria-label={task.completed_at ? 'Вернуть в список' : 'Выполнено'}
-        >
-          {task.completed_at ? (
-            <svg width="9" height="9" viewBox="0 0 16 16" aria-hidden>
-              <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          ) : children.length > 0 ? (
-            // Two stripes: the same hint as in the plans, telling that the task
-            // holds subtasks even when they are not drawn on the card.
-            <span className="kanban-card__task-hint" aria-hidden>
-              <span />
-              <span />
-            </span>
-          ) : null}
-        </button>
+      <li className={`kanban-card__task kanban-card__task--depth-${depth} kanban-card__task--top-${top} ${money && done ? 'kanban-card__task--done' : ''}`}>
+        {money ? (
+          <span className={`kanban-card__task-sum ${line.amount === null ? 'kanban-card__task-sum--sub' : ''}`}>
+            {sum === null ? '—' : formatMoney(sum)}
+          </span>
+        ) : (
+          <button
+            type="button"
+            className={`kanban-card__task-check ${done ? 'kanban-card__task-check--done' : ''}`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle?.(task);
+            }}
+            aria-label={done ? 'Вернуть в список' : 'Выполнено'}
+          >
+            {done ? (
+              <svg width="9" height="9" viewBox="0 0 16 16" aria-hidden>
+                <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : children.length > 0 ? (
+              // Two stripes: the same hint as in the plans, telling that the task
+              // holds subtasks even when they are not drawn on the card.
+              <span className="kanban-card__task-hint" aria-hidden>
+                <span />
+                <span />
+              </span>
+            ) : null}
+          </button>
+        )}
         <span
           className="kanban-card__task-title"
-          style={{ color: task.completed_at ? undefined : task.text_color || undefined }}
+          style={{ color: done ? undefined : task.text_color || undefined }}
         >
-          {task.title || 'Без названия'}
+          {line && line.amount !== null ? line.label : task.title || 'Без названия'}
         </span>
       </li>
       {showSubtasks && children.map((st) => (
@@ -380,6 +398,7 @@ function CardTaskLine({ task, subtasks, showSubtasks, onToggle, depth = 0 }) {
           subtasks={subtasks}
           showSubtasks={showSubtasks}
           onToggle={onToggle}
+          money={money}
           depth={depth + 1}
         />
       ))}
@@ -448,6 +467,23 @@ function KanbanCard({
     [tasks, card.id],
   );
   const doneCount = cardTasks.filter((t) => t.completed_at).length;
+  const money = !!card.money_mode;
+  const total = useMemo(
+    () => (money ? moneyTotal(cardTasks, getSubtasks) : 0),
+    [money, cardTasks, getSubtasks],
+  );
+  // The amounts stand in one column, as wide as the longest of them.
+  const moneyWidth = useMemo(() => {
+    if (!money) return 0;
+    let widest = formatMoney(total).length;
+    const walk = (list) => list.forEach((t) => {
+      const sum = taskMoney(t, getSubtasks);
+      if (sum !== null) widest = Math.max(widest, formatMoney(sum).length);
+      if (settings.showSubtasks) walk(getSubtasks(t.id));
+    });
+    walk(cardTasks);
+    return widest;
+  }, [money, total, cardTasks, getSubtasks, settings.showSubtasks]);
   const marks = cardLabels(card, boardLabels);
   const overdue = isOverdue(card.due_date);
   // Laid out by date, the column a card stands in already says when it is due.
@@ -553,7 +589,10 @@ function KanbanCard({
         <p className="kanban-card__desc">{card.description}</p>
       )}
       {!folded && settings.showTasks && cardTasks.length > 0 && (
-        <ul className="kanban-card__tasks">
+        <ul
+          className={`kanban-card__tasks ${money ? 'kanban-card__tasks--money' : ''}`}
+          style={money ? { '--money-width': `${moneyWidth}ch` } : undefined}
+        >
           {cardTasks.map((t) => (
             <CardTaskLine
               key={t.id}
@@ -561,13 +600,23 @@ function KanbanCard({
               subtasks={getSubtasks}
               showSubtasks={settings.showSubtasks}
               onToggle={onToggleTask}
+              money={money}
             />
           ))}
+          {money && (
+            <li className="kanban-card__task kanban-card__task--total">
+              <span className="kanban-card__task-sum">{formatMoney(total)}</span>
+              <span className="kanban-card__task-title">Итого</span>
+            </li>
+          )}
         </ul>
       )}
-      {/* Folded, or with the task list turned off: how far along it is. */}
+      {/* Folded, or with the task list turned off: how far along it is, or
+          what it all comes to. */}
       {(folded || !settings.showTasks) && cardTasks.length > 0 && (
-        <div className="kanban-card__meta">{`${doneCount} из ${cardTasks.length}`}</div>
+        <div className="kanban-card__meta">
+          {money ? `Итого ${formatMoney(total)}` : `${doneCount} из ${cardTasks.length}`}
+        </div>
       )}
     </article>
   );
@@ -1215,6 +1264,16 @@ function CardContextMenu({
         })}
         {item(lineHeightIcon, 'Быстрое редактирование', () => { onQuickEdit(card.id); onClose(); })}
         {item(editIcon, 'Открыть', () => { onOpen(card.id); onClose(); })}
+        <button
+          type="button"
+          className="dashboard__context-menu-item"
+          onMouseEnter={hasHover ? () => showFlyout(null) : undefined}
+          onClick={() => { onUpdate(card.id, { money_mode: !card.money_mode }); onClose(); }}
+        >
+          <img src={moneyIcon} alt="" className="dashboard__context-menu-item-icon" />
+          <span>Режим «Деньги»</span>
+          {card.money_mode && <span className="kanban-menu__check" aria-hidden>✓</span>}
+        </button>
         <div className="dashboard__context-menu-separator" aria-hidden />
 
         {branch('due', calIcon, card.due_date ? `Срок: ${formatDueDate(card.due_date)}` : 'Срок…', (

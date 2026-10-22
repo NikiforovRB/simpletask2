@@ -240,6 +240,38 @@
   color: var(--danger);
 }
 
+.kanban-panel__money {
+  margin-left: auto;
+}
+
+.kanban-panel__money--on,
+.kanban-panel__money--on:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.kanban-panel__money--on img {
+  opacity: 1;
+}
+
+.kanban-panel__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--divider);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.kanban-panel__total-sum {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 /* The month grid brings its own padding and backdrop; inside a popover of the
    board it only needs the grid itself. */
 .kanban-due-pop .calendar-popover {

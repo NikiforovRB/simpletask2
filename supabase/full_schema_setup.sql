@@ -1947,3 +1947,7 @@ $$;
 
 -- 069: «Планер» — порядок карточек внутри дня
 alter table public.girl_tasks add column if not exists position double precision;
+
+-- 070: Канбан — режим «Деньги» у плашки
+alter table public.kanban_cards
+  add column if not exists money_mode boolean not null default false;

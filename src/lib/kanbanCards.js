@@ -65,6 +65,58 @@ export function cardFill(hex) {
   return /^#([0-9a-f]{6})$/i.test(hex || '') ? `color-mix(in srgb, ${hex} 20%, var(--bg-elev))` : null;
 }
 
+/*
+ * «Деньги»: a task line opens with its amount — "249 • MMB", "1 500 Прана",
+ * "249 + 249 — Агрозаказ", "300₽: Алмикс". The number has to stand apart from
+ * the word after it, so "3D модель" is not read as three roubles.
+ */
+const NUM = String.raw`\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?`;
+const MONEY_LEAD = new RegExp(
+  String.raw`^\s*((?:${NUM})(?:\s*\+\s*(?:${NUM}))*)(?:\s*(?:₽|руб\.?|р\.))?(?=$|[\s•·:|—–-])\s*(?:[•·:|—–-]\s*)?`,
+  'i',
+);
+
+/** The amount a task line opens with, or null, and the words after it. */
+export function moneyLine(title) {
+  const text = title || '';
+  const m = MONEY_LEAD.exec(text);
+  if (!m) return { amount: null, label: text };
+  const amount = m[1]
+    .split('+')
+    .reduce((sum, part) => sum + Number(part.replace(/[\s\u00a0\u202f]/g, '').replace(',', '.')), 0);
+  return { amount: Math.round(amount * 100) / 100, label: text.slice(m[0].length).trim() };
+}
+
+/**
+ * What a task is worth: its own amount, or else what its open subtasks add up
+ * to, so a group line ("Клиенты") counts once — through its children — and a
+ * line with a sum of its own is not counted twice. Null when nothing has one.
+ */
+export function taskMoney(task, subtasks) {
+  const own = moneyLine(task.title).amount;
+  if (own !== null) return own;
+  let sum = null;
+  for (const st of subtasks(task.id)) {
+    if (st.completed_at) continue;
+    const a = taskMoney(st, subtasks);
+    if (a !== null) sum = (sum ?? 0) + a;
+  }
+  return sum;
+}
+
+/** The total of a card: its open lines, each worth what taskMoney says. */
+export function moneyTotal(list, subtasks) {
+  const sum = list.reduce((acc, t) => (t.completed_at ? acc : acc + (taskMoney(t, subtasks) ?? 0)), 0);
+  return Math.round(sum * 100) / 100;
+}
+
+const moneyFormat = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
+
+/** "1 500 ₽", with spaces that never break the number apart. */
+export function formatMoney(n) {
+  return `${moneyFormat.format(n)}\u00a0₽`;
+}
+
 /** The labels of a board that a card actually wears, in board order. */
 export function cardLabels(card, boardLabels) {
   const ids = card?.label_ids || [];

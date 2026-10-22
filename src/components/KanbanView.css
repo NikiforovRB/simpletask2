@@ -705,6 +705,47 @@
   text-decoration: line-through;
 }
 
+/* «Деньги»: the amounts in a column of their own, right-aligned so the digits
+   line up, where the ticks would be. */
+.kanban-card__task-sum {
+  flex: 0 0 auto;
+  min-width: var(--money-width, auto);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* Not its own amount but what its subtasks add up to. */
+.kanban-card__task-sum--sub {
+  color: var(--text-dim);
+}
+
+.kanban-card__tasks--money .kanban-card__task {
+  gap: 0.6rem;
+}
+
+.kanban-card__task--done .kanban-card__task-sum,
+.kanban-card__task--done .kanban-card__task-title {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.kanban-card__task--total {
+  padding-top: 0.45rem;
+  border-top: 1px solid #3d3d3d;
+}
+
+[data-theme="light"] .kanban-card__task--total {
+  border-top-color: var(--border-strong);
+}
+
+.kanban-card__task--total .kanban-card__task-sum,
+.kanban-card__task--total .kanban-card__task-title {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
 .kanban-card__meta {
   margin-top: 0.35rem;
   font-size: 0.75rem;

@@ -5,7 +5,9 @@ import { DropSlot } from './DropSlot';
 import { ColorPalette, LabelPicker, Popover } from './KanbanView';
 import { CalendarPopover } from './CalendarPopover';
 import { getContainerIdForCard } from '../lib/dnd';
-import { cardFill, cardLabels, formatDueDate, isOverdue, labelTextColor, withAlpha } from '../lib/kanbanCards';
+import {
+  cardFill, cardLabels, formatDueDate, formatMoney, isOverdue, labelTextColor, moneyTotal, withAlpha,
+} from '../lib/kanbanCards';
 import { DEFAULT_TASK_COLOR, toLocalDateString } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import plusIcon from '../assets/plus.svg';
@@ -14,6 +16,8 @@ import deleteIcon from '../assets/delete.svg';
 import deleteNavIcon from '../assets/delete-nav.svg';
 import calIcon from '../assets/cal.svg';
 import tagIcon from '../assets/tag.svg';
+import moneyIcon from '../assets/money.svg';
+import moneyNavIcon from '../assets/money-nav.svg';
 import './KanbanCardPanel.css';
 
 const CLOSE_MS = 220;
@@ -112,6 +116,12 @@ export function KanbanCardPanel({
       return ca === cb ? (a.position ?? 0) - (b.position ?? 0) : (ca < cb ? -1 : 1);
     }),
     [cardTasks],
+  );
+
+  const money = !!card.money_mode;
+  const total = useMemo(
+    () => (money ? moneyTotal(openTasks, getSubtasks) : 0),
+    [money, openTasks, getSubtasks],
   );
 
   const mainContainerId = getContainerIdForCard(cardId, false);
@@ -258,6 +268,16 @@ export function KanbanCardPanel({
                 Убрать срок
               </button>
             )}
+            <button
+              type="button"
+              className={`kanban-panel__due kanban-panel__money ${money ? 'kanban-panel__money--on' : ''}`}
+              onClick={() => onUpdateCard(cardId, { money_mode: !money })}
+              aria-pressed={money}
+              title="Суммы вместо галочек и итог под списком. Сумма пишется в начале задачи: «249 • MMB»"
+            >
+              <img src={money ? moneyNavIcon : moneyIcon} alt="" />
+              Деньги
+            </button>
             {dueOpen && (
               <Popover anchor={dueBtnRef} align="left" onClose={() => setDueOpen(false)} className="kanban-due-pop kanban-pop--calendar">
                 <CalendarPopover
@@ -382,6 +402,12 @@ export function KanbanCardPanel({
             </SortableContext>
             <li><DropSlot id={mainContainerId} index={openTasks.length} /></li>
           </ul>
+          {money && openTasks.length > 0 && (
+            <div className="kanban-panel__total">
+              <span>Итого</span>
+              <span className="kanban-panel__total-sum">{formatMoney(total)}</span>
+            </div>
+          )}
 
           {completedVisible && doneTasks.length > 0 && (
             <>

@@ -1259,6 +1259,7 @@ export default function Dashboard() {
       bg_color: card.bg_color ?? null,
       due_date: card.due_date ?? null,
       label_ids: card.label_ids || [],
+      money_mode: !!card.money_mode,
     });
     if (!copy) return;
     const siblings = kanbanCards
