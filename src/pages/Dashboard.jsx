@@ -743,8 +743,21 @@ export default function Dashboard() {
         completed_at: it.completed_at,
       });
     }
+    // A kanban card's reminder rings at its time; one set for a whole day only
+    // shows on the board.
+    for (const c of kanbanCards || []) {
+      if (!c.remind_date || !c.remind_time) continue;
+      list.push({
+        id: `kc-${c.id}`,
+        title: c.title || 'Плашка',
+        scheduled_date: c.remind_date,
+        scheduled_time: c.remind_time,
+        reminder_minutes: 0,
+        completed_at: null,
+      });
+    }
     return list;
-  }, [tasks, goalPlanItemsByKind]);
+  }, [tasks, goalPlanItemsByKind, kanbanCards]);
   useReminderScheduler(reminderItems);
   const sidebarWidthPx = useMemo(() => clampSidebarWidthPx(settings.sidebar_width_px), [settings.sidebar_width_px]);
   const liveMenuWidth = useMemo(
@@ -1260,6 +1273,8 @@ export default function Dashboard() {
       due_date: card.due_date ?? null,
       label_ids: card.label_ids || [],
       money_mode: !!card.money_mode,
+      remind_date: card.remind_date ?? null,
+      remind_time: card.remind_time ?? null,
     });
     if (!copy) return;
     const siblings = kanbanCards

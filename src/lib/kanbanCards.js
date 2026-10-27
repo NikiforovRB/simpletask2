@@ -32,6 +32,25 @@ export function isOverdue(dateStr) {
   return !!dateStr && dateStr < toLocalDateString(new Date());
 }
 
+/** "HH:MM" of a Postgres time ("18:00:00"), or '' when there is none. */
+export function shortTime(time) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(time || '');
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : '';
+}
+
+/** "27 октября, вт • 18:00", or the day alone when no time is set. */
+export function formatReminder(date, time) {
+  const at = shortTime(time);
+  return at ? `${formatDueDate(date)} • ${at}` : formatDueDate(date);
+}
+
+/** 'overdue' once the day has passed, 'today', or 'future' — the colour of a reminder. */
+export function reminderState(date) {
+  const today = toLocalDateString(new Date());
+  if (date < today) return 'overdue';
+  return date === today ? 'today' : 'future';
+}
+
 /** Today plus `days`, as YYYY-MM-DD. */
 export function dueInDays(days) {
   const d = new Date();

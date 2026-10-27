@@ -260,6 +260,113 @@
   padding-right: 2px;
 }
 
+/* The reminders of a day column, under its cards: plain lines on the column
+   itself, not cards, so they read as notes beside the work rather than as more
+   of it. */
+.kanban-reminders {
+  margin-top: 0.75rem;
+  padding: 0 0.15rem 0.5rem;
+}
+
+.kanban-reminders__head {
+  margin-bottom: 0.3rem;
+  padding-left: 0.35rem;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.kanban-reminders__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kanban-reminder {
+  --remind-color: var(--text-dim);
+  display: flex;
+  align-items: flex-start;
+  border-radius: 6px;
+}
+
+.kanban-reminder:hover {
+  background: var(--bg-hover);
+}
+
+.kanban-reminder__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.3rem 0.35rem;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+/* Level with the first line of the text. */
+.kanban-reminder__dot {
+  margin-top: calc((1.35em - 7px) / 2);
+}
+
+.kanban-reminder__text {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.kanban-reminder__when {
+  margin-right: 0.4rem;
+  color: var(--remind-color);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.kanban-reminder__main:hover .kanban-reminder__title {
+  color: var(--text-primary);
+}
+
+.kanban-reminder__clear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0.1rem 0.1rem 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.kanban-reminder:hover .kanban-reminder__clear,
+.kanban-reminder__clear:focus-visible {
+  opacity: 1;
+}
+
+.kanban-reminder__clear:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+/* Under a finger there is no hover to bring the cross out. */
+@media (hover: none) {
+  .kanban-reminder__clear {
+    opacity: 1;
+  }
+}
+
 /* A folded column: a narrow strip with the title on its side. It carries no
    colour bar — at this width it would read as a column of its own. */
 .kanban-column--collapsed {
@@ -744,6 +851,39 @@
 .kanban-card__task--total .kanban-card__task-title {
   color: var(--text-strong);
   font-weight: 600;
+}
+
+/* The reminder of a card, at its foot: a dot and the day, red once it has
+   passed, blue on the day itself, grey while it is still ahead. */
+.kanban-card__remind {
+  --remind-color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--remind-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.kanban-card__remind-dot,
+.kanban-reminder__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--remind-color);
+}
+
+.kanban-card__remind--overdue,
+.kanban-reminder--overdue {
+  --remind-color: var(--danger);
+}
+
+.kanban-card__remind--today,
+.kanban-reminder--today {
+  --remind-color: var(--accent);
 }
 
 .kanban-card__meta {

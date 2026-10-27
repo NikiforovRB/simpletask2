@@ -5,8 +5,10 @@ import { DropSlot } from './DropSlot';
 import { ColorPalette, LabelPicker, Popover } from './KanbanView';
 import { CalendarPopover } from './CalendarPopover';
 import { getContainerIdForCard } from '../lib/dnd';
+import { KanbanReminderPicker } from './KanbanReminderPicker';
 import {
-  cardFill, cardLabels, formatDueDate, formatMoney, isOverdue, labelTextColor, moneyTotal, withAlpha,
+  cardFill, cardLabels, formatDueDate, formatMoney, formatReminder, isOverdue, labelTextColor, moneyTotal,
+  reminderState, withAlpha,
 } from '../lib/kanbanCards';
 import { DEFAULT_TASK_COLOR, toLocalDateString } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -18,6 +20,7 @@ import calIcon from '../assets/cal.svg';
 import tagIcon from '../assets/tag.svg';
 import moneyIcon from '../assets/money.svg';
 import moneyNavIcon from '../assets/money-nav.svg';
+import notificationIcon from '../assets/notification.svg';
 import './KanbanCardPanel.css';
 
 const CLOSE_MS = 220;
@@ -61,6 +64,8 @@ export function KanbanCardPanel({
   const [delHover, setDelHover] = useState(false);
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [dueOpen, setDueOpen] = useState(false);
+  const [remindOpen, setRemindOpen] = useState(false);
+  const remindBtnRef = useRef(null);
   const titleRef = useAutoGrow(title);
   const descRef = useAutoGrow(description);
   const titleColorRef = useRef(null);
@@ -267,6 +272,34 @@ export function KanbanCardPanel({
               >
                 Убрать срок
               </button>
+            )}
+            <button
+              type="button"
+              ref={remindBtnRef}
+              className={`kanban-panel__due kanban-panel__remind ${card.remind_date ? `kanban-panel__remind--${reminderState(card.remind_date)}` : ''}`}
+              onClick={() => setRemindOpen((v) => !v)}
+              title="Напоминание"
+            >
+              {card.remind_date ? <span className="kanban-panel__remind-dot" aria-hidden /> : <img src={notificationIcon} alt="" />}
+              {card.remind_date ? formatReminder(card.remind_date, card.remind_time) : 'Напоминание'}
+            </button>
+            {remindOpen && (
+              <Popover anchor={remindBtnRef} align="left" onClose={() => setRemindOpen(false)} className="kanban-remind-pop">
+                <KanbanReminderPicker
+                  date={card.remind_date}
+                  time={card.remind_time}
+                  onApply={({ date, time }) => {
+                    onUpdateCard(cardId, { remind_date: date, remind_time: time });
+                    setRemindOpen(false);
+                  }}
+                  onClear={card.remind_date
+                    ? () => {
+                      onUpdateCard(cardId, { remind_date: null, remind_time: null });
+                      setRemindOpen(false);
+                    }
+                    : null}
+                />
+              </Popover>
             )}
             <button
               type="button"

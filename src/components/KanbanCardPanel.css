@@ -205,6 +205,7 @@
 /* Due date and labels, between the title and the description. */
 .kanban-panel__meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
@@ -242,6 +243,30 @@
 
 .kanban-panel__money {
   margin-left: auto;
+}
+
+.kanban-panel__remind {
+  --remind-color: var(--text-dim);
+}
+
+.kanban-panel__remind--overdue { --remind-color: var(--danger); color: var(--danger); }
+.kanban-panel__remind--today { --remind-color: var(--accent); color: var(--accent); }
+
+.kanban-panel__remind-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--remind-color);
+}
+
+.kanban-panel__remind--overdue:hover,
+.kanban-panel__remind--today:hover {
+  color: var(--remind-color);
+}
+
+/* The picker brings its own padding. */
+.kanban-remind-pop {
+  padding: 0.25rem 0;
 }
 
 .kanban-panel__money--on,

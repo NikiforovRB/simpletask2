@@ -34,16 +34,20 @@ import {
   dueInDays,
   formatDueDate,
   formatMoney,
+  formatReminder,
   formatStamp,
   isOverdue,
   labelTextColor,
   moneyLine,
   moneyTotal,
+  reminderState,
+  shortTime,
   taskMoney,
 } from '../lib/kanbanCards';
 import { ARCHIVE_DAYS } from '../hooks/useKanban';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { CalendarPopover } from './CalendarPopover';
+import { KanbanReminderPicker } from './KanbanReminderPicker';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
@@ -76,6 +80,7 @@ import settingsNavIcon from '../assets/settings-nav.svg';
 import archiveIcon from '../assets/archive.svg';
 import archiveNavIcon from '../assets/archive-nav.svg';
 import moneyIcon from '../assets/money.svg';
+import notificationIcon from '../assets/notification.svg';
 import './KanbanView.css';
 
 const DEFAULT_COLUMN_COLOR = '#5a86ee';
@@ -618,6 +623,12 @@ function KanbanCard({
           {money ? `Итого ${formatMoney(total)}` : `${doneCount} из ${cardTasks.length}`}
         </div>
       )}
+      {card.remind_date && (
+        <div className={`kanban-card__remind kanban-card__remind--${reminderState(card.remind_date)}`} title="Напоминание">
+          <span className="kanban-card__remind-dot" aria-hidden />
+          {formatReminder(card.remind_date, card.remind_time)}
+        </div>
+      )}
     </article>
   );
 }
@@ -980,7 +991,7 @@ function KanbanColumn({
  */
 function DateColumn({
   group, width, settings, tasks, getSubtasks, boardLabels,
-  onToggleTask, onOpenCard, onAddCard, onCardMenu, onToggleFold, hasHover,
+  onToggleTask, onOpenCard, onAddCard, onCardMenu, onToggleFold, onClearReminder, hasHover,
   editingCardId, onTitleCommit, onEditDone,
 }) {
   const id = dateColumnId(group.key);
@@ -1009,7 +1020,7 @@ function DateColumn({
       <header className="kanban-column__head">
         <span className="kanban-column__title kanban-column__title--static">{group.title}</span>
         <span className="kanban-column__tools">
-          <span className="kanban-column__count">{group.cards.length}</span>
+          {group.cards.length > 0 && <span className="kanban-column__count">{group.cards.length}</span>}
           {canAdd && (
             <button
               type="button"
@@ -1071,8 +1082,57 @@ function DateColumn({
             onClose={() => setComposing(false)}
           />
         )}
+        {group.reminders.length > 0 && (
+          <DayReminders
+            cards={group.reminders}
+            withDate={group.key === OVERDUE_KEY}
+            onOpen={onOpenCard}
+            onClear={onClearReminder}
+          />
+        )}
       </div>
     </section>
+  );
+}
+
+/**
+ * The reminders of a day, under its cards. They are not cards themselves —
+ * only a note of what to think of and when — so they are drawn as plain lines:
+ * the coloured dot of the reminder, its time, and the card it belongs to,
+ * which a press opens. The cross takes the reminder off once it is dealt with.
+ */
+function DayReminders({ cards, withDate, onOpen, onClear }) {
+  return (
+    <div className="kanban-reminders">
+      <div className="kanban-reminders__head">Напоминания</div>
+      <ul className="kanban-reminders__list">
+        {cards.map((card) => {
+          const when = withDate ? formatReminder(card.remind_date, card.remind_time) : shortTime(card.remind_time);
+          return (
+            <li key={card.id} className={`kanban-reminder kanban-reminder--${reminderState(card.remind_date)}`}>
+              <button type="button" className="kanban-reminder__main" onClick={() => onOpen?.(card.id)}>
+                <span className="kanban-reminder__dot" aria-hidden />
+                <span className="kanban-reminder__text">
+                  {when && <span className="kanban-reminder__when">{when}</span>}
+                  <span className="kanban-reminder__title">{card.title || 'Без названия'}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="kanban-reminder__clear"
+                onClick={() => onClear?.(card.id)}
+                aria-label="Убрать напоминание"
+                title="Убрать напоминание"
+              >
+                <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
+                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -1134,6 +1194,8 @@ function CardContextMenu({
   // Which of the three side lists is out, if any.
   const [flyout, setFlyout] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // The reminder picker takes the place of the menu rather than opening beside it.
+  const [remindOpen, setRemindOpen] = useState(false);
   const pickerRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -1143,7 +1205,7 @@ function CardContextMenu({
     el.style.left = `${Math.max(8, Math.min(at.x, window.innerWidth - w - 8))}px`;
     el.style.top = `${Math.max(8, Math.min(at.y, window.innerHeight - h - 8))}px`;
     el.style.visibility = 'visible';
-  }, [at]);
+  }, [at, remindOpen]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -1234,7 +1296,7 @@ function CardContextMenu({
 
   const labelIds = card.label_ids || [];
 
-  return createPortal(
+  const shell = (content) => createPortal(
     <>
       <div className="dashboard__context-menu-backdrop" aria-hidden onClick={onClose} />
       <div
@@ -1243,138 +1305,163 @@ function CardContextMenu({
         onClick={(e) => e.stopPropagation()}
         onContextMenu={(e) => e.preventDefault()}
       >
-        {swatches(card.border_color, (c) => onUpdate(card.id, { border_color: c }), {
-          label: 'Без обводки',
-          of: 'Цвет обводки',
-          className: 'kanban-menu__color--none',
-          swatch: 'var(--border-strong)',
-        })}
-        {swatches(card.title_color, (c) => onUpdate(card.id, { title_color: c }), {
-          label: 'Обычный цвет текста',
-          of: 'Цвет текста',
-          className: '',
-          style: { background: 'var(--text-strong)' },
-          swatch: 'var(--text-strong)',
-        })}
-        {swatches(card.bg_color, (c) => onUpdate(card.id, { bg_color: c }), {
-          label: 'Обычный фон',
-          of: 'Цвет фона плашки',
-          className: 'kanban-menu__color--none',
-          swatch: 'var(--border-strong)',
-        })}
-        {item(lineHeightIcon, 'Быстрое редактирование', () => { onQuickEdit(card.id); onClose(); })}
-        {item(editIcon, 'Открыть', () => { onOpen(card.id); onClose(); })}
-        <button
-          type="button"
-          className="dashboard__context-menu-item"
-          onMouseEnter={hasHover ? () => showFlyout(null) : undefined}
-          onClick={() => { onUpdate(card.id, { money_mode: !card.money_mode }); onClose(); }}
-        >
-          <img src={moneyIcon} alt="" className="dashboard__context-menu-item-icon" />
-          <span>Режим «Деньги»</span>
-          {card.money_mode && <span className="kanban-menu__check" aria-hidden>✓</span>}
-        </button>
-        <div className="dashboard__context-menu-separator" aria-hidden />
-
-        {branch('due', calIcon, card.due_date ? `Срок: ${formatDueDate(card.due_date)}` : 'Срок…', (
-          <>
-            {row(starIcon, 'Сегодня', () => { onUpdate(card.id, { due_date: dueInDays(0) }); onClose(); })}
-            {row(zavtraIcon, 'Завтра', () => { onUpdate(card.id, { due_date: dueInDays(1) }); onClose(); })}
-            {row(calIcon, 'Через неделю', () => { onUpdate(card.id, { due_date: dueInDays(7) }); onClose(); })}
-            <button
-              type="button"
-              ref={pickerRef}
-              className="dashboard__context-menu-item"
-              onClick={() => setPickerOpen((v) => !v)}
-            >
-              <img src={calendarIcon} alt="" className="dashboard__context-menu-item-icon" />
-              <span>Указать дату</span>
-            </button>
-            {card.due_date && row(closeIcon, 'Убрать срок', () => { onUpdate(card.id, { due_date: null }); onClose(); })}
-            {pickerOpen && (
-              <Popover
-                anchor={pickerRef}
-                align="left"
-                className="kanban-pop--calendar"
-                onClose={() => setPickerOpen(false)}
-              >
-                <CalendarPopover
-                  value={card.due_date || null}
-                  onChange={(dateStr) => onUpdate(card.id, { due_date: dateStr })}
-                  onClose={() => { setPickerOpen(false); onClose(); }}
-                />
-              </Popover>
-            )}
-          </>
-        ))}
-
-        {branch('labels', tagIcon, labelIds.length ? `Метки: ${labelIds.length}` : 'Метки…', (
-          <>
-            {boardLabels.length === 0 && (
-              <div className="kanban-menu__empty">Метки создаются в плашке</div>
-            )}
-            {boardLabels.map((l) => {
-              const on = labelIds.includes(l.id);
-              return (
-                <button
-                  key={l.id}
-                  type="button"
-                  className="dashboard__context-menu-item"
-                  onClick={() => onUpdate(card.id, {
-                    label_ids: on ? labelIds.filter((x) => x !== l.id) : [...labelIds, l.id],
-                  })}
-                >
-                  <span className="kanban-menu__dot" style={{ background: l.color }} aria-hidden />
-                  <span>{l.title || 'Метка'}</span>
-                  {on && <span className="kanban-menu__check" aria-hidden>✓</span>}
-                </button>
-              );
-            })}
-          </>
-        ))}
-
-        <div className="dashboard__context-menu-separator" aria-hidden />
-        {item(layersIcon, 'Скопировать', () => { onDuplicate(card); onClose(); })}
-
-        {boardTargets.length > 0 && branch('board', kanbanIcon, 'Переместить на другую доску…', (
-          boardTargets.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              className="dashboard__context-menu-item"
-              disabled={!b.ready}
-              title={b.ready ? undefined : 'В этой доске ещё нет столбцов'}
-              onClick={() => { onMoveToBoard(card.id, b.id); onClose(); }}
-            >
-              <img src={kanbanIcon} alt="" className="dashboard__context-menu-item-icon" />
-              <span>{b.title || 'Без названия'}</span>
-            </button>
-          ))
-        ))}
-
-        {branch('move', horizontalIcon, 'Переместить в столбец…', (
-          columns.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className="dashboard__context-menu-item"
-              disabled={c.id === card.column_id}
-              onClick={() => {
-                onMove(card.id, c.id, (cardsByColumn.get(c.id) || []).filter((x) => x.id !== card.id).length);
-                onClose();
-              }}
-            >
-              <span className="kanban-menu__dot" style={{ background: c.accent_color || DEFAULT_COLUMN_COLOR }} aria-hidden />
-              <span>{c.title || 'Без названия'}</span>
-              {c.id === card.column_id && <span className="kanban-menu__check" aria-hidden>✓</span>}
-            </button>
-          ))
-        ))}
-
-        {item(deleteDangerIcon, 'Удалить', () => { onDelete(card.id); onClose(); }, 'dashboard__context-menu-item--danger')}
+        {content}
       </div>
     </>,
     document.body,
+  );
+
+  if (remindOpen) {
+    return shell(
+      <KanbanReminderPicker
+        date={card.remind_date}
+        time={card.remind_time}
+        onBack={() => setRemindOpen(false)}
+        onApply={({ date, time }) => { onUpdate(card.id, { remind_date: date, remind_time: time }); onClose(); }}
+        onClear={card.remind_date
+          ? () => { onUpdate(card.id, { remind_date: null, remind_time: null }); onClose(); }
+          : null}
+      />,
+    );
+  }
+
+  return shell(
+    <>
+      {swatches(card.border_color, (c) => onUpdate(card.id, { border_color: c }), {
+        label: 'Без обводки',
+        of: 'Цвет обводки',
+        className: 'kanban-menu__color--none',
+        swatch: 'var(--border-strong)',
+      })}
+      {swatches(card.title_color, (c) => onUpdate(card.id, { title_color: c }), {
+        label: 'Обычный цвет текста',
+        of: 'Цвет текста',
+        className: '',
+        style: { background: 'var(--text-strong)' },
+        swatch: 'var(--text-strong)',
+      })}
+      {swatches(card.bg_color, (c) => onUpdate(card.id, { bg_color: c }), {
+        label: 'Обычный фон',
+        of: 'Цвет фона плашки',
+        className: 'kanban-menu__color--none',
+        swatch: 'var(--border-strong)',
+      })}
+      {item(lineHeightIcon, 'Быстрое редактирование', () => { onQuickEdit(card.id); onClose(); })}
+      {item(editIcon, 'Открыть', () => { onOpen(card.id); onClose(); })}
+      <button
+        type="button"
+        className="dashboard__context-menu-item"
+        onMouseEnter={hasHover ? () => showFlyout(null) : undefined}
+        onClick={() => { onUpdate(card.id, { money_mode: !card.money_mode }); onClose(); }}
+      >
+        <img src={moneyIcon} alt="" className="dashboard__context-menu-item-icon" />
+        <span>Режим «Деньги»</span>
+        {card.money_mode && <span className="kanban-menu__check" aria-hidden>✓</span>}
+      </button>
+      <div className="dashboard__context-menu-separator" aria-hidden />
+
+      {branch('due', calIcon, card.due_date ? `Срок: ${formatDueDate(card.due_date)}` : 'Срок…', (
+        <>
+          {row(starIcon, 'Сегодня', () => { onUpdate(card.id, { due_date: dueInDays(0) }); onClose(); })}
+          {row(zavtraIcon, 'Завтра', () => { onUpdate(card.id, { due_date: dueInDays(1) }); onClose(); })}
+          {row(calIcon, 'Через неделю', () => { onUpdate(card.id, { due_date: dueInDays(7) }); onClose(); })}
+          <button
+            type="button"
+            ref={pickerRef}
+            className="dashboard__context-menu-item"
+            onClick={() => setPickerOpen((v) => !v)}
+          >
+            <img src={calendarIcon} alt="" className="dashboard__context-menu-item-icon" />
+            <span>Указать дату</span>
+          </button>
+          {card.due_date && row(closeIcon, 'Убрать срок', () => { onUpdate(card.id, { due_date: null }); onClose(); })}
+          {pickerOpen && (
+            <Popover
+              anchor={pickerRef}
+              align="left"
+              className="kanban-pop--calendar"
+              onClose={() => setPickerOpen(false)}
+            >
+              <CalendarPopover
+                value={card.due_date || null}
+                onChange={(dateStr) => onUpdate(card.id, { due_date: dateStr })}
+                onClose={() => { setPickerOpen(false); onClose(); }}
+              />
+            </Popover>
+          )}
+        </>
+      ))}
+      {item(
+        notificationIcon,
+        card.remind_date ? `Напоминание: ${formatReminder(card.remind_date, card.remind_time)}` : 'Напоминание…',
+        () => { showFlyout(null); setRemindOpen(true); },
+      )}
+
+      {branch('labels', tagIcon, labelIds.length ? `Метки: ${labelIds.length}` : 'Метки…', (
+        <>
+          {boardLabels.length === 0 && (
+            <div className="kanban-menu__empty">Метки создаются в плашке</div>
+          )}
+          {boardLabels.map((l) => {
+            const on = labelIds.includes(l.id);
+            return (
+              <button
+                key={l.id}
+                type="button"
+                className="dashboard__context-menu-item"
+                onClick={() => onUpdate(card.id, {
+                  label_ids: on ? labelIds.filter((x) => x !== l.id) : [...labelIds, l.id],
+                })}
+              >
+                <span className="kanban-menu__dot" style={{ background: l.color }} aria-hidden />
+                <span>{l.title || 'Метка'}</span>
+                {on && <span className="kanban-menu__check" aria-hidden>✓</span>}
+              </button>
+            );
+          })}
+        </>
+      ))}
+
+      <div className="dashboard__context-menu-separator" aria-hidden />
+      {item(layersIcon, 'Скопировать', () => { onDuplicate(card); onClose(); })}
+
+      {boardTargets.length > 0 && branch('board', kanbanIcon, 'Переместить на другую доску…', (
+        boardTargets.map((b) => (
+          <button
+            key={b.id}
+            type="button"
+            className="dashboard__context-menu-item"
+            disabled={!b.ready}
+            title={b.ready ? undefined : 'В этой доске ещё нет столбцов'}
+            onClick={() => { onMoveToBoard(card.id, b.id); onClose(); }}
+          >
+            <img src={kanbanIcon} alt="" className="dashboard__context-menu-item-icon" />
+            <span>{b.title || 'Без названия'}</span>
+          </button>
+        ))
+      ))}
+
+      {branch('move', horizontalIcon, 'Переместить в столбец…', (
+        columns.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className="dashboard__context-menu-item"
+            disabled={c.id === card.column_id}
+            onClick={() => {
+              onMove(card.id, c.id, (cardsByColumn.get(c.id) || []).filter((x) => x.id !== card.id).length);
+              onClose();
+            }}
+          >
+            <span className="kanban-menu__dot" style={{ background: c.accent_color || DEFAULT_COLUMN_COLOR }} aria-hidden />
+            <span>{c.title || 'Без названия'}</span>
+            {c.id === card.column_id && <span className="kanban-menu__check" aria-hidden>✓</span>}
+          </button>
+        ))
+      ))}
+
+      {item(deleteDangerIcon, 'Удалить', () => { onDelete(card.id); onClose(); }, 'dashboard__context-menu-item--danger')}
+    </>,
   );
 }
 
@@ -1779,42 +1866,54 @@ export function KanbanView({
 
   /**
    * The day columns standing to the left of the board: everything overdue,
-   * then one column per day that has cards, up to as far as the filter looks.
-   * A day nobody planned anything for is not worth a column of its own.
+   * then one column per day that has cards or reminders, up to as far as the
+   * filter looks. A day with neither is not worth a column of its own.
    */
   const dateColumns = useMemo(() => {
     if (!dateFilter) return [];
     const today = dueInDays(0);
     const last = dateFilterLimit(dateFilter);
-    const groups = new Map();
-    visibleCards
-      .filter((c) => c.due_date && (!last || c.due_date <= last))
-      .forEach((c) => {
-        const key = c.due_date < today ? OVERDUE_KEY : c.due_date;
-        const bucket = groups.get(key);
-        if (bucket) bucket.push(c);
-        else groups.set(key, [c]);
-      });
+    const bucketBy = (field) => {
+      const map = new Map();
+      visibleCards
+        .filter((c) => c[field] && (!last || c[field] <= last))
+        .forEach((c) => {
+          const key = c[field] < today ? OVERDUE_KEY : c[field];
+          const bucket = map.get(key);
+          if (bucket) bucket.push(c);
+          else map.set(key, [c]);
+        });
+      return map;
+    };
+    const groups = bucketBy('due_date');
+    const reminders = bucketBy('remind_date');
+    // The earliest first; a reminder without a time is for the whole day and
+    // goes before the timed ones.
+    const byReminder = (a, b) => a.remind_date.localeCompare(b.remind_date)
+      || shortTime(a.remind_time).localeCompare(shortTime(b.remind_time))
+      || (a.title || '').localeCompare(b.title || '');
 
     const out = [];
-    if (groups.has(OVERDUE_KEY)) {
+    if (groups.has(OVERDUE_KEY) || reminders.has(OVERDUE_KEY)) {
       out.push({
         key: OVERDUE_KEY,
         title: 'Просроченные',
         accent: OVERDUE_ACCENT,
         // A column of several days at once has one sensible order: the oldest
         // debt at the top.
-        cards: groups.get(OVERDUE_KEY).sort((a, b) => a.due_date.localeCompare(b.due_date) || byDay(a, b)),
+        cards: (groups.get(OVERDUE_KEY) || []).sort((a, b) => a.due_date.localeCompare(b.due_date) || byDay(a, b)),
+        reminders: (reminders.get(OVERDUE_KEY) || []).sort(byReminder),
       });
     }
-    Array.from(groups.keys())
+    Array.from(new Set([...groups.keys(), ...reminders.keys()]))
       .filter((k) => k !== OVERDUE_KEY)
       .sort()
       .forEach((day) => out.push({
         key: day,
         title: dateColumnTitle(day),
         accent: day === today ? TODAY_ACCENT : DAY_ACCENT,
-        cards: groups.get(day).sort(byDay),
+        cards: (groups.get(day) || []).sort(byDay),
+        reminders: (reminders.get(day) || []).sort(byReminder),
       }));
     return out;
   }, [dateFilter, visibleCards, byDay]);
@@ -2163,6 +2262,7 @@ export function KanbanView({
                 : null}
               onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
               onToggleFold={(cardId, collapsed) => updateCard(cardId, { collapsed })}
+              onClearReminder={(cardId) => updateCard(cardId, { remind_date: null, remind_time: null })}
               hasHover={hasHover}
               editingCardId={editingCardId}
               onTitleCommit={(cardId, title) => updateCard(cardId, { title })}
