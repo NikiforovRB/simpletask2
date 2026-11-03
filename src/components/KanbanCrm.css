@@ -7,11 +7,13 @@
   height: 1rem;
   flex: 0 0 auto;
   display: block;
+  color: var(--text-strong);
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
 }
 
 .crm-icon--phone {
   display: inline-flex;
-  color: var(--text-muted);
 }
 
 .crm-icon--phone svg {
@@ -38,8 +40,8 @@
   background: var(--bg-hover-strong);
 }
 
-.crm-contact-btn:hover .crm-icon--phone {
-  color: var(--text-primary);
+.crm-contact-btn:hover .crm-icon {
+  opacity: 1;
 }
 
 .crm-contact-btn__copied {
@@ -58,7 +60,7 @@
   pointer-events: none;
 }
 
-/* ---- The circle a reminder is ticked off by ---- */
+/* ---- The box a reminder is ticked off by ---- */
 .crm-check {
   flex: 0 0 auto;
   display: inline-flex;
@@ -68,7 +70,7 @@
   height: 14px;
   padding: 0;
   border: 1.5px solid var(--remind-color, var(--text-dim));
-  border-radius: 50%;
+  border-radius: 4px;
   background: none;
   color: var(--remind-color, var(--text-dim));
   cursor: pointer;
@@ -96,25 +98,15 @@
 
 /* ---- The foot of a client card: the next touch and the contact ---- */
 .kanban-card__crm {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   margin-top: 0.5rem;
 }
 
 .kanban-card__crm .kanban-card__remind {
-  flex: 1;
-  min-width: 0;
   margin-top: 0;
-}
-
-.kanban-card__reach {
-  margin: -0.2rem -0.25rem -0.2rem auto;
 }
 
 /* ---- A client in the reminders of a day ---- */
 .kanban-reminder--crm {
-  align-items: center;
   padding-left: 0.35rem;
 }
 
@@ -122,13 +114,24 @@
   padding-left: 0.45rem;
 }
 
+/* Level with the first line of the text beside them. */
+.kanban-reminder__check {
+  margin-top: calc(0.3rem + (0.8125rem * 1.35 - 14px) / 2);
+}
+
 .kanban-reminder__reach {
+  margin-top: calc(0.3rem + (0.8125rem * 1.35 - 1.5rem) / 2);
   margin-right: 0.1rem;
 }
 
 /* ---- Ticking off: what came of it and when next ---- */
 .crm-done {
   width: 270px;
+}
+
+.kanban-pop:has(> .crm-done),
+.kanban-menu:has(> .crm-done) {
+  border: none;
 }
 
 .crm-done__note,
@@ -467,9 +470,6 @@ button.crm-stats__row:hover {
 .crm-contact__kind .crm-icon {
   width: 0.9rem;
   height: 0.9rem;
-  filter: grayscale(1);
-  opacity: 0.55;
-  transition: filter 0.15s ease, opacity 0.15s ease;
 }
 
 .crm-contact__kind:hover {
@@ -482,12 +482,6 @@ button.crm-stats__row:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--text-primary);
-}
-
-.crm-contact__kind--on .crm-icon,
-.crm-contact__kind:hover .crm-icon {
-  filter: none;
-  opacity: 1;
 }
 
 /* The history: plain lines under the day they happened on. */

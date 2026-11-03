@@ -7,7 +7,6 @@ import {
   clockOf, contactAction, doneByDay, enterSends, momentOf, shiftWeeks, weekOf,
 } from '../lib/crm';
 import { notificationPermission, requestNotificationPermission } from '../lib/reminders';
-import telegramIcon from '../assets/telegram.png';
 import leftIcon from '../assets/left.svg';
 import rightIcon from '../assets/right.svg';
 import calendarIcon from '../assets/calendar.svg';
@@ -33,29 +32,30 @@ export const PhoneGlyph = () => (
   </svg>
 );
 
-/** The mark of a messenger, or a handset for a plain call. */
+/** The mark of a messenger, or a handset for a plain call — in the colour of the text. */
 export function MessengerIcon({ kind }) {
-  if (kind === 'telegram') return <img className="crm-icon" src={telegramIcon} alt="" draggable={false} />;
+  if (kind === 'telegram') {
+    return (
+      <svg className="crm-icon" viewBox="1.5 2.5 21 19" aria-hidden>
+        <path
+          fill="currentColor"
+          d="M21.9 4.3 18.7 19.4c-.2 1-.9 1.3-1.7.8l-4.7-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.8 8.8-8c.4-.3-.1-.5-.6-.2L6.6 13.2 2 11.8c-1-.3-1-1 .2-1.5L20.6 3.2c.8-.3 1.6.2 1.3 1.1z"
+        />
+      </svg>
+    );
+  }
   if (kind === 'whatsapp') {
     return (
-      <svg className="crm-icon" viewBox="0 0 24 24" aria-hidden>
-        <circle cx="12" cy="12" r="12" fill="#25d366" />
-        <path fill="#fff" d="M12 5.2a6.8 6.8 0 0 0-5.86 10.25L5.2 18.8l3.45-.9A6.8 6.8 0 1 0 12 5.2zm0 12.4a5.6 5.6 0 0 1-2.86-.78l-.2-.12-2.05.54.55-2-.13-.21A5.6 5.6 0 1 1 12 17.6z" />
-        <path fill="#fff" d="M15.07 13.4c-.17-.08-1-.49-1.15-.55-.15-.06-.27-.08-.38.09-.11.17-.44.55-.54.66-.1.11-.2.13-.37.04a4.6 4.6 0 0 1-2.3-2c-.17-.3.17-.28.5-.93.05-.11.03-.2-.02-.29l-.52-1.25c-.14-.33-.28-.28-.38-.29h-.33a.63.63 0 0 0-.46.21 1.93 1.93 0 0 0-.6 1.44 3.36 3.36 0 0 0 .7 1.78 7.7 7.7 0 0 0 2.95 2.6c1.1.47 1.53.51 2.08.43.34-.05 1-.41 1.15-.81.14-.4.14-.74.1-.81-.04-.07-.15-.11-.32-.2z" />
+      <svg className="crm-icon" viewBox="4.8 4.8 14.4 14.4" aria-hidden>
+        <path fill="currentColor" d="M12 5.2a6.8 6.8 0 0 0-5.86 10.25L5.2 18.8l3.45-.9A6.8 6.8 0 1 0 12 5.2zm0 12.4a5.6 5.6 0 0 1-2.86-.78l-.2-.12-2.05.54.55-2-.13-.21A5.6 5.6 0 1 1 12 17.6z" />
+        <path fill="currentColor" d="M15.07 13.4c-.17-.08-1-.49-1.15-.55-.15-.06-.27-.08-.38.09-.11.17-.44.55-.54.66-.1.11-.2.13-.37.04a4.6 4.6 0 0 1-2.3-2c-.17-.3.17-.28.5-.93.05-.11.03-.2-.02-.29l-.52-1.25c-.14-.33-.28-.28-.38-.29h-.33a.63.63 0 0 0-.46.21 1.93 1.93 0 0 0-.6 1.44 3.36 3.36 0 0 0 .7 1.78 7.7 7.7 0 0 0 2.95 2.6c1.1.47 1.53.51 2.08.43.34-.05 1-.41 1.15-.81.14-.4.14-.74.1-.81-.04-.07-.15-.11-.32-.2z" />
       </svg>
     );
   }
   if (kind === 'max') {
     return (
-      <svg className="crm-icon" viewBox="0 0 24 24" aria-hidden>
-        <defs>
-          <linearGradient id="crm-max-fill" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#3d8bff" />
-            <stop offset="1" stopColor="#8e44ff" />
-          </linearGradient>
-        </defs>
-        <rect width="24" height="24" rx="7" fill="url(#crm-max-fill)" />
-        <path d="M12 6.4a5.6 5.6 0 0 0-4.6 8.8l-.6 2.6 2.7-.7A5.6 5.6 0 1 0 12 6.4z" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
+      <svg className="crm-icon" viewBox="5.2 5.4 13.6 13.6" aria-hidden>
+        <path d="M12 6.4a5.6 5.6 0 0 0-4.6 8.8l-.6 2.6 2.7-.7A5.6 5.6 0 1 0 12 6.4z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       </svg>
     );
   }
@@ -122,8 +122,7 @@ export function CrmCheck({ onPick, className = '' }) {
 
 const NEXT_DAYS = [
   { offset: 1, label: 'Завтра' },
-  { offset: 3, label: 'Через 3 дня' },
-  { offset: 7, label: 'Через неделю' },
+  { offset: 2, label: 'Послезавтра' },
 ];
 
 /**

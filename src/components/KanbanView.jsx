@@ -627,18 +627,15 @@ function KanbanCard({
         </div>
       )}
       {settings.crm ? (
-        // A client: the next touch, ticked off right here, and the way to reach them.
-        (card.remind_date || card.phone) && (
+        // A client: the next touch, ticked off right here.
+        card.remind_date && (
           <div className="kanban-card__crm">
-            {card.remind_date && (
-              <div className={`kanban-card__remind kanban-card__remind--${reminderState(card.remind_date)}`}>
-                {overlay ? <span className="crm-check" aria-hidden /> : (
-                  <CrmCheck onPick={(el) => onDoneReminder?.(el, card)} />
-                )}
-                {formatReminder(card.remind_date, card.remind_time)}
-              </div>
-            )}
-            {!overlay && <ContactButton card={card} className="kanban-card__reach" />}
+            <div className={`kanban-card__remind kanban-card__remind--${reminderState(card.remind_date)}`}>
+              {overlay ? <span className="crm-check" aria-hidden /> : (
+                <CrmCheck onPick={(el) => onDoneReminder?.(el, card)} />
+              )}
+              {formatReminder(card.remind_date, card.remind_time)}
+            </div>
           </div>
         )
       ) : card.remind_date && (
