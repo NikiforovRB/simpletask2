@@ -48,6 +48,8 @@ import { ARCHIVE_DAYS } from '../hooks/useKanban';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { CalendarPopover } from './CalendarPopover';
 import { KanbanReminderPicker } from './KanbanReminderPicker';
+import { CheckGlyph, ContactButton, CrmCheck, CrmDoneForm, CrmStats } from './KanbanCrm';
+import { touchDay } from '../lib/crm';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
@@ -81,6 +83,7 @@ import archiveIcon from '../assets/archive.svg';
 import archiveNavIcon from '../assets/archive-nav.svg';
 import moneyIcon from '../assets/money.svg';
 import notificationIcon from '../assets/notification.svg';
+import checkIcon from '../assets/check.svg';
 import './KanbanView.css';
 
 const DEFAULT_COLUMN_COLOR = '#5a86ee';
@@ -455,7 +458,7 @@ function CardTitleEditor({ card, onCommit, onDone }) {
 
 function KanbanCard({
   card, settings, tasks, getSubtasks, boardLabels = [], hasHover = false, editing = false,
-  onToggleTask, onOpen, onContextMenu, onToggleFold, onTitleCommit, onEditDone,
+  onToggleTask, onOpen, onContextMenu, onToggleFold, onTitleCommit, onEditDone, onDoneReminder,
   dragHandleProps, overlay = false,
 }) {
   // A card is dragged by its whole body, so a click only counts as a click
@@ -618,12 +621,27 @@ function KanbanCard({
       )}
       {/* Folded, or with the task list turned off: how far along it is, or
           what it all comes to. */}
-      {(folded || !settings.showTasks) && cardTasks.length > 0 && (
+      {!settings.crm && (folded || !settings.showTasks) && cardTasks.length > 0 && (
         <div className="kanban-card__meta">
           {money ? `Итого ${formatMoney(total)}` : `${doneCount} из ${cardTasks.length}`}
         </div>
       )}
-      {card.remind_date && (
+      {settings.crm ? (
+        // A client: the next touch, ticked off right here, and the way to reach them.
+        (card.remind_date || card.phone) && (
+          <div className="kanban-card__crm">
+            {card.remind_date && (
+              <div className={`kanban-card__remind kanban-card__remind--${reminderState(card.remind_date)}`}>
+                {overlay ? <span className="crm-check" aria-hidden /> : (
+                  <CrmCheck onPick={(el) => onDoneReminder?.(el, card)} />
+                )}
+                {formatReminder(card.remind_date, card.remind_time)}
+              </div>
+            )}
+            {!overlay && <ContactButton card={card} className="kanban-card__reach" />}
+          </div>
+        )
+      ) : card.remind_date && (
         <div className={`kanban-card__remind kanban-card__remind--${reminderState(card.remind_date)}`} title="Напоминание">
           <span className="kanban-card__remind-dot" aria-hidden />
           {formatReminder(card.remind_date, card.remind_time)}
@@ -718,7 +736,7 @@ function CardComposer({ onSubmit, onClose }) {
 function KanbanColumn({
   column, cards, width, settings, tasks, getSubtasks, boardLabels, onToggleTask,
   onOpenCard, onAddCard, onUpdateColumn, onDeleteColumn, onCardMenu, onToggleFold, hasHover,
-  editingCardId, onTitleCommit, onEditDone,
+  editingCardId, onTitleCommit, onEditDone, onDoneReminder,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: column.id,
@@ -940,6 +958,7 @@ function KanbanColumn({
                 onToggleFold={onToggleFold}
                 onTitleCommit={onTitleCommit}
                 onEditDone={onEditDone}
+                onDoneReminder={onDoneReminder}
               />
             </div>
           ))}
@@ -991,7 +1010,7 @@ function KanbanColumn({
  */
 function DateColumn({
   group, width, settings, tasks, getSubtasks, boardLabels,
-  onToggleTask, onOpenCard, onAddCard, onCardMenu, onToggleFold, onClearReminder, hasHover,
+  onToggleTask, onOpenCard, onAddCard, onCardMenu, onToggleFold, onClearReminder, onDoneReminder, hasHover,
   editingCardId, onTitleCommit, onEditDone,
 }) {
   const id = dateColumnId(group.key);
@@ -1068,6 +1087,7 @@ function DateColumn({
                 onToggleFold={onToggleFold}
                 onTitleCommit={onTitleCommit}
                 onEditDone={onEditDone}
+                onDoneReminder={onDoneReminder}
               />
             </div>
           ))}
@@ -1086,8 +1106,10 @@ function DateColumn({
           <DayReminders
             cards={group.reminders}
             withDate={group.key === OVERDUE_KEY}
+            crm={!!settings.crm}
             onOpen={onOpenCard}
             onClear={onClearReminder}
+            onDone={onDoneReminder}
           />
         )}
       </div>
@@ -1100,8 +1122,10 @@ function DateColumn({
  * only a note of what to think of and when — so they are drawn as plain lines:
  * the coloured dot of the reminder, its time, and the card it belongs to,
  * which a press opens. The cross takes the reminder off once it is dealt with.
+ * On a CRM board these are the clients to get back to that day: the dot is the
+ * circle that ticks the task off, and the cross gives way to the chat.
  */
-function DayReminders({ cards, withDate, onOpen, onClear }) {
+function DayReminders({ cards, withDate, crm = false, onOpen, onClear, onDone }) {
   return (
     <div className="kanban-reminders">
       <div className="kanban-reminders__head">Напоминания</div>
@@ -1109,25 +1133,30 @@ function DayReminders({ cards, withDate, onOpen, onClear }) {
         {cards.map((card) => {
           const when = withDate ? formatReminder(card.remind_date, card.remind_time) : shortTime(card.remind_time);
           return (
-            <li key={card.id} className={`kanban-reminder kanban-reminder--${reminderState(card.remind_date)}`}>
+            <li key={card.id} className={`kanban-reminder kanban-reminder--${reminderState(card.remind_date)} ${crm ? 'kanban-reminder--crm' : ''}`}>
+              {crm && <CrmCheck className="kanban-reminder__check" onPick={(el) => onDone?.(el, card)} />}
               <button type="button" className="kanban-reminder__main" onClick={() => onOpen?.(card.id)}>
-                <span className="kanban-reminder__dot" aria-hidden />
+                {!crm && <span className="kanban-reminder__dot" aria-hidden />}
                 <span className="kanban-reminder__text">
                   {when && <span className="kanban-reminder__when">{when}</span>}
                   <span className="kanban-reminder__title">{card.title || 'Без названия'}</span>
                 </span>
               </button>
-              <button
-                type="button"
-                className="kanban-reminder__clear"
-                onClick={() => onClear?.(card.id)}
-                aria-label="Убрать напоминание"
-                title="Убрать напоминание"
-              >
-                <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
-                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              </button>
+              {crm ? (
+                <ContactButton card={card} className="kanban-reminder__reach" />
+              ) : (
+                <button
+                  type="button"
+                  className="kanban-reminder__clear"
+                  onClick={() => onClear?.(card.id)}
+                  aria-label="Убрать напоминание"
+                  title="Убрать напоминание"
+                >
+                  <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
+                    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </button>
+              )}
             </li>
           );
         })}
@@ -1186,16 +1215,18 @@ function MenuBranch({ icon, label, open, hover, onOpen, onToggle, children }) {
  * opens to the side, under the pointer that asked for it.
  */
 function CardContextMenu({
-  card, at, columns, cardsByColumn, boardLabels, boardTargets = [],
-  onUpdate, onDuplicate, onDelete, onMove, onMoveToBoard, onOpen, onQuickEdit, onClose,
+  card, at, columns, cardsByColumn, boardLabels, boardTargets = [], crm = false,
+  onUpdate, onDuplicate, onDelete, onMove, onMoveToBoard, onOpen, onQuickEdit, onComplete, onClose,
 }) {
   const ref = useRef(null);
   const hasHover = useMediaQuery('(hover: hover)');
   // Which of the three side lists is out, if any.
   const [flyout, setFlyout] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  // The reminder picker takes the place of the menu rather than opening beside it.
+  // The reminder picker and the form that ticks it off take the place of the
+  // menu rather than opening beside it.
   const [remindOpen, setRemindOpen] = useState(false);
+  const [doneOpen, setDoneOpen] = useState(false);
   const pickerRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -1205,7 +1236,7 @@ function CardContextMenu({
     el.style.left = `${Math.max(8, Math.min(at.x, window.innerWidth - w - 8))}px`;
     el.style.top = `${Math.max(8, Math.min(at.y, window.innerHeight - h - 8))}px`;
     el.style.visibility = 'visible';
-  }, [at, remindOpen]);
+  }, [at, remindOpen, doneOpen]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -1325,6 +1356,15 @@ function CardContextMenu({
     );
   }
 
+  if (doneOpen && card.remind_date) {
+    return shell(
+      <CrmDoneForm
+        onBack={() => setDoneOpen(false)}
+        onSubmit={(result) => { onComplete(card, result); onClose(); }}
+      />,
+    );
+  }
+
   return shell(
     <>
       {swatches(card.border_color, (c) => onUpdate(card.id, { border_color: c }), {
@@ -1348,19 +1388,22 @@ function CardContextMenu({
       })}
       {item(lineHeightIcon, 'Быстрое редактирование', () => { onQuickEdit(card.id); onClose(); })}
       {item(editIcon, 'Открыть', () => { onOpen(card.id); onClose(); })}
-      <button
-        type="button"
-        className="dashboard__context-menu-item"
-        onMouseEnter={hasHover ? () => showFlyout(null) : undefined}
-        onClick={() => { onUpdate(card.id, { money_mode: !card.money_mode }); onClose(); }}
-      >
-        <img src={moneyIcon} alt="" className="dashboard__context-menu-item-icon" />
-        <span>Режим «Деньги»</span>
-        {card.money_mode && <span className="kanban-menu__check" aria-hidden>✓</span>}
-      </button>
+      {!crm && (
+        <button
+          type="button"
+          className="dashboard__context-menu-item"
+          onMouseEnter={hasHover ? () => showFlyout(null) : undefined}
+          onClick={() => { onUpdate(card.id, { money_mode: !card.money_mode }); onClose(); }}
+        >
+          <img src={moneyIcon} alt="" className="dashboard__context-menu-item-icon" />
+          <span>Режим «Деньги»</span>
+          {card.money_mode && <span className="kanban-menu__check" aria-hidden>✓</span>}
+        </button>
+      )}
       <div className="dashboard__context-menu-separator" aria-hidden />
 
-      {branch('due', calIcon, card.due_date ? `Срок: ${formatDueDate(card.due_date)}` : 'Срок…', (
+      {crm && card.remind_date && item(checkIcon, 'Выполнено…', () => { showFlyout(null); setDoneOpen(true); })}
+      {!crm && branch('due', calIcon, card.due_date ? `Срок: ${formatDueDate(card.due_date)}` : 'Срок…', (
         <>
           {row(starIcon, 'Сегодня', () => { onUpdate(card.id, { due_date: dueInDays(0) }); onClose(); })}
           {row(zavtraIcon, 'Завтра', () => { onUpdate(card.id, { due_date: dueInDays(1) }); onClose(); })}
@@ -1393,7 +1436,9 @@ function CardContextMenu({
       ))}
       {item(
         notificationIcon,
-        card.remind_date ? `Напоминание: ${formatReminder(card.remind_date, card.remind_time)}` : 'Напоминание…',
+        card.remind_date
+          ? `${crm ? 'Следующее' : 'Напоминание'}: ${formatReminder(card.remind_date, card.remind_time)}`
+          : (crm ? 'Следующее касание…' : 'Напоминание…'),
         () => { showFlyout(null); setRemindOpen(true); },
       )}
 
@@ -1472,6 +1517,7 @@ function snapColumnWidth(value) {
 }
 
 function BoardSettingsModal({ board, onChange, onClose }) {
+  const crm = !!board.kanban_crm;
   // Steps come in bursts, so the width is only saved once it has stood still
   // for a moment; the board behind the modal still follows along.
   const [widthDraft, setWidthDraft] = useState(null);
@@ -1508,6 +1554,30 @@ function BoardSettingsModal({ board, onChange, onClose }) {
               <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </button>
+        </div>
+
+        <div className="dashboard__settings-group">
+          <div className="dashboard__settings-title">Режим доски</div>
+          <div className="dashboard__settings-row kanban-settings__pair">
+            {[
+              { id: false, label: 'Задачи' },
+              { id: true, label: 'CRM' },
+            ].map((o) => (
+              <button
+                key={o.label}
+                type="button"
+                className={`kanban-settings__choice ${crm === o.id ? 'kanban-settings__choice--on' : ''}`}
+                onClick={() => { if (crm !== o.id) onChange({ kanban_crm: o.id }); }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <p className="kanban-settings__hint">
+            {crm
+              ? 'Плашка — это клиент: телефон, мессенджер и история касаний вместо задач. Напоминание — следующее касание, его отметка — выполненная задача.'
+              : 'Плашки держат списки задач. В режиме CRM плашка становится клиентом с историей касаний.'}
+          </p>
         </div>
 
         <div className="dashboard__settings-group">
@@ -1568,15 +1638,17 @@ function BoardSettingsModal({ board, onChange, onClose }) {
             />
             <span>Описание</span>
           </label>
-          <label className="dashboard__settings-check">
-            <input
-              type="checkbox"
-              checked={board.kanban_show_tasks !== false}
-              onChange={(e) => onChange({ kanban_show_tasks: e.target.checked })}
-            />
-            <span>Задачи</span>
-          </label>
-          {board.kanban_show_tasks !== false && (
+          {!crm && (
+            <label className="dashboard__settings-check">
+              <input
+                type="checkbox"
+                checked={board.kanban_show_tasks !== false}
+                onChange={(e) => onChange({ kanban_show_tasks: e.target.checked })}
+              />
+              <span>Задачи</span>
+            </label>
+          )}
+          {!crm && board.kanban_show_tasks !== false && (
             <label className="dashboard__settings-check">
               <input
                 type="checkbox"
@@ -1769,8 +1841,14 @@ export function KanbanView({
   moveCard, moveCardToBoard, boards = [], planDay,
   dateFilter: savedDateFilter = null, onDateFilterChange,
   onToggleTask, onOpenCard, onUpdateBoard,
+  touches = [], onCompleteReminder,
 }) {
   const hasHover = useMediaQuery('(hover: hover)');
+  const crm = !!board.kanban_crm;
+  // The reminder being ticked off, and the circle its form hangs from.
+  const [doneFor, setDoneFor] = useState(null); // { cardId, anchor }
+  const [statsOpen, setStatsOpen] = useState(false);
+  const statsBtnRef = useRef(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsHover, setSettingsHover] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -1936,13 +2014,23 @@ export function KanbanView({
 
   const cardSettings = {
     showDescription: board.kanban_show_description !== false,
-    showTasks: board.kanban_show_tasks !== false,
-    showSubtasks: !!board.kanban_show_subtasks,
+    // A client is not a checklist: on a CRM board the tasks of a card stay out of sight.
+    showTasks: !crm && board.kanban_show_tasks !== false,
+    showSubtasks: !crm && !!board.kanban_show_subtasks,
     quickAdd: board.kanban_quick_add !== false,
     hideDue: dateOn,
     atStart,
     stacked,
+    crm,
   };
+
+  const today = dueInDays(0);
+  const doneToday = useMemo(
+    () => (crm ? touches.filter((t) => t.closed_reminder && touchDay(t) === today).length : 0),
+    [crm, touches, today],
+  );
+  const openDone = (anchorEl, card) => setDoneFor({ cardId: card.id, anchor: { current: anchorEl } });
+  const doneCard = doneFor ? cards.find((c) => c.id === doneFor.cardId && c.remind_date) : null;
   const width = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, board.kanban_column_width ?? 280));
 
   const activeCard = activeId ? cards.find((c) => c.id === activeId) : null;
@@ -2051,6 +2139,12 @@ export function KanbanView({
       ?? (dateOn && overCard?.due_date ? overCard.due_date : null);
     if (day) {
       if (day === OVERDUE_KEY || isOverdue(day)) return;
+      // A client handed to a day is to be got back to that day: the card stays
+      // in its stage of the funnel and the day gets its reminder.
+      if (crm && !moved.due_date) {
+        if (moved.remind_date !== day) updateCard(moved.id, { remind_date: day });
+        return;
+      }
       const shown = (dateColumns.find((g) => g.key === day)?.cards || []);
       const before = fullByDay.get(day) || [];
       const rest = before.filter((c) => c.id !== moved.id);
@@ -2110,6 +2204,19 @@ export function KanbanView({
       <div className="kanban__header">
         <span className="kanban__title">{board.title}</span>
         <span className="kanban__header-gap" />
+        {crm && (
+          <button
+            type="button"
+            ref={statsBtnRef}
+            className={`kanban__done-count ${statsOpen ? 'kanban__done-count--open' : ''}`}
+            onClick={() => setStatsOpen((v) => !v)}
+            aria-label={`Выполнено задач сегодня: ${doneToday}`}
+            title="Выполнено задач сегодня"
+          >
+            <CheckGlyph />
+            <span>{doneToday}</span>
+          </button>
+        )}
         <button
           type="button"
           ref={dateBtnRef}
@@ -2168,6 +2275,19 @@ export function KanbanView({
         >
           <img src={hasHover && archiveHover ? archiveNavIcon : archiveIcon} alt="" />
         </button>
+        {statsOpen && (
+          <Popover anchor={statsBtnRef} onClose={() => setStatsOpen(false)} className="crm-stats-pop">
+            <CrmStats
+              touches={touches}
+              cards={boardCards}
+              archived={boardArchive}
+              onOpenCard={(id) => {
+                setStatsOpen(false);
+                onOpenCard(id);
+              }}
+            />
+          </Popover>
+        )}
         {dateOpen && (
           <Popover anchor={dateBtnRef} onClose={() => setDateOpen(false)} className="kanban-filter">
             <div className="kanban-filter__head">Фильтровать по датам</div>
@@ -2256,13 +2376,17 @@ export function KanbanView({
               onToggleTask={onToggleTask}
               onOpenCard={onOpenCard}
               // A card planned for a day still has to live somewhere on the
-              // board, and the first column is where work starts.
+              // board, and the first column is where work starts. A client
+              // added to a day is one to get in touch with that day.
               onAddCard={boardColumns.length > 0
-                ? (day, title) => addCard(board.id, boardColumns[0].id, { title, due_date: day, atStart })
+                ? (day, title) => addCard(board.id, boardColumns[0].id, crm
+                  ? { title, remind_date: day, atStart }
+                  : { title, due_date: day, atStart })
                 : null}
               onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
               onToggleFold={(cardId, collapsed) => updateCard(cardId, { collapsed })}
               onClearReminder={(cardId) => updateCard(cardId, { remind_date: null, remind_time: null })}
+              onDoneReminder={openDone}
               hasHover={hasHover}
               editingCardId={editingCardId}
               onTitleCommit={(cardId, title) => updateCard(cardId, { title })}
@@ -2295,6 +2419,7 @@ export function KanbanView({
                 editingCardId={editingCardId}
                 onTitleCommit={(cardId, title) => updateCard(cardId, { title })}
                 onEditDone={() => setEditingCardId(null)}
+                onDoneReminder={openDone}
               />
             ))}
           </SortableContext>
@@ -2337,16 +2462,35 @@ export function KanbanView({
           }}
           onMoveToBoard={moveCardToBoard}
           boardTargets={boardTargets}
+          crm={crm}
           onOpen={onOpenCard}
           onQuickEdit={setEditingCardId}
+          onComplete={onCompleteReminder}
           onClose={() => setCardMenu(null)}
         />
+      )}
+
+      {doneCard && (
+        <Popover anchor={doneFor.anchor} align="left" onClose={() => setDoneFor(null)} className="kanban-remind-pop">
+          <CrmDoneForm
+            key={doneCard.id}
+            onSubmit={(result) => {
+              onCompleteReminder?.(doneCard, result);
+              setDoneFor(null);
+            }}
+          />
+        </Popover>
       )}
 
       {settingsOpen && (
         <BoardSettingsModal
           board={board}
-          onChange={(patch) => onUpdateBoard(board.id, patch)}
+          onChange={(patch) => {
+            onUpdateBoard(board.id, patch);
+            // The day columns are where a CRM is worked from, so turning it on
+            // lays the board out by date unless it already is.
+            if (patch.kanban_crm && !dateFilter) onDateFilterChange?.(board.id, 'days7');
+          }}
           onClose={() => setSettingsOpen(false)}
         />
       )}

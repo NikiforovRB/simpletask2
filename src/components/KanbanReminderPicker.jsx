@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CalendarPopover } from './CalendarPopover';
-import { dueInDays, formatReminder, shortTime } from '../lib/kanbanCards';
+import { REMIND_TIMES, dueInDays, formatReminder, shortDate, shortTime } from '../lib/kanbanCards';
 import { notificationPermission, requestNotificationPermission } from '../lib/reminders';
 import leftIcon from '../assets/left.svg';
 import calendarIcon from '../assets/calendar.svg';
@@ -11,9 +11,6 @@ const DAYS = [
   { offset: 1, label: 'Завтра' },
   { offset: 2, label: 'Послезавтра' },
 ];
-const TIMES = ['09:00', '12:00', '15:00', '18:00', '21:00'];
-
-const shortDate = (dateStr) => new Date(`${dateStr}T12:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 
 /**
  * The reminder of a card: a day and, if it matters, a time. With a time the
@@ -96,7 +93,7 @@ export function KanbanReminderPicker({ date, time, onApply, onClear, onBack }) {
         >
           Без времени
         </button>
-        {TIMES.map((t) => (
+        {REMIND_TIMES.map((t) => (
           <button
             key={t}
             type="button"

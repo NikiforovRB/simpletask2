@@ -6,6 +6,9 @@ import { ColorPalette, LabelPicker, Popover } from './KanbanView';
 import { CalendarPopover } from './CalendarPopover';
 import { getContainerIdForCard } from '../lib/dnd';
 import { KanbanReminderPicker } from './KanbanReminderPicker';
+import { CheckGlyph, ContactButton, CrmDoneForm, MessengerIcon, PhoneGlyph } from './KanbanCrm';
+import { TouchComposer, TouchHistory } from './KanbanTouches';
+import { MESSENGERS, callHref } from '../lib/crm';
 import {
   cardFill, cardLabels, formatDueDate, formatMoney, formatReminder, isOverdue, labelTextColor, moneyTotal,
   reminderState, withAlpha,
@@ -43,6 +46,11 @@ function useAutoGrow(value) {
  * "Планы", so the tasks keep their subtasks, colours, spacing and drag and
  * drop. The list is dragged in the dashboard's own DndContext, which is why
  * the panel is mounted there rather than inside the board.
+ *
+ * On a CRM board the card is a client: the task list gives way to their phone,
+ * their messenger and the history of touches, read like a chat — the oldest on
+ * top, the newest right above the line a new one is written into, and beside
+ * that line the next touch, ticked off from there.
  */
 export function KanbanCardPanel({
   card, tasks, getSubtasks, completedVisible = true,
@@ -51,6 +59,7 @@ export function KanbanCardPanel({
   onToggle, onUpdate, onDelete, onAddSubtask, onAddTask, onTaskContextMenu,
   editingTaskId, onEditingTaskConsumed,
   onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit,
+  crm = false, touches = [], onAddTouch, onUpdateTouch, onDeleteTouch, onCompleteReminder,
 }) {
   const hasHover = useMediaQuery('(hover: hover)');
   const [closing, setClosing] = useState(false);
@@ -66,6 +75,12 @@ export function KanbanCardPanel({
   const [dueOpen, setDueOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
   const remindBtnRef = useRef(null);
+  const [phone, setPhone] = useState(card.phone || '');
+  // What is being typed into the history; ticking the reminder off takes it along.
+  const [draft, setDraft] = useState('');
+  const [doneOpen, setDoneOpen] = useState(false);
+  const doneBtnRef = useRef(null);
+  const bodyRef = useRef(null);
   const titleRef = useAutoGrow(title);
   const descRef = useAutoGrow(description);
   const titleColorRef = useRef(null);
@@ -105,6 +120,31 @@ export function KanbanCardPanel({
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [description, cardId]);
+
+  useEffect(() => {
+    if (phone === (card.phone || '')) return undefined;
+    const t = setTimeout(() => onUpdateCard(cardId, { phone }), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone, cardId]);
+
+  const cardTouches = useMemo(
+    () => (crm ? touches.filter((t) => t.card_id === cardId) : []),
+    [crm, touches, cardId],
+  );
+
+  // Opened at the newest touch, like a chat, and kept there as touches are added.
+  const touchCount = cardTouches.length;
+  const seenTouches = useRef(null);
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (!crm || !el) return;
+    const first = seenTouches.current === null;
+    if (first || touchCount > seenTouches.current) {
+      el.scrollTo({ top: el.scrollHeight, behavior: first ? 'auto' : 'smooth' });
+    }
+    seenTouches.current = touchCount;
+  }, [crm, touchCount]);
 
   const cardTasks = useMemo(
     () => tasks.filter((t) => t.card_id === cardId && !t.parent_id),
@@ -230,6 +270,12 @@ export function KanbanCardPanel({
               />
             )}
           </span>
+          {crm && card.messenger && <ContactButton card={card} className="kanban-panel__reach" />}
+          {crm && callHref(card) && (
+            <a className="crm-contact-btn kanban-panel__reach" href={callHref(card)} title="Позвонить" aria-label="Позвонить">
+              <MessengerIcon kind="phone" />
+            </a>
+          )}
           <button
             type="button"
             className="kanban-panel__close"
@@ -242,107 +288,145 @@ export function KanbanCardPanel({
           </button>
         </header>
 
-        <div className="kanban-panel__body">
+        <div className="kanban-panel__body" ref={bodyRef}>
           <textarea
             ref={titleRef}
             className="kanban-panel__title"
             style={card.title_color ? { color: card.title_color } : undefined}
             value={title}
             rows={1}
-            placeholder="Название плашки"
+            placeholder={crm ? 'Имя клиента' : 'Название плашки'}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={() => onUpdateCard(cardId, { title })}
           />
 
-          <div className="kanban-panel__meta">
-            <button
-              type="button"
-              ref={dueBtnRef}
-              className={`kanban-panel__due ${isOverdue(card.due_date) ? 'kanban-panel__due--overdue' : ''}`}
-              onClick={() => setDueOpen((v) => !v)}
-            >
-              <img src={calIcon} alt="" />
-              {card.due_date ? formatDueDate(card.due_date) : 'Без срока'}
-            </button>
-            {card.due_date && (
+          {crm && (
+            <div className="crm-contact">
+              <label className="crm-contact__phone">
+                <PhoneGlyph />
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="off"
+                  value={phone}
+                  placeholder="Телефон"
+                  aria-label="Телефон"
+                  onChange={(e) => setPhone(e.target.value)}
+                  onBlur={() => { if (phone !== (card.phone || '')) onUpdateCard(cardId, { phone }); }}
+                />
+              </label>
+              <div className="crm-contact__kinds" role="radiogroup" aria-label="Мессенджер">
+                {MESSENGERS.map((m) => {
+                  const on = card.messenger === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      className={`crm-contact__kind ${on ? 'crm-contact__kind--on' : ''}`}
+                      onClick={() => onUpdateCard(cardId, { messenger: on ? null : m.id })}
+                    >
+                      <MessengerIcon kind={m.id} />
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!crm && (
+            <div className="kanban-panel__meta">
               <button
                 type="button"
-                className="kanban-panel__chip-clear"
-                onClick={() => onUpdateCard(cardId, { due_date: null })}
+                ref={dueBtnRef}
+                className={`kanban-panel__due ${isOverdue(card.due_date) ? 'kanban-panel__due--overdue' : ''}`}
+                onClick={() => setDueOpen((v) => !v)}
               >
-                Убрать срок
+                <img src={calIcon} alt="" />
+                {card.due_date ? formatDueDate(card.due_date) : 'Без срока'}
               </button>
-            )}
-            <button
-              type="button"
-              ref={remindBtnRef}
-              className={`kanban-panel__due kanban-panel__remind ${card.remind_date ? `kanban-panel__remind--${reminderState(card.remind_date)}` : ''}`}
-              onClick={() => setRemindOpen((v) => !v)}
-              title="Напоминание"
-            >
-              {card.remind_date ? <span className="kanban-panel__remind-dot" aria-hidden /> : <img src={notificationIcon} alt="" />}
-              {card.remind_date ? formatReminder(card.remind_date, card.remind_time) : 'Напоминание'}
-            </button>
-            {remindOpen && (
-              <Popover anchor={remindBtnRef} align="left" onClose={() => setRemindOpen(false)} className="kanban-remind-pop">
-                <KanbanReminderPicker
-                  date={card.remind_date}
-                  time={card.remind_time}
-                  onApply={({ date, time }) => {
-                    onUpdateCard(cardId, { remind_date: date, remind_time: time });
-                    setRemindOpen(false);
-                  }}
-                  onClear={card.remind_date
-                    ? () => {
-                      onUpdateCard(cardId, { remind_date: null, remind_time: null });
+              {card.due_date && (
+                <button
+                  type="button"
+                  className="kanban-panel__chip-clear"
+                  onClick={() => onUpdateCard(cardId, { due_date: null })}
+                >
+                  Убрать срок
+                </button>
+              )}
+              <button
+                type="button"
+                ref={remindBtnRef}
+                className={`kanban-panel__due kanban-panel__remind ${card.remind_date ? `kanban-panel__remind--${reminderState(card.remind_date)}` : ''}`}
+                onClick={() => setRemindOpen((v) => !v)}
+                title="Напоминание"
+              >
+                {card.remind_date ? <span className="kanban-panel__remind-dot" aria-hidden /> : <img src={notificationIcon} alt="" />}
+                {card.remind_date ? formatReminder(card.remind_date, card.remind_time) : 'Напоминание'}
+              </button>
+              {remindOpen && (
+                <Popover anchor={remindBtnRef} align="left" onClose={() => setRemindOpen(false)} className="kanban-remind-pop">
+                  <KanbanReminderPicker
+                    date={card.remind_date}
+                    time={card.remind_time}
+                    onApply={({ date, time }) => {
+                      onUpdateCard(cardId, { remind_date: date, remind_time: time });
                       setRemindOpen(false);
-                    }
-                    : null}
-                />
-              </Popover>
-            )}
-            <button
-              type="button"
-              className={`kanban-panel__due kanban-panel__money ${money ? 'kanban-panel__money--on' : ''}`}
-              onClick={() => onUpdateCard(cardId, { money_mode: !money })}
-              aria-pressed={money}
-              title="Суммы вместо галочек и итог под списком. Сумма пишется в начале задачи: «249 • MMB»"
-            >
-              <img src={money ? moneyNavIcon : moneyIcon} alt="" />
-              Деньги
-            </button>
-            {dueOpen && (
-              <Popover anchor={dueBtnRef} align="left" onClose={() => setDueOpen(false)} className="kanban-due-pop kanban-pop--calendar">
-                <CalendarPopover
-                  value={card.due_date || null}
-                  onChange={(dateStr) => onUpdateCard(cardId, { due_date: dateStr })}
-                  onClose={() => setDueOpen(false)}
-                />
-                <div className="kanban-due-pop__actions">
-                  <button
-                    type="button"
-                    className="kanban-due-pop__action"
-                    onClick={() => {
-                      onUpdateCard(cardId, { due_date: toLocalDateString(new Date()) });
-                      setDueOpen(false);
                     }}
-                  >
-                    Сегодня
-                  </button>
-                  <button
-                    type="button"
-                    className="kanban-due-pop__action kanban-due-pop__action--clear"
-                    onClick={() => {
-                      onUpdateCard(cardId, { due_date: null });
-                      setDueOpen(false);
-                    }}
-                  >
-                    Без срока
-                  </button>
-                </div>
-              </Popover>
-            )}
-          </div>
+                    onClear={card.remind_date
+                      ? () => {
+                        onUpdateCard(cardId, { remind_date: null, remind_time: null });
+                        setRemindOpen(false);
+                      }
+                      : null}
+                  />
+                </Popover>
+              )}
+              <button
+                type="button"
+                className={`kanban-panel__due kanban-panel__money ${money ? 'kanban-panel__money--on' : ''}`}
+                onClick={() => onUpdateCard(cardId, { money_mode: !money })}
+                aria-pressed={money}
+                title="Суммы вместо галочек и итог под списком. Сумма пишется в начале задачи: «249 • MMB»"
+              >
+                <img src={money ? moneyNavIcon : moneyIcon} alt="" />
+                Деньги
+              </button>
+              {dueOpen && (
+                <Popover anchor={dueBtnRef} align="left" onClose={() => setDueOpen(false)} className="kanban-due-pop kanban-pop--calendar">
+                  <CalendarPopover
+                    value={card.due_date || null}
+                    onChange={(dateStr) => onUpdateCard(cardId, { due_date: dateStr })}
+                    onClose={() => setDueOpen(false)}
+                  />
+                  <div className="kanban-due-pop__actions">
+                    <button
+                      type="button"
+                      className="kanban-due-pop__action"
+                      onClick={() => {
+                        onUpdateCard(cardId, { due_date: toLocalDateString(new Date()) });
+                        setDueOpen(false);
+                      }}
+                    >
+                      Сегодня
+                    </button>
+                    <button
+                      type="button"
+                      className="kanban-due-pop__action kanban-due-pop__action--clear"
+                      onClick={() => {
+                        onUpdateCard(cardId, { due_date: null });
+                        setDueOpen(false);
+                      }}
+                    >
+                      Без срока
+                    </button>
+                  </div>
+                </Popover>
+              )}
+            </div>
+          )}
 
           <div className="kanban-panel__labels">
             {cardLabels(card, boardLabels).map((l) => (
@@ -389,82 +473,160 @@ export function KanbanCardPanel({
             )}
           </div>
 
-          <div className="kanban-panel__section-title">Описание</div>
+          <div className="kanban-panel__section-title">{crm ? 'Заметки' : 'Описание'}</div>
           <textarea
             ref={descRef}
             className="kanban-panel__desc"
             value={description}
             rows={2}
-            placeholder="Любое описание"
+            placeholder={crm ? 'Заметки о клиенте' : 'Любое описание'}
             onChange={(e) => setDescription(e.target.value)}
             onBlur={() => onUpdateCard(cardId, { description })}
           />
 
-          <div className="kanban-panel__tasks-head">
-            <span className="kanban-panel__section-title">Задачи</span>
-            <button
-              type="button"
-              className="kanban-panel__icon-btn"
-              onMouseEnter={() => hasHover && setPlusHover(true)}
-              onMouseLeave={() => hasHover && setPlusHover(false)}
-              onClick={() => onAddTask?.({
-                list_type: 'kanban',
-                project_id: card.board_id,
-                card_id: cardId,
-                text_color: DEFAULT_TASK_COLOR,
-              })}
-              aria-label="Добавить задачу"
-            >
-              <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
-            </button>
-          </div>
-
-          <ul className="kanban-panel__list">
-            <SortableContext items={openTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-              {openTasks.map((task, i) => (
-                <li key={task.id}>
-                  <DropSlot id={mainContainerId} index={i} />
-                  <SortableTask
-                    task={task}
-                    containerId={mainContainerId}
-                    subtasks={getSubtasks(task.id)}
-                    {...taskProps}
-                  />
-                </li>
-              ))}
-            </SortableContext>
-            <li><DropSlot id={mainContainerId} index={openTasks.length} /></li>
-          </ul>
-          {money && openTasks.length > 0 && (
-            <div className="kanban-panel__total">
-              <span>Итого</span>
-              <span className="kanban-panel__total-sum">{formatMoney(total)}</span>
-            </div>
-          )}
-
-          {completedVisible && doneTasks.length > 0 && (
+          {crm ? (
             <>
-              <div className="kanban-panel__section-title kanban-panel__section-title--done">Выполненные задачи</div>
-              <ul className="kanban-panel__list kanban-panel__list--completed">
-                <SortableContext items={doneTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                  {doneTasks.map((task, i) => (
+              <div className="kanban-panel__section-title">
+                {touchCount > 0 ? `Касания · ${touchCount}` : 'Касания'}
+              </div>
+              {touchCount === 0 ? (
+                <p className="crm-history__empty">Касаний пока нет — первое записывается внизу.</p>
+              ) : (
+                <TouchHistory touches={cardTouches} onUpdate={onUpdateTouch} onDelete={onDeleteTouch} />
+              )}
+            </>
+          ) : (
+            <>
+              <div className="kanban-panel__tasks-head">
+                <span className="kanban-panel__section-title">Задачи</span>
+                <button
+                  type="button"
+                  className="kanban-panel__icon-btn"
+                  onMouseEnter={() => hasHover && setPlusHover(true)}
+                  onMouseLeave={() => hasHover && setPlusHover(false)}
+                  onClick={() => onAddTask?.({
+                    list_type: 'kanban',
+                    project_id: card.board_id,
+                    card_id: cardId,
+                    text_color: DEFAULT_TASK_COLOR,
+                  })}
+                  aria-label="Добавить задачу"
+                >
+                  <img src={hasHover && plusHover ? plusNavIcon : plusIcon} alt="" />
+                </button>
+              </div>
+
+              <ul className="kanban-panel__list">
+                <SortableContext items={openTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                  {openTasks.map((task, i) => (
                     <li key={task.id}>
-                      <DropSlot id={doneContainerId} index={i} />
+                      <DropSlot id={mainContainerId} index={i} />
                       <SortableTask
                         task={task}
-                        containerId={doneContainerId}
+                        containerId={mainContainerId}
                         subtasks={getSubtasks(task.id)}
-                        isCompleted
                         {...taskProps}
                       />
                     </li>
                   ))}
                 </SortableContext>
-                <li><DropSlot id={doneContainerId} index={doneTasks.length} /></li>
+                <li><DropSlot id={mainContainerId} index={openTasks.length} /></li>
               </ul>
+              {money && openTasks.length > 0 && (
+                <div className="kanban-panel__total">
+                  <span>Итого</span>
+                  <span className="kanban-panel__total-sum">{formatMoney(total)}</span>
+                </div>
+              )}
+
+              {completedVisible && doneTasks.length > 0 && (
+                <>
+                  <div className="kanban-panel__section-title kanban-panel__section-title--done">Выполненные задачи</div>
+                  <ul className="kanban-panel__list kanban-panel__list--completed">
+                    <SortableContext items={doneTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                      {doneTasks.map((task, i) => (
+                        <li key={task.id}>
+                          <DropSlot id={doneContainerId} index={i} />
+                          <SortableTask
+                            task={task}
+                            containerId={doneContainerId}
+                            subtasks={getSubtasks(task.id)}
+                            isCompleted
+                            {...taskProps}
+                          />
+                        </li>
+                      ))}
+                    </SortableContext>
+                    <li><DropSlot id={doneContainerId} index={doneTasks.length} /></li>
+                  </ul>
+                </>
+              )}
             </>
           )}
         </div>
+
+        {crm && (
+          <div className="crm-dock">
+            <div className="crm-dock__next">
+              <button
+                type="button"
+                ref={remindBtnRef}
+                className={`kanban-panel__due kanban-panel__remind ${card.remind_date ? `kanban-panel__remind--${reminderState(card.remind_date)}` : ''}`}
+                onClick={() => setRemindOpen((v) => !v)}
+                title="Следующее касание"
+              >
+                {card.remind_date ? <span className="kanban-panel__remind-dot" aria-hidden /> : <img src={notificationIcon} alt="" />}
+                {card.remind_date ? formatReminder(card.remind_date, card.remind_time) : 'Следующее касание'}
+              </button>
+              {card.remind_date && (
+                <button
+                  type="button"
+                  ref={doneBtnRef}
+                  className="crm-dock__done"
+                  onClick={() => setDoneOpen((v) => !v)}
+                >
+                  <CheckGlyph />
+                  Выполнено
+                </button>
+              )}
+              {remindOpen && (
+                <Popover anchor={remindBtnRef} align="left" onClose={() => setRemindOpen(false)} className="kanban-remind-pop">
+                  <KanbanReminderPicker
+                    date={card.remind_date}
+                    time={card.remind_time}
+                    onApply={({ date, time }) => {
+                      onUpdateCard(cardId, { remind_date: date, remind_time: time });
+                      setRemindOpen(false);
+                    }}
+                    onClear={card.remind_date
+                      ? () => {
+                        onUpdateCard(cardId, { remind_date: null, remind_time: null });
+                        setRemindOpen(false);
+                      }
+                      : null}
+                  />
+                </Popover>
+              )}
+              {doneOpen && card.remind_date && (
+                <Popover anchor={doneBtnRef} align="left" onClose={() => setDoneOpen(false)} className="kanban-remind-pop">
+                  <CrmDoneForm
+                    initialNote={draft}
+                    onSubmit={(result) => {
+                      onCompleteReminder?.(card, result);
+                      setDraft('');
+                      setDoneOpen(false);
+                    }}
+                  />
+                </Popover>
+              )}
+            </div>
+            <TouchComposer
+              text={draft}
+              onText={setDraft}
+              onSubmit={(touch) => onAddTouch?.({ board_id: card.board_id, card_id: cardId, ...touch })}
+            />
+          </div>
+        )}
 
         {/* Far from the close button: a miss on a phone should not be the one
             press that deletes the card. */}
@@ -487,7 +649,9 @@ export function KanbanCardPanel({
         <div className="dashboard__settings-overlay" onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}>
           <div className="dashboard__settings-popup" onClick={(e) => e.stopPropagation()}>
             <div className="dashboard__settings-title">Удалить плашку?</div>
-            <p className="dashboard__confirm-text">Задачи этой плашки также будут удалены.</p>
+            <p className="dashboard__confirm-text">
+              {crm ? 'Плашка уйдёт в архив вместе с историей касаний.' : 'Задачи этой плашки также будут удалены.'}
+            </p>
             <div className="dashboard__settings-edit-actions">
               <button type="button" className="dashboard__settings-submit" onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}>
                 Отмена

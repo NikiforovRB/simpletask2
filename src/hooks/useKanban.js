@@ -420,7 +420,8 @@ export function useKanban(boardIds) {
   /**
    * A card handed over to another board. It lands at the end of that board's
    * first column and leaves its labels behind — a label belongs to a board and
-   * would mean nothing on the new one — while its tasks travel with it.
+   * would mean nothing on the new one — while its tasks and the history of its
+   * touches travel with it.
    */
   const moveCardToBoard = useCallback(async (cardId, boardId) => {
     const card = cardsRef.current.find((c) => c.id === cardId);
@@ -435,14 +436,15 @@ export function useKanban(boardIds) {
       due_position: null,
     };
     patchCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, ...patch } : c)).sort(byPosition));
-    const [moved, carried] = await Promise.all([
+    const [moved, carried, touched] = await Promise.all([
       supabase
         .from('kanban_cards')
         .update({ ...patch, updated_at: new Date().toISOString() })
         .eq('id', cardId),
       supabase.from('tasks').update({ project_id: boardId }).eq('card_id', cardId),
+      supabase.from('kanban_touches').update({ board_id: boardId }).eq('card_id', cardId),
     ]);
-    if (moved.error || carried.error) await fetchAll();
+    if (moved.error || carried.error || touched.error) await fetchAll();
   }, [columns, fetchAll, patchCards]);
 
   return {

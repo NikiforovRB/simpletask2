@@ -46,6 +46,7 @@ import { useProjects } from '../hooks/useProjects';
 import { useHabits } from '../hooks/useHabits';
 import { useBoardItems } from '../hooks/useBoardItems';
 import { useKanban } from '../hooks/useKanban';
+import { useKanbanTouches } from '../hooks/useKanbanTouches';
 import { useMindmap } from '../hooks/useMindmap';
 import { useGoalPlan } from '../hooks/useGoalPlan';
 import { DayCard } from '../components/DayCard';
@@ -1225,6 +1226,28 @@ export default function Dashboard() {
     () => (viewMode === 'kanban' ? projects.find((p) => p.id === activeKanbanId && p.kind === 'kanban') ?? null : null),
     [viewMode, projects, activeKanbanId],
   );
+  // The touches of the CRM board on screen: its clients' histories and the daily count.
+  const crmBoardId = activeKanbanBoard?.kanban_crm ? activeKanbanBoard.id : null;
+  const {
+    touches: kanbanTouches,
+    addTouch: addKanbanTouch,
+    updateTouch: updateKanbanTouch,
+    deleteTouch: deleteKanbanTouch,
+  } = useKanbanTouches(crmBoardId);
+  /**
+   * A reminder ticked off: it goes into the client's history as a touch that
+   * closed it — which is what the daily count adds up — and the next one, if
+   * any, takes its place.
+   */
+  const completeKanbanReminder = useCallback((card, { body, next }) => {
+    addKanbanTouch({
+      board_id: card.board_id,
+      card_id: card.id,
+      body: body || '',
+      closed_reminder: card.remind_date,
+    });
+    updateKanbanCard(card.id, { remind_date: next?.date ?? null, remind_time: next?.time ?? null });
+  }, [addKanbanTouch, updateKanbanCard]);
   const activeMindMap = useMemo(
     () => (viewMode === 'mindmap' ? projects.find((p) => p.id === activeMindmapId && p.kind === 'mindmap') ?? null : null),
     [viewMode, projects, activeMindmapId],
@@ -1275,6 +1298,8 @@ export default function Dashboard() {
       money_mode: !!card.money_mode,
       remind_date: card.remind_date ?? null,
       remind_time: card.remind_time ?? null,
+      phone: card.phone || '',
+      messenger: card.messenger ?? null,
     });
     if (!copy) return;
     const siblings = kanbanCards
@@ -2858,6 +2883,8 @@ export default function Dashboard() {
           onToggleTask={handleToggle}
           onOpenCard={setOpenCardId}
           onUpdateBoard={updateProjectSettings}
+          touches={kanbanTouches}
+          onCompleteReminder={completeKanbanReminder}
         />
       )}
 
@@ -2865,6 +2892,12 @@ export default function Dashboard() {
         <KanbanCardPanel
           key={openCard.id}
           card={openCard}
+          crm={!!crmBoardId && openCard.board_id === crmBoardId}
+          touches={kanbanTouches}
+          onAddTouch={addKanbanTouch}
+          onUpdateTouch={updateKanbanTouch}
+          onDeleteTouch={deleteKanbanTouch}
+          onCompleteReminder={completeKanbanReminder}
           tasks={tasks}
           getSubtasks={getSubtasksOf}
           completedVisible={completedVisible}

@@ -1,0 +1,759 @@
+/* «CRM»: a board of clients. Everything here sits on top of the board and the
+   card panel, which keep their own look. */
+
+/* ---- Marks of the messengers ---- */
+.crm-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  display: block;
+}
+
+.crm-icon--phone {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+
+.crm-icon--phone svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- One press to the client: chat or call ---- */
+.crm-contact-btn {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 6px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.crm-contact-btn:hover {
+  background: var(--bg-hover-strong);
+}
+
+.crm-contact-btn:hover .crm-icon--phone {
+  color: var(--text-primary);
+}
+
+.crm-contact-btn__copied {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-elev);
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ---- The circle a reminder is ticked off by ---- */
+.crm-check {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1.5px solid var(--remind-color, var(--text-dim));
+  border-radius: 50%;
+  background: none;
+  color: var(--remind-color, var(--text-dim));
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.crm-check svg {
+  width: 9px;
+  height: 9px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.crm-check:hover,
+.crm-check:focus-visible {
+  background: var(--remind-color, var(--text-dim));
+  color: var(--bg-surface);
+}
+
+.crm-check:hover svg,
+.crm-check:focus-visible svg {
+  opacity: 1;
+}
+
+/* ---- The foot of a client card: the next touch and the contact ---- */
+.kanban-card__crm {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.kanban-card__crm .kanban-card__remind {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.kanban-card__reach {
+  margin: -0.2rem -0.25rem -0.2rem auto;
+}
+
+/* ---- A client in the reminders of a day ---- */
+.kanban-reminder--crm {
+  align-items: center;
+  padding-left: 0.35rem;
+}
+
+.kanban-reminder--crm .kanban-reminder__main {
+  padding-left: 0.45rem;
+}
+
+.kanban-reminder__reach {
+  margin-right: 0.1rem;
+}
+
+/* ---- Ticking off: what came of it and when next ---- */
+.crm-done {
+  width: 270px;
+}
+
+.crm-done__note,
+.crm-touch-edit__input {
+  width: 100%;
+  min-height: 2.6rem;
+  max-height: 10rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.crm-done__note:focus,
+.crm-touch-edit__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ---- The board header: done today ---- */
+.kanban__done-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 1.5rem;
+  padding: 0 0.45rem 0 0.35rem;
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.kanban__done-count svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.kanban__done-count:hover,
+.kanban__done-count--open {
+  background: color-mix(in srgb, var(--success) 24%, transparent);
+}
+
+/* ---- The week of work ---- */
+.crm-stats {
+  width: 17.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.crm-stats__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.1rem 0.15rem 0.45rem 0.35rem;
+}
+
+.crm-stats__title {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.crm-stats__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.crm-stats__range {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.crm-stats__arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.crm-stats__arrow img {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.crm-stats__arrow:hover:not(:disabled) {
+  background: var(--bg-hover-strong);
+}
+
+.crm-stats__arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.crm-stats__week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.2rem;
+}
+
+.crm-stats__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.3rem 0 0.35rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.crm-stats__day:hover:not(:disabled) {
+  background: var(--bg-hover-strong);
+}
+
+.crm-stats__day:disabled {
+  background: none;
+  cursor: default;
+}
+
+.crm-stats__day--on,
+.crm-stats__day--on:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.crm-stats__wd {
+  font-size: 0.6875rem;
+  color: var(--text-dim);
+}
+
+.crm-stats__day--today .crm-stats__wd {
+  color: var(--accent);
+}
+
+.crm-stats__n {
+  min-height: 1.2em;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-stats__n--zero {
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.crm-stats__total {
+  padding: 0.35rem 0.35rem 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.crm-stats__day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  padding: 0.5rem 0.35rem 0.3rem;
+  border-top: 1px solid var(--divider);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.crm-stats__count {
+  color: var(--success);
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-stats__empty {
+  margin: 0;
+  padding: 0.2rem 0.35rem 0.3rem;
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+
+.crm-stats__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.crm-stats__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.3rem 0.35rem;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+button.crm-stats__row {
+  cursor: pointer;
+}
+
+button.crm-stats__row:hover {
+  background: var(--bg-hover);
+}
+
+.crm-stats__row--gone {
+  color: var(--text-dim);
+}
+
+.crm-stats__time {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-stats__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.crm-stats__body {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- The card panel of a client ---- */
+.kanban-panel__reach {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+}
+
+.kanban-panel__reach .crm-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.crm-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.crm-contact__phone {
+  flex: 1 1 11rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-dim);
+}
+
+.crm-contact__phone:focus-within {
+  border-color: var(--accent);
+}
+
+.crm-contact__phone svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: 0 0 auto;
+}
+
+.crm-contact__phone input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-contact__phone input:focus {
+  outline: none;
+}
+
+.crm-contact__kinds {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.crm-contact__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.crm-contact__kind .crm-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  filter: grayscale(1);
+  opacity: 0.55;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.crm-contact__kind:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+.crm-contact__kind--on,
+.crm-contact__kind--on:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.crm-contact__kind--on .crm-icon,
+.crm-contact__kind:hover .crm-icon {
+  filter: none;
+  opacity: 1;
+}
+
+/* The history: plain lines under the day they happened on. */
+.crm-history__empty {
+  margin: 0.15rem 0 0;
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+
+.crm-history__day + .crm-history__day {
+  margin-top: 0.75rem;
+}
+
+.crm-history__day-title {
+  margin-bottom: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.crm-touch {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0 -0.4rem;
+  padding: 0.3rem 0.4rem;
+  width: calc(100% + 0.8rem);
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.crm-touch:hover {
+  background: var(--bg-hover);
+}
+
+.crm-touch__time {
+  flex: 0 0 auto;
+  min-width: 2.6rem;
+  font-size: 0.8125rem;
+  line-height: calc(0.9375rem * 1.4);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-touch__body {
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.crm-touch__tick {
+  display: inline-flex;
+  vertical-align: -0.1em;
+  margin-right: 0.35rem;
+  color: var(--success);
+}
+
+.crm-touch__tick svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.crm-touch__empty {
+  color: var(--text-dim);
+}
+
+.crm-touch-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.2rem 0 0.4rem;
+}
+
+.crm-touch-edit__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.crm-touch-edit__gap {
+  flex: 1;
+}
+
+.crm-touch-edit__ask {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.crm-btn {
+  padding: 0.3rem 0.6rem;
+  border: none;
+  border-radius: 7px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.crm-btn:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+.crm-btn--quiet {
+  background: none;
+  color: var(--text-dim);
+}
+
+.crm-btn--quiet:hover {
+  background: none;
+  color: var(--danger);
+}
+
+.crm-btn--danger,
+.crm-btn--danger:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.crm-btn--primary,
+.crm-btn--primary:hover {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+/* When a touch happened. */
+.crm-when {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.5rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.crm-when svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.crm-when:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+.crm-when--set {
+  color: var(--accent);
+}
+
+/* The foot of the panel: the next touch and the line a new one is written into. */
+.crm-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem 0.5rem;
+  border-top: 1px solid var(--divider);
+  background: var(--bg-app);
+}
+
+.crm-dock__next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.crm-dock__done {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.55rem;
+  border: none;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.crm-dock__done svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.crm-dock__done:hover {
+  background: color-mix(in srgb, var(--success) 24%, transparent);
+}
+
+.crm-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.crm-composer .crm-when {
+  margin-bottom: 0.2rem;
+}
+
+.crm-composer__input {
+  flex: 1;
+  min-width: 0;
+  max-height: 9rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.crm-composer__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.crm-composer__send {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.crm-composer__send svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.crm-composer__send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+@media (max-width: 480px) {
+  .crm-composer .crm-when {
+    padding: 0.3rem 0.4rem;
+  }
+}

@@ -3,7 +3,8 @@ import { supabase } from './supabase';
 // One shared broadcast channel per project, reference-counted across all hooks
 // (useTasks, useBoardItems, useProjects). The database emits a `db_change`
 // broadcast on topic `project:<id>` whenever that project's tasks, board items,
-// project row, or members change (see migration 030). Subscribers just refetch.
+// project row, or members change (see migration 030). Subscribers just refetch;
+// they are handed `{ table, op }` of the change, should only some tables matter.
 
 const entries = new Map(); // projectId -> { channel, handlers:Set<fn> }
 
@@ -13,10 +14,10 @@ function subscribeOne(projectId, handler) {
   if (!entry) {
     const channel = supabase.channel(`project:${projectId}`);
     entry = { channel, handlers: new Set() };
-    channel.on('broadcast', { event: 'db_change' }, () => {
+    channel.on('broadcast', { event: 'db_change' }, (message) => {
       entry.handlers.forEach((h) => {
         try {
-          h();
+          h(message?.payload);
         } catch {
           /* noop */
         }

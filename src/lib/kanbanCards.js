@@ -44,6 +44,12 @@ export function formatReminder(date, time) {
   return at ? `${formatDueDate(date)} • ${at}` : formatDueDate(date);
 }
 
+/** The times a reminder is most often set for, offered as chips. */
+export const REMIND_TIMES = ['09:00', '12:00', '15:00', '18:00', '21:00'];
+
+/** "27 окт." — a picked day among the chips. */
+export const shortDate = (dateStr) => new Date(`${dateStr}T12:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+
 /** 'overdue' once the day has passed, 'today', or 'future' — the colour of a reminder. */
 export function reminderState(date) {
   const today = toLocalDateString(new Date());
