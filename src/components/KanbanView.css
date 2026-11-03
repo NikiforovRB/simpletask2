@@ -268,6 +268,10 @@
   padding: 0 0.15rem 0.5rem;
 }
 
+.kanban-reminders--flush {
+  margin-top: 0;
+}
+
 .kanban-reminders__head {
   margin-bottom: 0.3rem;
   padding-left: 0.35rem;

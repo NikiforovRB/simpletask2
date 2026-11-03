@@ -22,12 +22,28 @@ export function phoneDigits(phone) {
 }
 
 /**
+ * A Telegram username however it was pasted — "@name", "t.me/name", a full
+ * link — down to the name itself. Empty when it is not one.
+ */
+export function telegramHandle(value) {
+  const s = String(value || '').trim()
+    .replace(/^(?:https?:\/\/)?(?:www\.)?(?:t\.me|telegram\.me)\//i, '')
+    .replace(/^@/, '')
+    .replace(/[/?#].*$/, '');
+  return /^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(s) ? s : '';
+}
+
+/**
  * Where a press on the contact of a client leads: the chat in its messenger,
- * or a call when no messenger is set. Max has no link that opens a chat by
- * number, so for it the number is copied and its web version opened, to be
- * pasted into the search there. Null when the card has no number.
+ * or a call when no messenger is set. In Telegram the username, when there is
+ * one, opens that very account; the number is the fallback. Max has no link
+ * that opens a chat by number, so for it the number is copied and its web
+ * version opened, to be pasted into the search there. Null when there is
+ * nothing to reach the client by.
  */
 export function contactAction(card) {
+  const handle = card?.messenger === 'telegram' ? telegramHandle(card.telegram) : '';
+  if (handle) return { kind: 'telegram', url: `https://t.me/${handle}`, title: `Написать @${handle} в Telegram` };
   const d = phoneDigits(card?.phone);
   if (!d) return null;
   switch (card.messenger) {

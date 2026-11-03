@@ -2070,3 +2070,8 @@ drop trigger if exists broadcast_kanban_touches_change on public.kanban_touches;
 create trigger broadcast_kanban_touches_change
   after insert or update or delete on public.kanban_touches
   for each row execute function public.broadcast_project_change();
+
+-- 073: Канбан CRM — никнейм клиента в Telegram
+
+alter table public.kanban_cards
+  add column if not exists telegram text not null default '';

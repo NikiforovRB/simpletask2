@@ -1103,6 +1103,7 @@ function DateColumn({
           <DayReminders
             cards={group.reminders}
             withDate={group.key === OVERDUE_KEY}
+            flush={group.cards.length === 0 && !composing}
             crm={!!settings.crm}
             onOpen={onOpenCard}
             onClear={onClearReminder}
@@ -1120,11 +1121,12 @@ function DateColumn({
  * the coloured dot of the reminder, its time, and the card it belongs to,
  * which a press opens. The cross takes the reminder off once it is dealt with.
  * On a CRM board these are the clients to get back to that day: the dot is the
- * circle that ticks the task off, and the cross gives way to the chat.
+ * box that ticks the task off, and the cross gives way to the chat. `flush`
+ * when the day has no cards above them to keep apart from.
  */
-function DayReminders({ cards, withDate, crm = false, onOpen, onClear, onDone }) {
+function DayReminders({ cards, withDate, flush = false, crm = false, onOpen, onClear, onDone }) {
   return (
-    <div className="kanban-reminders">
+    <div className={`kanban-reminders ${flush ? 'kanban-reminders--flush' : ''}`}>
       <div className="kanban-reminders__head">Напоминания</div>
       <ul className="kanban-reminders__list">
         {cards.map((card) => {

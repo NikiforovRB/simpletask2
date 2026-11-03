@@ -447,6 +447,42 @@ button.crm-stats__row:hover {
   outline: none;
 }
 
+.crm-contact__handle {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--bg-elev);
+}
+
+.crm-contact__handle:focus-within {
+  border-color: var(--accent);
+}
+
+.crm-contact__at {
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+
+.crm-contact__handle input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+.crm-contact__handle input:focus {
+  outline: none;
+}
+
 .crm-contact__kinds {
   display: flex;
   gap: 0.3rem;

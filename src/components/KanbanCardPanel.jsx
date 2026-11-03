@@ -8,7 +8,7 @@ import { getContainerIdForCard } from '../lib/dnd';
 import { KanbanReminderPicker } from './KanbanReminderPicker';
 import { CheckGlyph, ContactButton, CrmDoneForm, MessengerIcon, PhoneGlyph } from './KanbanCrm';
 import { TouchComposer, TouchHistory } from './KanbanTouches';
-import { MESSENGERS, callHref } from '../lib/crm';
+import { MESSENGERS, callHref, telegramHandle } from '../lib/crm';
 import {
   cardFill, cardLabels, formatDueDate, formatMoney, formatReminder, isOverdue, labelTextColor, moneyTotal,
   reminderState, withAlpha,
@@ -76,6 +76,7 @@ export function KanbanCardPanel({
   const [remindOpen, setRemindOpen] = useState(false);
   const remindBtnRef = useRef(null);
   const [phone, setPhone] = useState(card.phone || '');
+  const [telegram, setTelegram] = useState(card.telegram || '');
   // What is being typed into the history; ticking the reminder off takes it along.
   const [draft, setDraft] = useState('');
   const [doneOpen, setDoneOpen] = useState(false);
@@ -127,6 +128,13 @@ export function KanbanCardPanel({
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phone, cardId]);
+
+  useEffect(() => {
+    if (telegram === (card.telegram || '')) return undefined;
+    const t = setTimeout(() => onUpdateCard(cardId, { telegram }), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [telegram, cardId]);
 
   const cardTouches = useMemo(
     () => (crm ? touches.filter((t) => t.card_id === cardId) : []),
@@ -333,6 +341,27 @@ export function KanbanCardPanel({
                   );
                 })}
               </div>
+              {card.messenger === 'telegram' && (
+                <label className="crm-contact__handle">
+                  <span className="crm-contact__at" aria-hidden>@</span>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    value={telegram}
+                    placeholder="Никнейм в Telegram"
+                    aria-label="Никнейм в Telegram"
+                    onChange={(e) => setTelegram(e.target.value)}
+                    onBlur={() => {
+                      // "@name" or a pasted t.me link is kept as the bare name.
+                      const next = telegramHandle(telegram) || telegram.trim();
+                      if (next !== telegram) setTelegram(next);
+                      if (next !== (card.telegram || '')) onUpdateCard(cardId, { telegram: next });
+                    }}
+                  />
+                </label>
+              )}
             </div>
           )}
 

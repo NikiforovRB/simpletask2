@@ -1300,6 +1300,7 @@ export default function Dashboard() {
       remind_time: card.remind_time ?? null,
       phone: card.phone || '',
       messenger: card.messenger ?? null,
+      telegram: card.telegram || '',
     });
     if (!copy) return;
     const siblings = kanbanCards
