@@ -642,15 +642,18 @@ function KanbanCard({
         </div>
       )}
       {settings.crm ? (
-        // A client: the next touch, ticked off right here.
-        card.remind_date && (
+        // A client: the next touch, ticked off right here, and what the deal is worth.
+        (card.remind_date || card.amount != null) && (
           <div className="kanban-card__crm">
-            <div className={`kanban-card__remind kanban-card__remind--${reminderState(card.remind_date)}`}>
-              {overlay ? <span className="crm-check" aria-hidden /> : (
-                <CrmCheck onPick={(el) => onDoneReminder?.(el, card)} />
-              )}
-              {formatReminder(card.remind_date, card.remind_time)}
-            </div>
+            {card.remind_date && (
+              <div className={`kanban-card__remind kanban-card__remind--${reminderState(card.remind_date)}`}>
+                {overlay ? <span className="crm-check" aria-hidden /> : (
+                  <CrmCheck onPick={(el) => onDoneReminder?.(el, card)} />
+                )}
+                {formatReminder(card.remind_date, card.remind_time)}
+              </div>
+            )}
+            {card.amount != null && <span className="kanban-card__amount">{formatMoney(Number(card.amount))}</span>}
           </div>
         )
       ) : card.remind_date && (

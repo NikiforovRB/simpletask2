@@ -97,12 +97,26 @@
 }
 
 /* ---- The foot of a client card: the next touch and the contact ---- */
+/* The reminder on the left, the amount on the right; alone, or pushed onto a
+   line of its own when both do not fit, the amount starts at the left. */
 .kanban-card__crm {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
   margin-top: 0.5rem;
 }
 
 .kanban-card__crm .kanban-card__remind {
   margin-top: 0;
+}
+
+.kanban-card__amount {
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* ---- A client in the reminders of a day ---- */
@@ -480,6 +494,43 @@ button.crm-stats__row:hover {
 
 .crm-contact__handle input:focus {
   outline: none;
+}
+
+.crm-contact__amount {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--bg-elev);
+}
+
+.crm-contact__amount:focus-within {
+  border-color: var(--accent);
+}
+
+.crm-contact__amount input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-contact__amount input:focus {
+  outline: none;
+}
+
+.crm-contact__currency {
+  font-size: 0.875rem;
+  color: var(--text-dim);
 }
 
 .crm-contact__kinds {

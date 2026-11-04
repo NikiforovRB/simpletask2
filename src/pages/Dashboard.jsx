@@ -1301,6 +1301,7 @@ export default function Dashboard() {
       phone: card.phone || '',
       messenger: card.messenger ?? null,
       telegram: card.telegram || '',
+      amount: card.amount ?? null,
     });
     if (!copy) return;
     const siblings = kanbanCards

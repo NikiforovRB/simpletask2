@@ -142,6 +142,19 @@ export function formatMoney(n) {
   return `${moneyFormat.format(n)}\u00a0₽`;
 }
 
+/** The amount typed into a field — "15 000", "1500,50 ₽" — or null when there is none. */
+export function parseAmount(text) {
+  const clean = String(text ?? '').replace(/[\s\u00a0\u202f₽]|руб\.?|р\./gi, '').replace(',', '.');
+  if (!clean) return null;
+  const n = Number(clean);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+}
+
+/** An amount as it stands in a field: grouped by thousands, no currency sign. */
+export function amountText(n) {
+  return n === null || n === undefined || n === '' ? '' : moneyFormat.format(Number(n));
+}
+
 /** The labels of a board that a card actually wears, in board order. */
 export function cardLabels(card, boardLabels) {
   const ids = card?.label_ids || [];

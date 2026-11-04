@@ -11,7 +11,7 @@ import { TouchComposer, TouchHistory } from './KanbanTouches';
 import { MESSENGERS, callHref, telegramHandle } from '../lib/crm';
 import {
   cardFill, cardLabels, formatDueDate, formatMoney, formatReminder, isOverdue, labelTextColor, moneyTotal,
-  reminderState, withAlpha,
+  amountText, parseAmount, reminderState, withAlpha,
 } from '../lib/kanbanCards';
 import { DEFAULT_TASK_COLOR, toLocalDateString } from '../constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -77,6 +77,7 @@ export function KanbanCardPanel({
   const remindBtnRef = useRef(null);
   const [phone, setPhone] = useState(card.phone || '');
   const [telegram, setTelegram] = useState(card.telegram || '');
+  const [amount, setAmount] = useState(amountText(card.amount));
   // What is being typed into the history; ticking the reminder off takes it along.
   const [draft, setDraft] = useState('');
   const [doneOpen, setDoneOpen] = useState(false);
@@ -135,6 +136,19 @@ export function KanbanCardPanel({
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [telegram, cardId]);
+
+  const saveAmount = (text) => {
+    const next = parseAmount(text);
+    const was = card.amount == null ? null : Number(card.amount);
+    if (next !== was) onUpdateCard(cardId, { amount: next });
+    return next;
+  };
+
+  useEffect(() => {
+    const t = setTimeout(() => saveAmount(amount), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [amount, cardId]);
 
   const cardTouches = useMemo(
     () => (crm ? touches.filter((t) => t.card_id === cardId) : []),
@@ -362,6 +376,19 @@ export function KanbanCardPanel({
                   />
                 </label>
               )}
+              <label className="crm-contact__amount">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={amount}
+                  placeholder="Сумма"
+                  aria-label="Сумма"
+                  onChange={(e) => setAmount(e.target.value)}
+                  onBlur={() => setAmount(amountText(saveAmount(amount)))}
+                />
+                <span className="crm-contact__currency" aria-hidden>₽</span>
+              </label>
             </div>
           )}
 

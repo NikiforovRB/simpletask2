@@ -2075,3 +2075,8 @@ create trigger broadcast_kanban_touches_change
 
 alter table public.kanban_cards
   add column if not exists telegram text not null default '';
+
+-- 074: Канбан CRM — сумма сделки клиента
+
+alter table public.kanban_cards
+  add column if not exists amount numeric;
