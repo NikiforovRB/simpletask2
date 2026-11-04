@@ -115,6 +115,7 @@
 .kanban-card__amount {
   font-size: 0.75rem;
   color: var(--text-primary);
+  opacity: 0.5;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
