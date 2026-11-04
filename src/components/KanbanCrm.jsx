@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarPopover } from './CalendarPopover';
+import { ReminderTime } from './KanbanReminderPicker';
 import { MONTH_GENITIVE_RU, WEEKDAY_SHORT_RU, toLocalDateString } from '../constants';
 import { useAutoGrow } from '../hooks/useAutoGrow';
-import { REMIND_TIMES, dateColumnTitle, dueInDays, shortDate } from '../lib/kanbanCards';
+import { dateColumnTitle, dueInDays, shortDate } from '../lib/kanbanCards';
 import {
   clockOf, contactAction, doneByDay, enterSends, momentOf, shiftWeeks, weekOf,
 } from '../lib/crm';
@@ -209,39 +210,7 @@ export function CrmDoneForm({ initialNote = '', onSubmit, onBack }) {
         </div>
       )}
 
-      {next && (
-        <>
-          <div className="task-time__times">
-            <input
-              type="time"
-              step={300}
-              className="task-time__input"
-              value={at}
-              onChange={(e) => setAt(e.target.value)}
-              aria-label="Время"
-            />
-          </div>
-          <div className="task-time__chips">
-            <button
-              type="button"
-              className={`task-time__chip${!at ? ' task-time__chip--on' : ''}`}
-              onClick={() => setAt('')}
-            >
-              Без времени
-            </button>
-            {REMIND_TIMES.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className={`task-time__chip${at === t ? ' task-time__chip--on' : ''}`}
-                onClick={() => setAt(t)}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      {next && <ReminderTime at={at} onChange={setAt} />}
 
       <div className="task-time__actions">
         <button type="button" className="task-time__apply" onClick={submit}>

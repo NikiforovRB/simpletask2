@@ -13,6 +13,60 @@ const DAYS = [
 ];
 
 /**
+ * The time of a reminder, behind «Добавить время» until it is wanted; the
+ * fields then slide in. `open` shows them from the start — for a time already set.
+ */
+export function ReminderTime({ at, onChange, open = false }) {
+  const [shown, setShown] = useState(open);
+  return (
+    <>
+      {!shown && (
+        <button type="button" className="task-time__add" onClick={() => setShown(true)}>
+          <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
+            <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+          Добавить время
+        </button>
+      )}
+      <div className={`task-time__reveal${shown ? ' task-time__reveal--open' : ''}`} inert={!shown}>
+        <div className="task-time__reveal-inner">
+          <div className="task-time__label">Время</div>
+          <div className="task-time__times">
+            <input
+              type="time"
+              step={300}
+              className="task-time__input"
+              value={at}
+              onChange={(e) => onChange(e.target.value)}
+              aria-label="Время"
+            />
+          </div>
+          <div className="task-time__chips">
+            <button
+              type="button"
+              className={`task-time__chip${!at ? ' task-time__chip--on' : ''}`}
+              onClick={() => onChange('')}
+            >
+              Без времени
+            </button>
+            {REMIND_TIMES.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`task-time__chip${at === t ? ' task-time__chip--on' : ''}`}
+                onClick={() => onChange(t)}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/**
  * The reminder of a card: a day and, if it matters, a time. With a time the
  * app also sends a notification, so that is when it asks for the permission.
  * `onBack` is given inside the context menu, which the picker stands in for.
@@ -21,8 +75,6 @@ export function KanbanReminderPicker({ date, time, onApply, onClear, onBack }) {
   const [day, setDay] = useState(date || dueInDays(0));
   const [at, setAt] = useState(shortTime(time));
   const [pickerOpen, setPickerOpen] = useState(false);
-  // A reminder that already has a time shows it; otherwise the time waits behind a button.
-  const [timeOpen, setTimeOpen] = useState(!!time);
 
   const dayChips = DAYS.map((d) => ({ date: dueInDays(d.offset), label: d.label }));
   if (!dayChips.some((c) => c.date === day)) dayChips.push({ date: day, label: shortDate(day) });
@@ -75,48 +127,7 @@ export function KanbanReminderPicker({ date, time, onApply, onClear, onBack }) {
         </div>
       )}
 
-      {!timeOpen && (
-        <button type="button" className="task-time__add" onClick={() => setTimeOpen(true)}>
-          <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
-            <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-          </svg>
-          Добавить время
-        </button>
-      )}
-      <div className={`task-time__reveal${timeOpen ? ' task-time__reveal--open' : ''}`} inert={!timeOpen}>
-        <div className="task-time__reveal-inner">
-          <div className="task-time__label">Время</div>
-          <div className="task-time__times">
-            <input
-              type="time"
-              step={300}
-              className="task-time__input"
-              value={at}
-              onChange={(e) => setAt(e.target.value)}
-              aria-label="Время"
-            />
-          </div>
-          <div className="task-time__chips">
-            <button
-              type="button"
-              className={`task-time__chip${!at ? ' task-time__chip--on' : ''}`}
-              onClick={() => setAt('')}
-            >
-              Без времени
-            </button>
-            {REMIND_TIMES.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className={`task-time__chip${at === t ? ' task-time__chip--on' : ''}`}
-                onClick={() => setAt(t)}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <ReminderTime at={at} onChange={setAt} open={!!time} />
 
       <div className="task-time__actions">
         <button type="button" className="task-time__apply" onClick={apply} title={formatReminder(day, at)}>
