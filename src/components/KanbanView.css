@@ -1047,6 +1047,10 @@
 
 /* The month grid brings its own backdrop and padding, and a date picker reads
    better without an outline of its own. */
+.kanban-pop .calendar-popover__cell {
+  border-radius: 4px;
+}
+
 .kanban-pop--calendar {
   border: none;
   z-index: 205;

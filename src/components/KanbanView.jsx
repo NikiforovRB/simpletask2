@@ -144,17 +144,32 @@ export function Popover({ anchor, onClose, className = '', align = 'right', chil
     if (!box || !at) return undefined;
     const place = () => {
       const a = at.getBoundingClientRect();
+      // Taller than the window, it scrolls inside rather than off the screen.
+      const room = window.innerHeight - 16;
+      const tooTall = box.scrollHeight > room;
+      box.style.maxHeight = tooTall ? `${room}px` : '';
+      box.style.overflowY = tooTall ? 'auto' : '';
       const { offsetWidth: w, offsetHeight: h } = box;
       const wanted = align === 'left' ? a.left : a.right - w;
       box.style.left = `${Math.max(8, Math.min(wanted, window.innerWidth - w - 8))}px`;
+      // Under the button, else over it, else as low as it can go and still be whole.
       const below = a.bottom + 6;
-      box.style.top = `${below + h > window.innerHeight - 8 ? Math.max(8, a.top - h - 6) : below}px`;
+      const above = a.top - h - 6;
+      let top = Math.max(8, window.innerHeight - h - 8);
+      if (below + h <= window.innerHeight - 8) top = below;
+      else if (above >= 8) top = above;
+      box.style.top = `${top}px`;
       box.style.visibility = 'visible';
     };
     place();
+    // What is inside can grow on its own — a calendar opened in a picker —
+    // without the popover rendering again.
+    const grown = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null;
+    grown?.observe(box);
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
     return () => {
+      grown?.disconnect();
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };

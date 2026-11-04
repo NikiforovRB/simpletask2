@@ -269,6 +269,10 @@
   padding: 0.25rem 0;
 }
 
+.kanban-pop.kanban-remind-pop {
+  border: none;
+}
+
 .kanban-panel__money--on,
 .kanban-panel__money--on:hover {
   background: color-mix(in srgb, var(--accent) 18%, transparent);

@@ -129,7 +129,6 @@
   width: 270px;
 }
 
-.kanban-pop:has(> .crm-done),
 .kanban-menu:has(> .crm-done) {
   border: none;
 }
