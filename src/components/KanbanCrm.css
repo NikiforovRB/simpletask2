@@ -121,10 +121,6 @@
 }
 
 /* ---- A client in the reminders of a day ---- */
-.kanban-reminder--crm {
-  padding-left: 0.35rem;
-}
-
 .kanban-reminder--crm .kanban-reminder__main {
   padding-left: 0.45rem;
 }

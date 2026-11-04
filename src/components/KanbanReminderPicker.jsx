@@ -21,6 +21,8 @@ export function KanbanReminderPicker({ date, time, onApply, onClear, onBack }) {
   const [day, setDay] = useState(date || dueInDays(0));
   const [at, setAt] = useState(shortTime(time));
   const [pickerOpen, setPickerOpen] = useState(false);
+  // A reminder that already has a time shows it; otherwise the time waits behind a button.
+  const [timeOpen, setTimeOpen] = useState(!!time);
 
   const dayChips = DAYS.map((d) => ({ date: dueInDays(d.offset), label: d.label }));
   if (!dayChips.some((c) => c.date === day)) dayChips.push({ date: day, label: shortDate(day) });
@@ -74,35 +76,47 @@ export function KanbanReminderPicker({ date, time, onApply, onClear, onBack }) {
         </div>
       )}
 
-      <div className="task-time__label">Время</div>
-      <div className="task-time__times">
-        <input
-          type="time"
-          step={300}
-          className="task-time__input"
-          value={at}
-          onChange={(e) => setAt(e.target.value)}
-          aria-label="Время"
-        />
-      </div>
-      <div className="task-time__chips">
-        <button
-          type="button"
-          className={`task-time__chip${!at ? ' task-time__chip--on' : ''}`}
-          onClick={() => setAt('')}
-        >
-          Без времени
+      {!timeOpen && (
+        <button type="button" className="task-time__add" onClick={() => setTimeOpen(true)}>
+          <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
+            <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+          Добавить время
         </button>
-        {REMIND_TIMES.map((t) => (
-          <button
-            key={t}
-            type="button"
-            className={`task-time__chip${at === t ? ' task-time__chip--on' : ''}`}
-            onClick={() => setAt(t)}
-          >
-            {t}
-          </button>
-        ))}
+      )}
+      <div className={`task-time__reveal${timeOpen ? ' task-time__reveal--open' : ''}`} inert={!timeOpen}>
+        <div className="task-time__reveal-inner">
+          <div className="task-time__label">Время</div>
+          <div className="task-time__times">
+            <input
+              type="time"
+              step={300}
+              className="task-time__input"
+              value={at}
+              onChange={(e) => setAt(e.target.value)}
+              aria-label="Время"
+            />
+          </div>
+          <div className="task-time__chips">
+            <button
+              type="button"
+              className={`task-time__chip${!at ? ' task-time__chip--on' : ''}`}
+              onClick={() => setAt('')}
+            >
+              Без времени
+            </button>
+            {REMIND_TIMES.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`task-time__chip${at === t ? ' task-time__chip--on' : ''}`}
+                onClick={() => setAt(t)}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="task-time__actions">

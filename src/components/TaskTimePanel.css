@@ -123,6 +123,54 @@
   color: var(--text-dim);
 }
 
+.task-time__add {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+  padding: 0.2rem 0;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.task-time__add:hover {
+  color: var(--text-primary);
+}
+
+.task-time__add svg {
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+
+/* Grows out of nothing to its own height, so the fields slide in rather than jump. */
+.task-time__reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-top: -0.4rem;
+  transition: grid-template-rows 0.22s ease, opacity 0.22s ease, margin-top 0.22s ease;
+}
+
+.task-time__reveal--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 0;
+}
+
+.task-time__reveal-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .task-time__actions {
   display: flex;
   flex-direction: column;
