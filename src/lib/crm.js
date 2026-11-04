@@ -58,6 +58,40 @@ export function contactAction(card) {
   }
 }
 
+const fold = (s) => String(s || '').toLowerCase().replace(/ё/g, 'е');
+
+/** What the client search looks through, worked out once per change of the cards. */
+export function clientIndex(cards) {
+  return cards.map((card) => ({
+    card,
+    title: fold(card.title),
+    digits: phoneDigits(card.phone) || String(card.phone || '').replace(/\D/g, ''),
+  }));
+}
+
+/**
+ * Clients whose name holds the query, or whose phone does when the query is a
+ * number — "8 999", "+7 999", "999-12" all find +7 999 12…. Those whose name
+ * starts with it come first. Nothing for less than two characters.
+ */
+export function searchClients(index, query, limit = 30) {
+  const q = fold(query).trim();
+  if (q.length < 2) return [];
+  const isNumber = /^[\d\s+()-]+$/.test(q);
+  const qd = isNumber ? q.replace(/\D/g, '') : '';
+  const alt = qd.startsWith('8') ? `7${qd.slice(1)}` : '';
+  const first = [];
+  const rest = [];
+  for (const row of index) {
+    const at = row.title.indexOf(q);
+    const byPhone = qd.length >= 2 && row.digits && (row.digits.includes(qd) || (alt && row.digits.includes(alt)));
+    if (at === 0) first.push(row.card);
+    else if (at > 0 || byPhone) rest.push(row.card);
+    if (first.length >= limit) break;
+  }
+  return first.concat(rest).slice(0, limit);
+}
+
 /** A call to the client, whatever messenger they are in. */
 export function callHref(card) {
   const d = phoneDigits(card?.phone);

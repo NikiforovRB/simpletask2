@@ -773,17 +773,35 @@ button.crm-stats__row:hover {
 }
 
 .crm-composer {
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "when input send";
+  align-items: end;
   gap: 0.4rem;
 }
 
 .crm-composer .crm-when {
+  grid-area: when;
   margin-bottom: 0.2rem;
 }
 
+/* Too long for one line beside the buttons: the field takes the whole width
+   and the buttons go under it. */
+.crm-composer--stacked {
+  grid-template-areas:
+    "input input input"
+    "when . send";
+  align-items: center;
+}
+
+.crm-composer--stacked .crm-when {
+  justify-self: start;
+  margin-bottom: 0;
+}
+
 .crm-composer__input {
-  flex: 1;
+  grid-area: input;
+  width: 100%;
   min-width: 0;
   max-height: 9rem;
   padding: 0.45rem 0.6rem;
@@ -804,6 +822,7 @@ button.crm-stats__row:hover {
 }
 
 .crm-composer__send {
+  grid-area: send;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -833,4 +852,138 @@ button.crm-stats__row:hover {
   .crm-composer .crm-when {
     padding: 0.3rem 0.4rem;
   }
+}
+
+/* ---- Finding a client: beside the menu button in the header ---- */
+.crm-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.crm-search__btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #666666;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.crm-search__btn svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.crm-search__btn:hover,
+.crm-search--open .crm-search__btn {
+  color: var(--accent);
+}
+
+.crm-search__input {
+  width: 0;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--bg-elev);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  opacity: 0;
+  box-sizing: border-box;
+  transition: width 0.22s ease, opacity 0.22s ease, padding 0.22s ease;
+}
+
+.crm-search--open .crm-search__input {
+  width: min(16rem, calc(100vw - 7rem));
+  padding: 0 0.65rem;
+  opacity: 1;
+}
+
+.crm-search__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.crm-search__input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.crm-search__results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: calc(2.25rem + 0.35rem);
+  z-index: 60;
+  width: min(22rem, calc(100vw - 4rem));
+  max-height: min(60vh, 24rem);
+  overflow-y: auto;
+  padding: 0.25rem;
+  border-radius: 10px;
+  background: var(--bg-surface-2);
+  box-shadow: var(--shadow-elev);
+  box-sizing: border-box;
+}
+
+.crm-search__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.crm-search__row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.4rem 0.55rem;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.crm-search__row--active {
+  background: var(--bg-hover-strong);
+}
+
+.crm-search__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-search__name mark {
+  background: none;
+  color: var(--accent);
+}
+
+.crm-search__meta {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-search__empty {
+  padding: 0.5rem 0.55rem;
+  font-size: 0.8125rem;
+  color: var(--text-dim);
 }

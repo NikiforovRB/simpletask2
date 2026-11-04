@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Popover } from './KanbanView';
 import { CheckGlyph, TouchWhenPicker } from './KanbanCrm';
 import { useAutoGrow } from '../hooks/useAutoGrow';
@@ -6,6 +6,16 @@ import { clockOf, dayHeading, enterSends, touchDay } from '../lib/crm';
 
 /** "Вчера • 18:05". */
 const whenLabel = (iso) => `${dayHeading(touchDay({ touched_at: iso }))} • ${clockOf(iso)}`;
+
+let ruler = null;
+/** Whether `text` goes into `width` pixels on one line, in the font of `el`. */
+function fitsOnALine(el, text, width) {
+  if (text.includes('\n')) return false;
+  ruler ??= document.createElement('canvas').getContext('2d');
+  const s = getComputedStyle(el);
+  ruler.font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+  return ruler.measureText(text).width <= width;
+}
 
 const ClockGlyph = () => (
   <svg viewBox="0 0 16 16" aria-hidden>
@@ -147,21 +157,60 @@ function TouchEditor({ touch, onSave, onDelete, onCancel }) {
 export function TouchComposer({ text, onText, onSubmit }) {
   const [when, setWhen] = useState(null);
   const [whenOpen, setWhenOpen] = useState(false);
+  const [long, setLong] = useState(false);
+  const formRef = useRef(null);
   const whenRef = useRef(null);
+  const sendRef = useRef(null);
   const inputRef = useAutoGrow(text);
+  // Text that would not fit beside the buttons puts them under the field.
+  // Whether it fits is measured against the narrow field, not the one on
+  // screen, so the line never flips back and forth at the edge.
+  const stacked = long && text !== '';
+
+  const tooLong = (value) => {
+    const form = formRef.current;
+    const input = inputRef.current;
+    if (!value || !form || !input || !whenRef.current || !sendRef.current) return false;
+    const s = getComputedStyle(input);
+    const gap = parseFloat(getComputedStyle(form).columnGap) || 0;
+    const room = form.clientWidth - whenRef.current.offsetWidth - sendRef.current.offsetWidth - 2 * gap
+      - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight)
+      - parseFloat(s.borderLeftWidth) - parseFloat(s.borderRightWidth) - 2;
+    return !fitsOnALine(input, value, room);
+  };
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => setLong(tooLong(inputRef.current?.value)));
+    ro.observe(form);
+    if (whenRef.current) ro.observe(whenRef.current);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The field changes width with the layout, so its height is worked out again.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [stacked, inputRef]);
 
   const submit = () => {
     const body = text.trim();
     if (!body) return;
     onSubmit({ body, touched_at: when || new Date().toISOString() });
     onText('');
+    setLong(false);
     setWhen(null);
     inputRef.current?.focus();
   };
 
   return (
     <form
-      className="crm-composer"
+      ref={formRef}
+      className={`crm-composer ${stacked ? 'crm-composer--stacked' : ''}`}
       onSubmit={(e) => {
         e.preventDefault();
         submit();
@@ -202,7 +251,10 @@ export function TouchComposer({ text, onText, onSubmit }) {
         maxLength={2000}
         placeholder="Новое касание…"
         aria-label="Новое касание"
-        onChange={(e) => onText(e.target.value)}
+        onChange={(e) => {
+          onText(e.target.value);
+          setLong(tooLong(e.target.value));
+        }}
         onKeyDown={(e) => {
           if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing || !enterSends()) return;
           e.preventDefault();
@@ -210,6 +262,7 @@ export function TouchComposer({ text, onText, onSubmit }) {
         }}
       />
       <button
+        ref={sendRef}
         type="submit"
         className="crm-composer__send"
         disabled={!text.trim()}

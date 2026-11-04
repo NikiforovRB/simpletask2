@@ -34,7 +34,7 @@ export function KanbanReminderPicker({ date, time, onApply, onClear, onBack }) {
 
   return (
     <div
-      className="task-time"
+      className="task-time task-time--remind"
       onKeyDown={(e) => {
         if (e.key === 'Enter') { e.preventDefault(); apply(); }
       }}
@@ -48,7 +48,6 @@ export function KanbanReminderPicker({ date, time, onApply, onClear, onBack }) {
         <span className="task-time__title">Напоминание</span>
       </div>
 
-      <div className="task-time__label">День</div>
       <div className="task-time__chips">
         {dayChips.map((c) => (
           <button

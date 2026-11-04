@@ -58,6 +58,7 @@ import { dueCount, planItems } from '../lib/girls';
 import { BoardView } from '../components/BoardView';
 import { KanbanView } from '../components/KanbanView';
 import { KanbanCardPanel } from '../components/KanbanCardPanel';
+import { CrmSearch } from '../components/CrmSearch';
 import { MindMapView } from '../components/MindMapView';
 import { GoalPlanView } from '../components/GoalPlanView';
 import { CalendarView } from '../components/CalendarView';
@@ -1228,6 +1229,10 @@ export default function Dashboard() {
   );
   // The touches of the CRM board on screen: its clients' histories and the daily count.
   const crmBoardId = activeKanbanBoard?.kanban_crm ? activeKanbanBoard.id : null;
+  const crmCards = useMemo(
+    () => (crmBoardId ? kanbanCards.filter((c) => c.board_id === crmBoardId) : []),
+    [crmBoardId, kanbanCards],
+  );
   const {
     touches: kanbanTouches,
     addTouch: addKanbanTouch,
@@ -1915,6 +1920,9 @@ export default function Dashboard() {
             >
               <img src={hasHover && menuHover ? menuNavIcon : menuIcon} alt="" />
             </button>
+            {crmBoardId && (
+              <CrmSearch key={crmBoardId} cards={crmCards} columns={kanbanColumns} onOpen={setOpenCardId} />
+            )}
             {viewMode === 'board' && (
               <div
                 ref={setBoardHeaderLeftSlot}

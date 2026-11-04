@@ -7,6 +7,12 @@
   box-sizing: border-box;
 }
 
+/* Wide enough for Сегодня, Завтра, Послезавтра and the calendar in one row. */
+.task-time--remind {
+  width: 300px;
+  max-width: calc(100vw - 16px);
+}
+
 .task-time__head {
   display: flex;
   align-items: center;
