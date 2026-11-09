@@ -215,6 +215,21 @@
   object-fit: contain;
 }
 
+/* Drawn in place rather than taken from a file: grey like the icons beside it, blue under the pointer. */
+.kanban-column__icon-btn--glyph {
+  color: #666666;
+  transition: color 0.15s ease;
+}
+
+.kanban-column__icon-btn--glyph:hover {
+  color: var(--accent);
+}
+
+.kanban-column__icon-btn--glyph svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
 /* Count, colour and buttons live over the tail of the title and only come out
    when the pointer is on the head of the column, so a resting board is just
    titles and cards. The page background masks whatever they cover. */

@@ -1026,7 +1026,7 @@ function KanbanColumn({
 function DateColumn({
   group, width, settings, tasks, getSubtasks, boardLabels,
   onToggleTask, onOpenCard, onAddCard, onCardMenu, onToggleFold, onClearReminder, onDoneReminder, hasHover,
-  editingCardId, onTitleCommit, onEditDone,
+  editingCardId, onTitleCommit, onEditDone, onMoveToToday,
 }) {
   const id = dateColumnId(group.key);
   const droppable = group.key !== OVERDUE_KEY;
@@ -1055,6 +1055,20 @@ function DateColumn({
         <span className="kanban-column__title kanban-column__title--static">{group.title}</span>
         <span className="kanban-column__tools">
           {group.cards.length > 0 && <span className="kanban-column__count">{group.cards.length}</span>}
+          {onMoveToToday && (group.cards.length > 0 || group.reminders.length > 0) && (
+            <button
+              type="button"
+              className="kanban-column__icon-btn kanban-column__icon-btn--glyph"
+              onClick={() => onMoveToToday(group)}
+              aria-label="Перенести все просроченные на сегодня"
+              title="Перенести все просроченные на сегодня"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+                <path d="M3.5 10h17M8 3v4M16 3v4M9 15.25h6M13 13.25l2 2-2 2" />
+              </svg>
+            </button>
+          )}
           {canAdd && (
             <button
               type="button"
@@ -2047,6 +2061,11 @@ export function KanbanView({
     [crm, touches, today],
   );
   const openDone = (anchorEl, card) => setDoneFor({ cardId: card.id, anchor: { current: anchorEl } });
+  // Everything past due, cards and reminders alike, is put on today; a reminder keeps its time.
+  const moveOverdueToToday = (group) => {
+    group.reminders.forEach((c) => updateCard(c.id, { remind_date: today }));
+    group.cards.forEach((c) => updateCard(c.id, { due_date: today }));
+  };
   const doneCard = doneFor ? cards.find((c) => c.id === doneFor.cardId && c.remind_date) : null;
   const width = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, board.kanban_column_width ?? 280));
 
@@ -2406,6 +2425,7 @@ export function KanbanView({
               editingCardId={editingCardId}
               onTitleCommit={(cardId, title) => updateCard(cardId, { title })}
               onEditDone={() => setEditingCardId(null)}
+              onMoveToToday={crm && group.key === OVERDUE_KEY ? moveOverdueToToday : undefined}
             />
           ))}
           {dateColumns.length > 0 && <div className="kanban__split" aria-hidden />}

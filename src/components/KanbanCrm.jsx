@@ -53,13 +53,7 @@ export function MessengerIcon({ kind }) {
       </svg>
     );
   }
-  if (kind === 'max') {
-    return (
-      <svg className="crm-icon" viewBox="5.2 5.4 13.6 13.6" aria-hidden>
-        <path d="M12 6.4a5.6 5.6 0 0 0-4.6 8.8l-.6 2.6 2.7-.7A5.6 5.6 0 1 0 12 6.4z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      </svg>
-    );
-  }
+  if (kind === 'max') return <span className="crm-icon crm-icon--max" aria-hidden />;
   return (
     <span className="crm-icon crm-icon--phone">
       <PhoneGlyph />
