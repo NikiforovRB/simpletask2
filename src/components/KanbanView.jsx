@@ -2393,12 +2393,10 @@ export function KanbanView({
               onToggleTask={onToggleTask}
               onOpenCard={onOpenCard}
               // A card planned for a day still has to live somewhere on the
-              // board, and the first column is where work starts. A client
-              // added to a day is one to get in touch with that day.
+              // board, and the first column is where work starts. On a CRM
+              // board too it is a card of that day, shown in its column.
               onAddCard={boardColumns.length > 0
-                ? (day, title) => addCard(board.id, boardColumns[0].id, crm
-                  ? { title, remind_date: day, atStart }
-                  : { title, due_date: day, atStart })
+                ? (day, title) => addCard(board.id, boardColumns[0].id, { title, due_date: day, atStart })
                 : null}
               onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
               onToggleFold={(cardId, collapsed) => updateCard(cardId, { collapsed })}
