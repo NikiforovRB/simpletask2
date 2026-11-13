@@ -999,3 +999,228 @@ button.crm-stats__row:hover {
   font-size: 0.8125rem;
   color: var(--text-dim);
 }
+
+/* The stage of the funnel in the card panel: a column title over its strip,
+   and the list of every column dropping out from under it. */
+.crm-stage {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin-bottom: 0.9rem;
+}
+
+.crm-stage__trigger {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 15rem;
+  max-width: 100%;
+  padding: 0.45rem 0.65rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--bg-elev);
+  color: var(--text-primary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.crm-stage__trigger:hover {
+  background: var(--bg-hover-strong);
+}
+
+.crm-stage__trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.crm-stage--open .crm-stage__trigger {
+  border-color: var(--border-strong);
+}
+
+.crm-stage__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.crm-stage__title,
+.crm-stage__option-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+}
+
+.crm-stage__title {
+  animation: crm-stage-title-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.crm-stage__title--none {
+  color: var(--text-dim);
+}
+
+@keyframes crm-stage-title-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+
+.crm-stage__chevron {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.18s ease;
+}
+
+.crm-stage__trigger:hover .crm-stage__chevron,
+.crm-stage--open .crm-stage__chevron {
+  color: var(--text-primary);
+}
+
+.crm-stage--open .crm-stage__chevron {
+  transform: rotate(180deg);
+}
+
+/* Height 2px, as under the title of the column itself; drawn anew from the
+   left whenever the stage changes. */
+.crm-stage__strip {
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--stage);
+  transform-origin: left center;
+}
+
+.crm-stage__trigger .crm-stage__strip {
+  animation: crm-stage-strip-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes crm-stage-strip-in {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.crm-stage__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(24rem, calc(100vw - 2rem));
+  max-height: 19rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-elev);
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(0.98);
+  transform-origin: top left;
+  transition:
+    opacity 0.16s ease,
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    visibility 0s linear 0.2s;
+}
+
+.crm-stage--open .crm-stage__menu {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1),
+    visibility 0s;
+}
+
+.crm-stage__option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem 0.5rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: background 0.15s ease, color 0.15s ease, opacity 0.12s ease, transform 0.12s ease;
+}
+
+.crm-stage--open .crm-stage__option {
+  opacity: 1;
+  transform: none;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    opacity 0.22s ease calc(var(--i) * 22ms + 40ms),
+    transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) calc(var(--i) * 22ms + 40ms);
+}
+
+.crm-stage__option:hover,
+.crm-stage__option:focus-visible {
+  outline: none;
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.crm-stage__option--on {
+  color: var(--text-strong);
+}
+
+.crm-stage__option .crm-stage__strip {
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+
+.crm-stage__option:hover .crm-stage__strip,
+.crm-stage__option--on .crm-stage__strip {
+  opacity: 1;
+}
+
+.crm-stage__option svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.crm-stage__option-title {
+  font-size: 0.875rem;
+}
+
+.crm-stage__menu li + li {
+  margin-top: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crm-stage__menu,
+  .crm-stage__option,
+  .crm-stage--open .crm-stage__menu,
+  .crm-stage--open .crm-stage__option,
+  .crm-stage__chevron {
+    transition-duration: 0.01s;
+    transition-delay: 0s;
+  }
+
+  .crm-stage__title,
+  .crm-stage__trigger .crm-stage__strip {
+    animation: none;
+  }
+}

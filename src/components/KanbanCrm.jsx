@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarPopover } from './CalendarPopover';
 import { ReminderTime } from './KanbanReminderPicker';
 import { MONTH_GENITIVE_RU, WEEKDAY_SHORT_RU, toLocalDateString } from '../constants';
 import { useAutoGrow } from '../hooks/useAutoGrow';
-import { dateColumnTitle, dueInDays, shortDate } from '../lib/kanbanCards';
+import { DEFAULT_COLUMN_COLOR, dateColumnTitle, dueInDays, shortDate } from '../lib/kanbanCards';
 import {
   clockOf, contactAction, doneByDay, enterSends, momentOf, shiftWeeks, weekOf,
 } from '../lib/crm';
@@ -112,6 +112,102 @@ export function CrmCheck({ onPick, className = '' }) {
     >
       <CheckGlyph />
     </button>
+  );
+}
+
+const stageColor = (column) => column?.accent_color || DEFAULT_COLUMN_COLOR;
+
+/**
+ * The column of the board a client sits in, shown the way the column shows
+ * itself — its title over its strip — and changed from a list of all of them.
+ */
+export function CrmStagePicker({ columns, columnId, onPick }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+  const listRef = useRef(null);
+  const current = columns.find((c) => c.id === columnId) || null;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      if (!rootRef.current?.contains(e.target)) setOpen(false);
+    };
+    // Captured before the panel hears it: Escape closes the list, not the panel.
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    window.addEventListener('keydown', onKey, true);
+    const list = listRef.current;
+    (list?.querySelector('[aria-selected="true"]') || list?.querySelector('button'))?.focus({ preventScroll: true });
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+
+  const onListKey = (e) => {
+    const items = [...(listRef.current?.querySelectorAll('button') || [])];
+    const at = items.indexOf(document.activeElement);
+    const go = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[e.key];
+    if (go === undefined || !items.length) return;
+    e.preventDefault();
+    items[(go + items.length) % items.length].focus();
+  };
+
+  return (
+    <div className={`crm-stage ${open ? 'crm-stage--open' : ''}`} ref={rootRef}>
+      <button
+        type="button"
+        ref={triggerRef}
+        className="crm-stage__trigger"
+        style={{ '--stage': current ? stageColor(current) : 'var(--border-strong)' }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="crm-stage__row">
+          <span key={current?.id ?? 'none'} className={`crm-stage__title ${current ? '' : 'crm-stage__title--none'}`}>
+            {current ? current.title || 'Без названия' : 'Не выбран'}
+          </span>
+          <svg className="crm-stage__chevron" viewBox="0 0 16 16" aria-hidden>
+            <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+        <span key={`strip-${current?.id ?? 'none'}`} className="crm-stage__strip" aria-hidden />
+      </button>
+      <ul className="crm-stage__menu" role="listbox" aria-label="Этап воронки" ref={listRef} inert={!open} onKeyDown={onListKey}>
+        {columns.map((c, i) => {
+          const on = c.id === columnId;
+          return (
+            <li key={c.id} role="none">
+              <button
+                type="button"
+                role="option"
+                aria-selected={on}
+                className={`crm-stage__option ${on ? 'crm-stage__option--on' : ''}`}
+                style={{ '--stage': stageColor(c), '--i': Math.min(i, 10) }}
+                onClick={() => {
+                  setOpen(false);
+                  triggerRef.current?.focus({ preventScroll: true });
+                  onPick(c.id);
+                }}
+              >
+                <span className="crm-stage__row">
+                  <span className="crm-stage__option-title">{c.title || 'Без названия'}</span>
+                  {on && <CheckGlyph />}
+                </span>
+                <span className="crm-stage__strip" aria-hidden />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

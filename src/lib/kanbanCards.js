@@ -1,5 +1,8 @@
 import { MONTH_GENITIVE_RU, WEEKDAY_SHORT_RU, toLocalDateString } from '../constants';
 
+/** The strip of a column that was never given a colour of its own. */
+export const DEFAULT_COLUMN_COLOR = '#5a86ee';
+
 /** "20 августа, чт", with the year added once it is not the current one. */
 export function formatDueDate(dateStr) {
   if (!dateStr) return '';

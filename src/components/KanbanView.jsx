@@ -21,6 +21,7 @@ import { TASK_COLORS } from '../constants';
 import {
   DATE_FILTERS,
   DAY_ACCENT,
+  DEFAULT_COLUMN_COLOR,
   OVERDUE_ACCENT,
   OVERDUE_KEY,
   TODAY_ACCENT,
@@ -86,7 +87,6 @@ import notificationIcon from '../assets/notification.svg';
 import checkIcon from '../assets/check.svg';
 import './KanbanView.css';
 
-const DEFAULT_COLUMN_COLOR = '#5a86ee';
 const MIN_COLUMN_WIDTH = 180;
 const MAX_COLUMN_WIDTH = 640;
 const COLUMN_WIDTH_STEP = 10;

@@ -6,7 +6,7 @@ import { ColorPalette, LabelPicker, Popover } from './KanbanView';
 import { CalendarPopover } from './CalendarPopover';
 import { getContainerIdForCard } from '../lib/dnd';
 import { KanbanReminderPicker } from './KanbanReminderPicker';
-import { CheckGlyph, ContactButton, CrmDoneForm, MessengerIcon, PhoneGlyph } from './KanbanCrm';
+import { CheckGlyph, ContactButton, CrmDoneForm, CrmStagePicker, MessengerIcon, PhoneGlyph } from './KanbanCrm';
 import { TouchComposer, TouchHistory } from './KanbanTouches';
 import { MESSENGERS, callHref, telegramHandle } from '../lib/crm';
 import {
@@ -60,6 +60,7 @@ export function KanbanCardPanel({
   editingTaskId, onEditingTaskConsumed,
   onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit,
   crm = false, touches = [], onAddTouch, onUpdateTouch, onDeleteTouch, onCompleteReminder,
+  columns = [], onMoveCard,
 }) {
   const hasHover = useMediaQuery('(hover: hover)');
   const [closing, setClosing] = useState(false);
@@ -321,6 +322,23 @@ export function KanbanCardPanel({
             onChange={(e) => setTitle(e.target.value)}
             onBlur={() => onUpdateCard(cardId, { title })}
           />
+
+          {crm && columns.length > 0 && (
+            <>
+              <div className="kanban-panel__section-title">Этап воронки</div>
+              <CrmStagePicker
+                columns={columns}
+                columnId={card.column_id}
+                onPick={(columnId) => {
+                  // A dated card sits in its day column; sent to a stage, it gives
+                  // the date up so it really is there, on top.
+                  if (columnId === card.column_id && !card.due_date) return;
+                  onMoveCard?.(cardId, columnId, 0);
+                  if (card.due_date) onUpdateCard(cardId, { due_date: null });
+                }}
+              />
+            </>
+          )}
 
           {crm && (
             <div className="crm-contact">

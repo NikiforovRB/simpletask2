@@ -1285,6 +1285,13 @@ export default function Dashboard() {
       : []),
     [openCard, kanbanLabels],
   );
+  const openCardBoardId = openCard?.board_id;
+  const openCardColumns = useMemo(
+    () => (openCardBoardId
+      ? kanbanColumns.filter((c) => c.board_id === openCardBoardId).sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+      : []),
+    [openCardBoardId, kanbanColumns],
+  );
 
   /**
    * A copy of a card next to the original, with its task list copied too:
@@ -2903,6 +2910,8 @@ export default function Dashboard() {
           key={openCard.id}
           card={openCard}
           crm={!!crmBoardId && openCard.board_id === crmBoardId}
+          columns={openCardColumns}
+          onMoveCard={moveKanbanCard}
           touches={kanbanTouches}
           onAddTouch={addKanbanTouch}
           onUpdateTouch={updateKanbanTouch}
