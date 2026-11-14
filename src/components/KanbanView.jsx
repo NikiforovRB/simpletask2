@@ -636,7 +636,7 @@ function KanbanCard({
       )}
       {/* Folded, or with the task list turned off: how far along it is, or
           what it all comes to. */}
-      {!settings.crm && (folded || !settings.showTasks) && cardTasks.length > 0 && (
+      {(!settings.crm || card.due_date) && (folded || !settings.showTasks) && cardTasks.length > 0 && (
         <div className="kanban-card__meta">
           {money ? `Итого ${formatMoney(total)}` : `${doneCount} из ${cardTasks.length}`}
         </div>
@@ -1259,6 +1259,10 @@ function CardContextMenu({
   const [remindOpen, setRemindOpen] = useState(false);
   const [doneOpen, setDoneOpen] = useState(false);
   const pickerRef = useRef(null);
+  // On a CRM board a card with a date is a task of that day, not a client: it
+  // gets its date to change and none of the touches.
+  const dayTask = crm && !!card.due_date;
+  const client = crm && !dayTask;
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -1433,8 +1437,8 @@ function CardContextMenu({
       )}
       <div className="dashboard__context-menu-separator" aria-hidden />
 
-      {crm && card.remind_date && item(checkIcon, 'Выполнено…', () => { showFlyout(null); setDoneOpen(true); })}
-      {!crm && branch('due', calIcon, card.due_date ? `Срок: ${formatDueDate(card.due_date)}` : 'Срок…', (
+      {client && card.remind_date && item(checkIcon, 'Выполнено…', () => { showFlyout(null); setDoneOpen(true); })}
+      {!client && branch('due', calIcon, card.due_date ? `${dayTask ? 'Дата' : 'Срок'}: ${formatDueDate(card.due_date)}` : 'Срок…', (
         <>
           {row(starIcon, 'Сегодня', () => { onUpdate(card.id, { due_date: dueInDays(0) }); onClose(); })}
           {row(zavtraIcon, 'Завтра', () => { onUpdate(card.id, { due_date: dueInDays(1) }); onClose(); })}
@@ -1448,7 +1452,7 @@ function CardContextMenu({
             <img src={calendarIcon} alt="" className="dashboard__context-menu-item-icon" />
             <span>Указать дату</span>
           </button>
-          {card.due_date && row(closeIcon, 'Убрать срок', () => { onUpdate(card.id, { due_date: null }); onClose(); })}
+          {card.due_date && !dayTask && row(closeIcon, 'Убрать срок', () => { onUpdate(card.id, { due_date: null }); onClose(); })}
           {pickerOpen && (
             <Popover
               anchor={pickerRef}
@@ -1465,7 +1469,7 @@ function CardContextMenu({
           )}
         </>
       ))}
-      {item(
+      {!dayTask && item(
         notificationIcon,
         card.remind_date
           ? `${crm ? 'Следующее' : 'Напоминание'}: ${formatReminder(card.remind_date, card.remind_time)}`

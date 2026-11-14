@@ -59,9 +59,13 @@ export function KanbanCardPanel({
   onToggle, onUpdate, onDelete, onAddSubtask, onAddTask, onTaskContextMenu,
   editingTaskId, onEditingTaskConsumed,
   onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit,
-  crm = false, touches = [], onAddTouch, onUpdateTouch, onDeleteTouch, onCompleteReminder,
+  crm: crmBoard = false, touches = [], onAddTouch, onUpdateTouch, onDeleteTouch, onCompleteReminder,
   columns = [], onMoveCard,
 }) {
+  // On a CRM board only a card without a date is a client. One with a date was
+  // put straight into a day: a task for that day, kept like a card of any board.
+  const crm = crmBoard && !card.due_date;
+  const dayTask = crmBoard && !!card.due_date;
   const hasHover = useMediaQuery('(hover: hover)');
   const [closing, setClosing] = useState(false);
   const [title, setTitle] = useState(card.title || '');
@@ -421,7 +425,7 @@ export function KanbanCardPanel({
                 <img src={calIcon} alt="" />
                 {card.due_date ? formatDueDate(card.due_date) : 'Без срока'}
               </button>
-              {card.due_date && (
+              {card.due_date && !dayTask && (
                 <button
                   type="button"
                   className="kanban-panel__chip-clear"
@@ -430,44 +434,50 @@ export function KanbanCardPanel({
                   Убрать срок
                 </button>
               )}
-              <button
-                type="button"
-                ref={remindBtnRef}
-                className={`kanban-panel__due kanban-panel__remind ${card.remind_date ? `kanban-panel__remind--${reminderState(card.remind_date)}` : ''}`}
-                onClick={() => setRemindOpen((v) => !v)}
-                title="Напоминание"
-              >
-                {card.remind_date ? <span className="kanban-panel__remind-dot" aria-hidden /> : <img src={notificationIcon} alt="" />}
-                {card.remind_date ? formatReminder(card.remind_date, card.remind_time) : 'Напоминание'}
-              </button>
-              {remindOpen && (
-                <Popover anchor={remindBtnRef} align="left" onClose={() => setRemindOpen(false)} className="kanban-remind-pop">
-                  <KanbanReminderPicker
-                    date={card.remind_date}
-                    time={card.remind_time}
-                    onApply={({ date, time }) => {
-                      onUpdateCard(cardId, { remind_date: date, remind_time: time });
-                      setRemindOpen(false);
-                    }}
-                    onClear={card.remind_date
-                      ? () => {
-                        onUpdateCard(cardId, { remind_date: null, remind_time: null });
-                        setRemindOpen(false);
-                      }
-                      : null}
-                  />
-                </Popover>
+              {/* A task of a CRM day has its day and nothing more: reminders
+                  there are the next touches of clients. */}
+              {!dayTask && (
+                <>
+                  <button
+                    type="button"
+                    ref={remindBtnRef}
+                    className={`kanban-panel__due kanban-panel__remind ${card.remind_date ? `kanban-panel__remind--${reminderState(card.remind_date)}` : ''}`}
+                    onClick={() => setRemindOpen((v) => !v)}
+                    title="Напоминание"
+                  >
+                    {card.remind_date ? <span className="kanban-panel__remind-dot" aria-hidden /> : <img src={notificationIcon} alt="" />}
+                    {card.remind_date ? formatReminder(card.remind_date, card.remind_time) : 'Напоминание'}
+                  </button>
+                  {remindOpen && (
+                    <Popover anchor={remindBtnRef} align="left" onClose={() => setRemindOpen(false)} className="kanban-remind-pop">
+                      <KanbanReminderPicker
+                        date={card.remind_date}
+                        time={card.remind_time}
+                        onApply={({ date, time }) => {
+                          onUpdateCard(cardId, { remind_date: date, remind_time: time });
+                          setRemindOpen(false);
+                        }}
+                        onClear={card.remind_date
+                          ? () => {
+                            onUpdateCard(cardId, { remind_date: null, remind_time: null });
+                            setRemindOpen(false);
+                          }
+                          : null}
+                      />
+                    </Popover>
+                  )}
+                  <button
+                    type="button"
+                    className={`kanban-panel__due kanban-panel__money ${money ? 'kanban-panel__money--on' : ''}`}
+                    onClick={() => onUpdateCard(cardId, { money_mode: !money })}
+                    aria-pressed={money}
+                    title="Суммы вместо галочек и итог под списком. Сумма пишется в начале задачи: «249 • MMB»"
+                  >
+                    <img src={money ? moneyNavIcon : moneyIcon} alt="" />
+                    Деньги
+                  </button>
+                </>
               )}
-              <button
-                type="button"
-                className={`kanban-panel__due kanban-panel__money ${money ? 'kanban-panel__money--on' : ''}`}
-                onClick={() => onUpdateCard(cardId, { money_mode: !money })}
-                aria-pressed={money}
-                title="Суммы вместо галочек и итог под списком. Сумма пишется в начале задачи: «249 • MMB»"
-              >
-                <img src={money ? moneyNavIcon : moneyIcon} alt="" />
-                Деньги
-              </button>
               {dueOpen && (
                 <Popover anchor={dueBtnRef} align="left" onClose={() => setDueOpen(false)} className="kanban-due-pop kanban-pop--calendar">
                   <CalendarPopover
@@ -486,16 +496,18 @@ export function KanbanCardPanel({
                     >
                       Сегодня
                     </button>
-                    <button
-                      type="button"
-                      className="kanban-due-pop__action kanban-due-pop__action--clear"
-                      onClick={() => {
-                        onUpdateCard(cardId, { due_date: null });
-                        setDueOpen(false);
-                      }}
-                    >
-                      Без срока
-                    </button>
+                    {!dayTask && (
+                      <button
+                        type="button"
+                        className="kanban-due-pop__action kanban-due-pop__action--clear"
+                        onClick={() => {
+                          onUpdateCard(cardId, { due_date: null });
+                          setDueOpen(false);
+                        }}
+                      >
+                        Без срока
+                      </button>
+                    )}
                   </div>
                 </Popover>
               )}
