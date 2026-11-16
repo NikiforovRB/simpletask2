@@ -19,6 +19,14 @@ const byDeletedAt = (a, b) => Date.parse(b.deleted_at) - Date.parse(a.deleted_at
 /** How long a deleted card is kept before it is really gone. */
 export const ARCHIVE_DAYS = 30;
 const ARCHIVE_MS = ARCHIVE_DAYS * 24 * 60 * 60 * 1000;
+/**
+ * Every row written is announced twice (postgres_changes and the project
+ * broadcast), and a move rewrites the places of whole columns: the boards are
+ * read back once things have gone quiet for this long, not once per row.
+ */
+const SYNC_DELAY = 300;
+/** The tables of the boards; touches have a hook of their own. */
+const BOARD_TABLES = new Set(['kanban_columns', 'kanban_cards', 'kanban_labels']);
 
 export function useKanban(boardIds) {
   const { user } = useAuth();
@@ -40,6 +48,45 @@ export function useKanban(boardIds) {
     putCards(fn(cardsRef.current));
   }, [putCards]);
 
+  // Every change is shown here at once and written behind it. A read of the
+  // server that set out before a change made here, or while its writes were
+  // still on their way, brings the board back as it was a moment earlier: put
+  // on screen, it would throw a card just moved back where it came from for an
+  // instant. Such a read is dropped, and the board is read again once the last
+  // write is in.
+  const pending = useRef(0); // writes on their way
+  const changes = useRef(0); // changes made here, ever
+  const lastRead = useRef(0);
+  const syncTimer = useRef(null);
+  const syncWanted = useRef(false);
+  const fetchRef = useRef(null);
+
+  const requestSync = useCallback((delay = SYNC_DELAY) => {
+    syncWanted.current = true;
+    clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      // Not while writes are out: the last of them to land asks again.
+      if (pending.current > 0) return;
+      syncWanted.current = false;
+      fetchRef.current?.();
+    }, delay);
+  }, []);
+
+  /** Writes to the server, for a change already shown; resolves to what they returned. */
+  const track = useCallback(async (work) => {
+    pending.current += 1;
+    changes.current += 1;
+    try {
+      return await work;
+    } finally {
+      pending.current -= 1;
+      if (pending.current === 0 && syncWanted.current) requestSync();
+    }
+  }, [requestSync]);
+
+  /** A write went wrong: what is on screen can no longer be trusted, so read it all back. */
+  const resync = useCallback(() => requestSync(0), [requestSync]);
+
   const idsKey = useMemo(() => (boardIds || []).slice().sort().join(','), [boardIds]);
 
   const fetchAll = useCallback(async () => {
@@ -53,12 +100,27 @@ export function useKanban(boardIds) {
       setLoading(false);
       return;
     }
-    const [{ data: cols }, { data: crds }, { data: lbls }] = await Promise.all([
+    const read = ++lastRead.current;
+    const changesBefore = changes.current;
+    const [colsRes, cardsRes, labelsRes] = await Promise.all([
       supabase.from('kanban_columns').select('*').in('board_id', ids).order('position', { ascending: true }),
       supabase.from('kanban_cards').select('*').in('board_id', ids).order('position', { ascending: true }),
       supabase.from('kanban_labels').select('*').in('board_id', ids).order('position', { ascending: true }),
     ]);
-    const rows = (crds || []).slice().sort(byPosition);
+    // A later read is on its way and will be the one to count.
+    if (read !== lastRead.current) return;
+    // A failed read says nothing about the boards; emptying them would.
+    if (colsRes.error || cardsRes.error || labelsRes.error) {
+      setLoading(false);
+      return;
+    }
+    if (pending.current > 0 || changes.current !== changesBefore) {
+      requestSync();
+      return;
+    }
+    const cols = colsRes.data;
+    const lbls = labelsRes.data;
+    const rows = (cardsRes.data || []).slice().sort(byPosition);
     // Whatever has served its 30 days in the archive is dropped here rather
     // than on a schedule somewhere: the boards are read often enough, and a
     // card nobody ever comes back for costs nothing while it waits.
@@ -72,7 +134,10 @@ export function useKanban(boardIds) {
     if (stale.length > 0) {
       await supabase.from('kanban_cards').delete().in('id', stale.map((c) => c.id));
     }
-  }, [userId, idsKey, putCards]);
+  }, [userId, idsKey, putCards, requestSync]);
+  fetchRef.current = fetchAll;
+
+  useEffect(() => () => clearTimeout(syncTimer.current), []);
 
   useEffect(() => {
     if (!userId) {
@@ -84,20 +149,24 @@ export function useKanban(boardIds) {
       return undefined;
     }
     fetchAll();
+    const onChange = () => requestSync();
     const channel = supabase
       .channel(`kanban_${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'kanban_columns', filter: `user_id=eq.${userId}` }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'kanban_cards', filter: `user_id=eq.${userId}` }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'kanban_labels', filter: `user_id=eq.${userId}` }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kanban_columns', filter: `user_id=eq.${userId}` }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kanban_cards', filter: `user_id=eq.${userId}` }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kanban_labels', filter: `user_id=eq.${userId}` }, onChange)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [userId, fetchAll, putCards]);
+  }, [userId, fetchAll, putCards, requestSync]);
 
-  // Changes made by a collaborator on a shared board.
+  // Changes made by a collaborator on a shared board. The same topic carries
+  // the tasks and touches of the board, which do not change its cards.
   useEffect(() => {
     if (!userId || !idsKey) return undefined;
-    return subscribeProjects(idsKey.split(','), fetchAll);
-  }, [userId, idsKey, fetchAll]);
+    return subscribeProjects(idsKey.split(','), (change) => {
+      if (!change?.table || BOARD_TABLES.has(change.table)) requestSync();
+    });
+  }, [userId, idsKey, requestSync]);
 
   const nextPosition = (list) => (list.length ? Math.max(...list.map((r) => r.position ?? 0)) + 1 : 0);
 
@@ -111,23 +180,23 @@ export function useKanban(boardIds) {
       accent_color: patch.accent_color ?? '#5a86ee',
       position: nextPosition(siblings),
     };
-    const { data, error } = await supabase.from('kanban_columns').insert(row).select().single();
+    const { data, error } = await track(supabase.from('kanban_columns').insert(row).select().single());
     if (error || !data) {
-      await fetchAll();
+      resync();
       return null;
     }
     setColumns((prev) => [...prev, data].sort(byPosition));
     return data;
-  }, [userId, columns, fetchAll]);
+  }, [userId, columns, track, resync]);
 
   const updateColumn = useCallback(async (id, patch) => {
     setColumns((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-    const { error } = await supabase
+    const { error } = await track(supabase
       .from('kanban_columns')
       .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) await fetchAll();
-  }, [fetchAll]);
+      .eq('id', id));
+    if (error) resync();
+  }, [track, resync]);
 
   /**
    * The column goes. A card with a date does not belong to a column any more —
@@ -168,28 +237,33 @@ export function useKanban(boardIds) {
         .eq('column_id', id)
         .is('due_date', null));
     }
-    if (writes.length > 0) {
-      const results = await Promise.all(writes);
-      if (results.some((r) => r.error)) {
-        await fetchAll();
-        return;
+    const ok = await track((async () => {
+      if (writes.length > 0) {
+        const results = await Promise.all(writes);
+        if (results.some((r) => r.error)) return false;
       }
-    }
-    const { error } = await supabase.from('kanban_columns').delete().eq('id', id);
-    if (error) await fetchAll();
-  }, [fetchAll, patchCards]);
+      const { error } = await supabase.from('kanban_columns').delete().eq('id', id);
+      return !error;
+    })());
+    if (!ok) resync();
+  }, [patchCards, track, resync]);
 
   const reorderColumns = useCallback(async (orderedIds) => {
+    const was = new Map(columns.map((c) => [c.id, c.position]));
     setColumns((prev) => {
       const rank = new Map(orderedIds.map((id, i) => [id, i]));
       return prev
         .map((c) => (rank.has(c.id) ? { ...c, position: rank.get(c.id) } : c))
         .sort(byPosition);
     });
-    await Promise.all(
-      orderedIds.map((id, i) => supabase.from('kanban_columns').update({ position: i }).eq('id', id)),
-    );
-  }, []);
+    const results = await track(Promise.all(
+      orderedIds
+        .map((id, i) => [id, i])
+        .filter(([id, i]) => was.get(id) !== i)
+        .map(([id, i]) => supabase.from('kanban_columns').update({ position: i }).eq('id', id)),
+    ));
+    if (results.some((r) => r.error)) resync();
+  }, [columns, track, resync]);
 
   const addCard = useCallback(async (boardId, columnId, patch = {}) => {
     if (!userId || !boardId || !columnId) return null;
@@ -213,14 +287,14 @@ export function useKanban(boardIds) {
       const sameDay = cardsRef.current.filter((c) => c.board_id === boardId && c.due_date === fields.due_date);
       row.due_position = sameDay.length ? Math.min(...sameDay.map((c) => c.due_position ?? 0)) - 1 : 0;
     }
-    const { data, error } = await supabase.from('kanban_cards').insert(row).select().single();
+    const { data, error } = await track(supabase.from('kanban_cards').insert(row).select().single());
     if (error || !data) {
-      await fetchAll();
+      resync();
       return null;
     }
     patchCards((prev) => [...prev, data].sort(byPosition));
     return data;
-  }, [userId, fetchAll, patchCards]);
+  }, [userId, patchCards, track, resync]);
 
   const updateCard = useCallback(async (id, patch) => {
     // A card given a new date has not been put anywhere in that day yet, so it
@@ -245,12 +319,32 @@ export function useKanban(boardIds) {
       }
     }
     patchCards((prev) => prev.map((c) => (c.id === id ? { ...c, ...full } : c)));
-    const { error } = await supabase
+    const { error } = await track(supabase
       .from('kanban_cards')
       .update({ ...full, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) await fetchAll();
-  }, [fetchAll, patchCards, columns]);
+      .eq('id', id));
+    if (error) resync();
+  }, [patchCards, columns, track, resync]);
+
+  /**
+   * Shows a set of card patches at once and writes them behind, leaving out
+   * the cards a patch would not change: a card moved to the top of a column
+   * shifts every card below it, but only those that really did move are written.
+   */
+  const writeCards = useCallback(async (writes) => {
+    const now = new Map(cardsRef.current.map((c) => [c.id, c]));
+    const real = Array.from(writes.entries()).filter(([id, patch]) => {
+      const card = now.get(id);
+      return card && Object.keys(patch).some((k) => (card[k] ?? null) !== (patch[k] ?? null));
+    });
+    if (real.length === 0) return;
+    const changed = new Map(real);
+    patchCards((prev) => prev.map((c) => (changed.has(c.id) ? { ...c, ...changed.get(c.id) } : c)).sort(byPosition));
+    const results = await track(Promise.all(
+      real.map(([id, patch]) => supabase.from('kanban_cards').update(patch).eq('id', id)),
+    ));
+    if (results.some((r) => r.error)) resync();
+  }, [patchCards, track, resync]);
 
   /**
    * Lay out one day: `orderedIds` is every card due that day in the order they
@@ -262,12 +356,8 @@ export function useKanban(boardIds) {
     orderedIds.forEach((id, i) => {
       writes.set(id, id === movedId ? { due_position: i, due_date: dueDate } : { due_position: i });
     });
-    patchCards((prev) => prev.map((c) => (writes.has(c.id) ? { ...c, ...writes.get(c.id) } : c)));
-    const results = await Promise.all(
-      Array.from(writes.entries()).map(([id, patch]) => supabase.from('kanban_cards').update(patch).eq('id', id)),
-    );
-    if (results.some((r) => r.error)) await fetchAll();
-  }, [fetchAll, patchCards]);
+    await writeCards(writes);
+  }, [writeCards]);
 
   /** Off the board and into the archive, tasks and all. */
   const deleteCard = useCallback(async (id) => {
@@ -278,7 +368,7 @@ export function useKanban(boardIds) {
       const gone = { ...card, deleted_at: stamp, archived_column_id: card.column_id, column_id: null };
       setArchived((prev) => [gone, ...prev]);
     }
-    const { error } = await supabase
+    const { error } = await track(supabase
       .from('kanban_cards')
       .update({
         deleted_at: stamp,
@@ -286,9 +376,9 @@ export function useKanban(boardIds) {
         column_id: null,
         updated_at: stamp,
       })
-      .eq('id', id);
-    if (error) await fetchAll();
-  }, [fetchAll, patchCards]);
+      .eq('id', id));
+    if (error) resync();
+  }, [patchCards, track, resync]);
 
   /** Back to the column it was deleted from, or to the first one left. */
   const restoreCard = useCallback(async (id) => {
@@ -307,7 +397,7 @@ export function useKanban(boardIds) {
       ...prev,
       { ...card, deleted_at: null, archived_column_id: null, column_id: columnId, position },
     ].sort(byPosition));
-    const { error } = await supabase
+    const { error } = await track(supabase
       .from('kanban_cards')
       .update({
         deleted_at: null,
@@ -316,23 +406,23 @@ export function useKanban(boardIds) {
         position,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
-    if (error) await fetchAll();
-  }, [archived, columns, fetchAll, patchCards]);
+      .eq('id', id));
+    if (error) resync();
+  }, [archived, columns, patchCards, track, resync]);
 
   const purgeCard = useCallback(async (id) => {
     setArchived((prev) => prev.filter((c) => c.id !== id));
-    const { error } = await supabase.from('kanban_cards').delete().eq('id', id);
-    if (error) await fetchAll();
-  }, [fetchAll]);
+    const { error } = await track(supabase.from('kanban_cards').delete().eq('id', id));
+    if (error) resync();
+  }, [track, resync]);
 
   const purgeArchive = useCallback(async (boardId) => {
     const ids = archived.filter((c) => c.board_id === boardId).map((c) => c.id);
     if (ids.length === 0) return;
     setArchived((prev) => prev.filter((c) => c.board_id !== boardId));
-    const { error } = await supabase.from('kanban_cards').delete().in('id', ids);
-    if (error) await fetchAll();
-  }, [archived, fetchAll]);
+    const { error } = await track(supabase.from('kanban_cards').delete().in('id', ids));
+    if (error) resync();
+  }, [archived, track, resync]);
 
   const addLabel = useCallback(async (boardId, patch = {}) => {
     if (!userId || !boardId) return null;
@@ -344,23 +434,23 @@ export function useKanban(boardIds) {
       color: patch.color ?? '#5a86ee',
       position: nextPosition(siblings),
     };
-    const { data, error } = await supabase.from('kanban_labels').insert(row).select().single();
+    const { data, error } = await track(supabase.from('kanban_labels').insert(row).select().single());
     if (error || !data) {
-      await fetchAll();
+      resync();
       return null;
     }
     setLabels((prev) => [...prev, data].sort(byPosition));
     return data;
-  }, [userId, labels, fetchAll]);
+  }, [userId, labels, track, resync]);
 
   const updateLabel = useCallback(async (id, patch) => {
     setLabels((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
-    const { error } = await supabase
+    const { error } = await track(supabase
       .from('kanban_labels')
       .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) await fetchAll();
-  }, [fetchAll]);
+      .eq('id', id));
+    if (error) resync();
+  }, [track, resync]);
 
   /** Drops the label and takes it off every card that wore it. */
   const deleteLabel = useCallback(async (id) => {
@@ -371,25 +461,23 @@ export function useKanban(boardIds) {
         ? { ...c, label_ids: c.label_ids.filter((x) => x !== id) }
         : c
     )));
-    const results = await Promise.all([
+    const results = await track(Promise.all([
       supabase.from('kanban_labels').delete().eq('id', id),
       ...wearing.map((c) => supabase
         .from('kanban_cards')
         .update({ label_ids: (c.label_ids || []).filter((x) => x !== id) })
         .eq('id', c.id)),
-    ]);
-    if (results.some((r) => r.error)) await fetchAll();
-  }, [fetchAll, patchCards]);
+    ]));
+    if (results.some((r) => r.error)) resync();
+  }, [patchCards, track, resync]);
 
   /**
-   * Put a card at `index` of `columnId`, renumbering the cards of the columns
-   * it left and joined so their positions stay 0..n.
+   * Put a card at `index` of `columnId`, renumbering the column it joins. The
+   * column it left keeps its numbers: a gap where it stood changes no order.
    */
   const moveCard = useCallback(async (cardId, columnId, index) => {
     const all = cardsRef.current;
-    const moved = all.find((c) => c.id === cardId);
-    if (!moved) return;
-    const fromColumnId = moved.column_id;
+    if (!all.some((c) => c.id === cardId)) return;
     const target = all
       .filter((c) => c.column_id === columnId && c.id !== cardId)
       .sort(byPosition)
@@ -402,20 +490,8 @@ export function useKanban(boardIds) {
       if (id === cardId) patch.column_id = columnId;
       writes.set(id, patch);
     });
-    // A dated card cut loose from its column has no old column to renumber.
-    if (fromColumnId && fromColumnId !== columnId) {
-      all
-        .filter((c) => c.column_id === fromColumnId && c.id !== cardId)
-        .sort(byPosition)
-        .forEach((c, i) => writes.set(c.id, { position: i }));
-    }
-
-    patchCards((prev) => prev.map((c) => (writes.has(c.id) ? { ...c, ...writes.get(c.id) } : c)).sort(byPosition));
-    const results = await Promise.all(
-      Array.from(writes.entries()).map(([id, patch]) => supabase.from('kanban_cards').update(patch).eq('id', id)),
-    );
-    if (results.some((r) => r.error)) await fetchAll();
-  }, [fetchAll, patchCards]);
+    await writeCards(writes);
+  }, [writeCards]);
 
   /**
    * A card handed over to another board. It lands at the end of that board's
@@ -436,16 +512,16 @@ export function useKanban(boardIds) {
       due_position: null,
     };
     patchCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, ...patch } : c)).sort(byPosition));
-    const [moved, carried, touched] = await Promise.all([
+    const [moved, carried, touched] = await track(Promise.all([
       supabase
         .from('kanban_cards')
         .update({ ...patch, updated_at: new Date().toISOString() })
         .eq('id', cardId),
       supabase.from('tasks').update({ project_id: boardId }).eq('card_id', cardId),
       supabase.from('kanban_touches').update({ board_id: boardId }).eq('card_id', cardId),
-    ]);
-    if (moved.error || carried.error || touched.error) await fetchAll();
-  }, [columns, fetchAll, patchCards]);
+    ]));
+    if (moved.error || carried.error || touched.error) resync();
+  }, [columns, patchCards, track, resync]);
 
   return {
     columns,

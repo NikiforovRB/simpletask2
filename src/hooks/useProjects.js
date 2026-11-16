@@ -74,7 +74,11 @@ export function useProjects() {
     if (!user) return;
     const ids = projectIdsKey ? projectIdsKey.split(',') : [];
     if (ids.length === 0) return;
-    return subscribeProjects(ids, fetchProjects);
+    // The columns, cards and touches of a kanban board are broadcast on its
+    // topic too, and none of them changes a project.
+    return subscribeProjects(ids, (change) => {
+      if (!change?.table?.startsWith('kanban_')) fetchProjects();
+    });
   }, [user?.id, projectIdsKey, fetchProjects]);
 
   const addProject = async (title, kind = 'project') => {

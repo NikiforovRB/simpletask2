@@ -88,7 +88,11 @@ export function useTasks() {
   // collaborator), via per-project broadcast from the database.
   useEffect(() => {
     if (!user || accessibleProjectIds.length === 0) return;
-    return subscribeProjects(accessibleProjectIds, fetchTasks);
+    // A kanban board shares the topic with its own columns, cards and touches;
+    // a card dragged across it rewrites a dozen rows that change no task.
+    return subscribeProjects(accessibleProjectIds, (change) => {
+      if (!change?.table?.startsWith('kanban_')) fetchTasks();
+    });
   }, [user?.id, accessibleProjectIds, fetchTasks]);
 
   const addTask = async (payload) => {
