@@ -1025,7 +1025,7 @@ function KanbanColumn({
  */
 function DateColumn({
   group, width, settings, tasks, getSubtasks, boardLabels,
-  onToggleTask, onOpenCard, onAddCard, onCardMenu, onToggleFold, onClearReminder, onDoneReminder, hasHover,
+  onToggleTask, onOpenCard, onAddCard, onCardMenu, onToggleFold, onClearReminder, onStarReminder, onDoneReminder, hasHover,
   editingCardId, onTitleCommit, onEditDone, onMoveToToday,
 }) {
   const id = dateColumnId(group.key);
@@ -1139,11 +1139,27 @@ function DateColumn({
             crm={!!settings.crm}
             onOpen={onOpenCard}
             onClear={onClearReminder}
+            onStar={onStarReminder}
             onDone={onDoneReminder}
           />
         )}
       </div>
     </section>
+  );
+}
+
+/** The star of a favourite reminder, in the colour of the text around it. */
+function StarGlyph({ filled = false, className = '' }) {
+  return (
+    <svg className={className} width="12" height="12" viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M11.28 3.45c.23-.46.35-.7.5-.77a.5.5 0 0 1 .43 0c.16.07.27.3.5.77l2.19 4.43c.07.14.1.2.15.26a.5.5 0 0 0 .16.11c.06.03.14.04.3.07l4.89.71c.51.08.77.11.89.24a.5.5 0 0 1 .13.41c-.02.17-.21.36-.58.72l-3.54 3.45c-.11.1-.17.16-.2.22a.5.5 0 0 0-.06.18c-.01.08 0 .15.03.3l.84 4.87c.09.51.13.77.05.92a.5.5 0 0 1-.35.25c-.17.03-.4-.09-.86-.33l-4.37-2.3c-.14-.07-.2-.1-.28-.12a.5.5 0 0 0-.19 0c-.07.01-.14.05-.28.12l-4.37 2.3c-.46.24-.69.36-.86.33a.5.5 0 0 1-.35-.25c-.08-.15-.04-.41.05-.92l.84-4.87c.03-.15.04-.22.03-.3a.5.5 0 0 0-.06-.18c-.04-.06-.09-.12-.2-.22L3.16 10.4c-.37-.36-.56-.55-.58-.72a.5.5 0 0 1 .13-.41c.12-.13.38-.16.89-.24l4.89-.71c.15-.02.23-.03.3-.07a.5.5 0 0 0 .16-.11c.05-.05.08-.12.15-.26l2.18-4.43Z"
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -1153,26 +1169,44 @@ function DateColumn({
  * the coloured dot of the reminder, its time, and the card it belongs to,
  * which a press opens. The cross takes the reminder off once it is dealt with.
  * On a CRM board these are the clients to get back to that day: the dot is the
- * box that ticks the task off, and the cross gives way to the chat. `flush`
- * when the day has no cards above them to keep apart from.
+ * box that ticks the task off, and the cross gives way to the chat. Any of
+ * them can be starred: the star goes before its text and the line to the top
+ * of the day. `flush` when the day has no cards above them to keep apart from.
  */
-function DayReminders({ cards, withDate, flush = false, crm = false, onOpen, onClear, onDone }) {
+function DayReminders({ cards, withDate, flush = false, crm = false, onOpen, onClear, onStar, onDone }) {
   return (
     <div className={`kanban-reminders ${flush ? 'kanban-reminders--flush' : ''}`}>
       <div className="kanban-reminders__head">Напоминания</div>
       <ul className="kanban-reminders__list">
         {cards.map((card) => {
           const when = withDate ? formatReminder(card.remind_date, card.remind_time) : shortTime(card.remind_time);
+          const starred = !!card.remind_starred;
           return (
-            <li key={card.id} className={`kanban-reminder kanban-reminder--${reminderState(card.remind_date)} ${crm ? 'kanban-reminder--crm' : ''}`}>
+            <li
+              key={card.id}
+              className={`kanban-reminder kanban-reminder--${reminderState(card.remind_date)} ${crm ? 'kanban-reminder--crm' : ''} ${starred ? 'kanban-reminder--starred' : ''}`}
+            >
               {crm && <CrmCheck className="kanban-reminder__check" onPick={(el) => onDone?.(el, card)} />}
               <button type="button" className="kanban-reminder__main" onClick={() => onOpen?.(card.id)}>
                 {!crm && <span className="kanban-reminder__dot" aria-hidden />}
                 <span className="kanban-reminder__text">
+                  {starred && <StarGlyph filled className="kanban-reminder__star" />}
                   {when && <span className="kanban-reminder__when">{when}</span>}
                   <span className="kanban-reminder__title">{card.title || 'Без названия'}</span>
                 </span>
               </button>
+              {onStar && (
+                <button
+                  type="button"
+                  className="kanban-reminder__fav"
+                  onClick={() => onStar(card)}
+                  aria-pressed={starred}
+                  aria-label={starred ? 'Убрать из избранного' : 'В избранное'}
+                  title={starred ? 'Убрать из избранного' : 'В избранное'}
+                >
+                  <StarGlyph filled={starred} />
+                </button>
+              )}
               {crm ? (
                 <ContactButton card={card} className="kanban-reminder__reach" />
               ) : (
@@ -2000,9 +2034,10 @@ export function KanbanView({
     };
     const groups = bucketBy('due_date');
     const reminders = bucketBy('remind_date');
-    // The earliest first; a reminder without a time is for the whole day and
-    // goes before the timed ones.
-    const byReminder = (a, b) => a.remind_date.localeCompare(b.remind_date)
+    // The starred on top; then the earliest first, a reminder without a time
+    // being for the whole day and going before the timed ones.
+    const byReminder = (a, b) => Number(!!b.remind_starred) - Number(!!a.remind_starred)
+      || a.remind_date.localeCompare(b.remind_date)
       || shortTime(a.remind_time).localeCompare(shortTime(b.remind_time))
       || (a.title || '').localeCompare(b.title || '');
 
@@ -2424,6 +2459,7 @@ export function KanbanView({
               onCardMenu={(e, card) => setCardMenu({ x: e.clientX, y: e.clientY, card })}
               onToggleFold={(cardId, collapsed) => updateCard(cardId, { collapsed })}
               onClearReminder={(cardId) => updateCard(cardId, { remind_date: null, remind_time: null })}
+              onStarReminder={(card) => updateCard(card.id, { remind_starred: !card.remind_starred })}
               onDoneReminder={openDone}
               hasHover={hasHover}
               editingCardId={editingCardId}

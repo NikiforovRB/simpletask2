@@ -345,6 +345,19 @@
   color: var(--text-primary);
 }
 
+.kanban-reminder__star {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.3rem;
+  vertical-align: -0.08em;
+}
+
+.kanban-reminder__main:hover .kanban-reminder__star {
+  color: var(--text-primary);
+}
+
+.kanban-reminder__fav,
 .kanban-reminder__clear {
   flex: 0 0 auto;
   display: inline-flex;
@@ -363,20 +376,33 @@
   transition: opacity 0.12s;
 }
 
+.kanban-reminder:hover .kanban-reminder__fav,
+.kanban-reminder__fav:focus-visible,
 .kanban-reminder:hover .kanban-reminder__clear,
 .kanban-reminder__clear:focus-visible {
   opacity: 1;
 }
 
+.kanban-reminder__fav:hover,
 .kanban-reminder__clear:hover {
   background: var(--bg-hover-strong);
   color: var(--text-primary);
 }
 
-/* Under a finger there is no hover to bring the cross out. */
+.kanban-reminder__fav svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Under a finger there is no hover to bring the cross out. The star stays
+   quieter there: it is the cross and the chat that are reached for. */
 @media (hover: none) {
   .kanban-reminder__clear {
     opacity: 1;
+  }
+
+  .kanban-reminder__fav {
+    opacity: 0.6;
   }
 }
 

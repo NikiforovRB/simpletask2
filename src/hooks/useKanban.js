@@ -302,6 +302,11 @@ export function useKanban(boardIds) {
     let full = 'due_date' in patch && !('due_position' in patch)
       ? { ...patch, due_position: null }
       : patch;
+    // The star belongs to the reminder: taken off, it takes the star along, so
+    // the next one set on the card does not come up starred.
+    if ('remind_date' in full && !full.remind_date && !('remind_starred' in full)) {
+      full = { ...full, remind_starred: false };
+    }
     // A card losing its date returns to the stage board. If the column it used
     // to sit in has since been deleted, it joins the first one still standing,
     // so it never ends up with neither a date nor a place to be seen in.

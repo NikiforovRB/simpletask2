@@ -2085,3 +2085,8 @@ alter table public.kanban_cards
 
 alter table public.kanban_cards
   add column if not exists max_link text not null default '';
+
+-- 076: Канбан — избранные напоминания (звёздочка, наверху списка дня)
+
+alter table public.kanban_cards
+  add column if not exists remind_starred boolean not null default false;
