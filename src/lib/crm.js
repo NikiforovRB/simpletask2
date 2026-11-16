@@ -34,16 +34,28 @@ export function telegramHandle(value) {
 }
 
 /**
+ * A link to a profile in Max however it was pasted — with or without https,
+ * from the app or from its web version — as a full address. Empty when it is
+ * not one. Max hands these out from «Контакты» → «+» → «Пригласить по ссылке».
+ */
+export function maxLink(value) {
+  const m = String(value || '').trim().match(/^(?:https?:\/\/)?((?:www\.|web\.)?max\.ru\/\S+)$/i);
+  return m ? `https://${m[1]}` : '';
+}
+
+/**
  * Where a press on the contact of a client leads: the chat in its messenger,
  * or a call when no messenger is set. In Telegram the username, when there is
  * one, opens that very account; the number is the fallback. Max has no link
- * that opens a chat by number, so for it the number is copied and its web
- * version opened, to be pasted into the search there. Null when there is
- * nothing to reach the client by.
+ * that opens a chat by number: its profile link does, and without one the
+ * number is copied and its web version opened, to be pasted into the search
+ * there. Null when there is nothing to reach the client by.
  */
 export function contactAction(card) {
   const handle = card?.messenger === 'telegram' ? telegramHandle(card.telegram) : '';
   if (handle) return { kind: 'telegram', url: `https://t.me/${handle}`, title: `Написать @${handle} в Telegram` };
+  const profile = card?.messenger === 'max' ? maxLink(card.max_link) : '';
+  if (profile) return { kind: 'max', url: profile, title: 'Написать в Max' };
   const d = phoneDigits(card?.phone);
   if (!d) return null;
   switch (card.messenger) {

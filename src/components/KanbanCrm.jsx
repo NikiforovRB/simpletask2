@@ -64,8 +64,9 @@ export function MessengerIcon({ kind }) {
 /**
  * One press from the board to the client: the chat in their messenger, or a
  * call. Pressed inside a card it does not open the card or start a drag.
+ * With `label` it also says what it does.
  */
-export function ContactButton({ card, className = '' }) {
+export function ContactButton({ card, className = '', label = false }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return undefined;
@@ -91,6 +92,7 @@ export function ContactButton({ card, className = '' }) {
       }}
     >
       <MessengerIcon kind={action.kind} />
+      {label && <span className="crm-contact-btn__label">{action.title}</span>}
       {copied && <span className="crm-contact-btn__copied" role="status">Номер скопирован</span>}
     </a>
   );

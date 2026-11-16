@@ -547,6 +547,67 @@ button.crm-stats__row:hover {
   color: var(--text-dim);
 }
 
+/* «Написать в …»: the chat with the client, a row of its own under the contacts. */
+.crm-contact-btn.crm-contact__write,
+.crm-contact__write {
+  flex: 1 1 100%;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.875rem;
+  box-sizing: border-box;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.crm-contact-btn.crm-contact__write:hover {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.crm-contact-btn.crm-contact__write:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.crm-contact__write .crm-icon,
+.crm-contact-btn.crm-contact__write:hover .crm-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: currentColor;
+  opacity: 1;
+}
+
+.crm-contact-btn__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-contact__write .crm-contact-btn__copied {
+  right: auto;
+  left: 0;
+}
+
+.crm-contact__write--off {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+}
+
+.crm-contact__write--off .crm-icon {
+  opacity: 0.6;
+}
+
 .crm-contact__kinds {
   display: flex;
   gap: 0.3rem;

@@ -1313,6 +1313,7 @@ export default function Dashboard() {
       phone: card.phone || '',
       messenger: card.messenger ?? null,
       telegram: card.telegram || '',
+      max_link: card.max_link || '',
       amount: card.amount ?? null,
     });
     if (!copy) return;

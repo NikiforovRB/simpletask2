@@ -8,7 +8,7 @@ import { getContainerIdForCard } from '../lib/dnd';
 import { KanbanReminderPicker } from './KanbanReminderPicker';
 import { CheckGlyph, ContactButton, CrmDoneForm, CrmStagePicker, MessengerIcon, PhoneGlyph } from './KanbanCrm';
 import { TouchComposer, TouchHistory } from './KanbanTouches';
-import { MESSENGERS, callHref, telegramHandle } from '../lib/crm';
+import { MESSENGERS, callHref, contactAction, maxLink, messengerLabel, telegramHandle } from '../lib/crm';
 import {
   cardFill, cardLabels, formatDueDate, formatMoney, formatReminder, isOverdue, labelTextColor, moneyTotal,
   amountText, parseAmount, reminderState, withAlpha,
@@ -82,6 +82,7 @@ export function KanbanCardPanel({
   const remindBtnRef = useRef(null);
   const [phone, setPhone] = useState(card.phone || '');
   const [telegram, setTelegram] = useState(card.telegram || '');
+  const [maxProfile, setMaxProfile] = useState(card.max_link || '');
   const [amount, setAmount] = useState(amountText(card.amount));
   // What is being typed into the history; ticking the reminder off takes it along.
   const [draft, setDraft] = useState('');
@@ -141,6 +142,17 @@ export function KanbanCardPanel({
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [telegram, cardId]);
+
+  useEffect(() => {
+    if (maxProfile === (card.max_link || '')) return undefined;
+    const t = setTimeout(() => onUpdateCard(cardId, { max_link: maxProfile }), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maxProfile, cardId]);
+
+  // The way to write to the client follows what is typed, not what has been saved.
+  const contact = { ...card, phone, telegram, max_link: maxProfile };
+  const canWrite = !!contactAction(contact);
 
   const saveAmount = (text) => {
     const next = parseAmount(text);
@@ -297,7 +309,7 @@ export function KanbanCardPanel({
               />
             )}
           </span>
-          {crm && card.messenger && <ContactButton card={card} className="kanban-panel__reach" />}
+          {crm && card.messenger && <ContactButton card={contact} className="kanban-panel__reach" />}
           {crm && callHref(card) && (
             <a className="crm-contact-btn kanban-panel__reach" href={callHref(card)} title="Позвонить" aria-label="Позвонить">
               <MessengerIcon kind="phone" />
@@ -398,6 +410,38 @@ export function KanbanCardPanel({
                   />
                 </label>
               )}
+              {card.messenger === 'max' && (
+                <label className="crm-contact__handle">
+                  <input
+                    type="url"
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    value={maxProfile}
+                    placeholder="Ссылка на профиль в Max: max.ru/u/…"
+                    aria-label="Ссылка на профиль в Max"
+                    title="В Max у клиента: «Контакты» → «+» → «Пригласить по ссылке». Без ссылки номер копируется и открывается Max"
+                    onChange={(e) => setMaxProfile(e.target.value)}
+                    onBlur={() => {
+                      const next = maxLink(maxProfile) || maxProfile.trim();
+                      if (next !== maxProfile) setMaxProfile(next);
+                      if (next !== (card.max_link || '')) onUpdateCard(cardId, { max_link: next });
+                    }}
+                  />
+                </label>
+              )}
+              {card.messenger && (canWrite ? (
+                <ContactButton card={contact} className="crm-contact__write" label />
+              ) : (
+                <span className="crm-contact__write crm-contact__write--off">
+                  <MessengerIcon kind={card.messenger} />
+                  {`Чтобы написать в ${messengerLabel(card.messenger)}, ${{
+                    telegram: 'укажите телефон или никнейм',
+                    whatsapp: 'укажите телефон',
+                    max: 'укажите телефон или ссылку на профиль',
+                  }[card.messenger]}`}
+                </span>
+              ))}
               <label className="crm-contact__amount">
                 <input
                   type="text"

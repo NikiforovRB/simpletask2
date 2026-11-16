@@ -2080,3 +2080,8 @@ alter table public.kanban_cards
 
 alter table public.kanban_cards
   add column if not exists amount numeric;
+
+-- 075: Канбан CRM — ссылка на профиль клиента в Max
+
+alter table public.kanban_cards
+  add column if not exists max_link text not null default '';
