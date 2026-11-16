@@ -50,7 +50,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { CalendarPopover } from './CalendarPopover';
 import { KanbanReminderPicker } from './KanbanReminderPicker';
 import { CheckGlyph, ContactButton, CrmCheck, CrmDoneForm, CrmStats } from './KanbanCrm';
-import { touchDay } from '../lib/crm';
+import { clientsOn } from '../lib/crm';
 import plusIcon from '../assets/plus.svg';
 import plusNavIcon from '../assets/plus-nav.svg';
 import deleteIcon from '../assets/delete.svg';
@@ -2061,7 +2061,7 @@ export function KanbanView({
 
   const today = dueInDays(0);
   const doneToday = useMemo(
-    () => (crm ? touches.filter((t) => t.closed_reminder && touchDay(t) === today).length : 0),
+    () => (crm ? clientsOn(touches, today) : 0),
     [crm, touches, today],
   );
   const openDone = (anchorEl, card) => setDoneFor({ cardId: card.id, anchor: { current: anchorEl } });
@@ -2250,8 +2250,8 @@ export function KanbanView({
             ref={statsBtnRef}
             className={`kanban__done-count ${statsOpen ? 'kanban__done-count--open' : ''}`}
             onClick={() => setStatsOpen((v) => !v)}
-            aria-label={`Выполнено задач сегодня: ${doneToday}`}
-            title="Выполнено задач сегодня"
+            aria-label={`Клиентов в работе сегодня: ${doneToday}`}
+            title="Клиентов в работе сегодня: выполнена задача или было касание"
           >
             <CheckGlyph />
             <span>{doneToday}</span>

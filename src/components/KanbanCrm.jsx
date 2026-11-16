@@ -5,7 +5,7 @@ import { MONTH_GENITIVE_RU, WEEKDAY_SHORT_RU, toLocalDateString } from '../const
 import { useAutoGrow } from '../hooks/useAutoGrow';
 import { DEFAULT_COLUMN_COLOR, dateColumnTitle, dueInDays, shortDate } from '../lib/kanbanCards';
 import {
-  clockOf, contactAction, doneByDay, enterSends, momentOf, shiftWeeks, weekOf,
+  clientsByDay, clockOf, contactAction, enterSends, momentOf, shiftWeeks, weekOf,
 } from '../lib/crm';
 import { notificationPermission, requestNotificationPermission } from '../lib/reminders';
 import leftIcon from '../assets/left.svg';
@@ -405,23 +405,26 @@ function weekLabel(week) {
 }
 
 /**
- * The work of the board, day by day: how many reminders were ticked off, a
- * week at a time, and for the day picked — whom and what came of it.
+ * The work of the board, day by day: how many clients were got hold of, a
+ * week at a time, and for the day picked — whom and what came of it, one
+ * line per client however many touches it took.
  */
 export function CrmStats({ touches, cards, archived = [], onOpenCard }) {
   const today = dueInDays(0);
   const [day, setDay] = useState(today);
-  const byDay = useMemo(() => doneByDay(touches), [touches]);
+  const byDay = useMemo(() => clientsByDay(touches), [touches]);
   const week = weekOf(day);
-  const weekTotal = week.reduce((sum, d) => sum + (byDay.get(d)?.length || 0), 0);
-  const list = (byDay.get(day) || []).slice().sort(byTime);
+  const weekTotal = week.reduce((sum, d) => sum + (byDay.get(d)?.size || 0), 0);
+  const list = [...(byDay.get(day)?.entries() || [])]
+    .map(([cardId, dayTouches]) => ({ cardId, touches: dayTouches.slice().sort(byTime) }))
+    .sort((a, b) => byTime(a.touches.at(-1), b.touches.at(-1)));
   const live = new Map(cards.map((c) => [c.id, c]));
   const gone = new Map(archived.map((c) => [c.id, c]));
 
   return (
     <div className="crm-stats">
       <div className="crm-stats__head">
-        <span className="crm-stats__title">Выполнено задач</span>
+        <span className="crm-stats__title">Клиенты в работе</span>
         <span className="crm-stats__nav">
           <button
             type="button"
@@ -451,7 +454,7 @@ export function CrmStats({ touches, cards, archived = [], onOpenCard }) {
 
       <div className="crm-stats__week">
         {week.map((d) => {
-          const n = byDay.get(d)?.length || 0;
+          const n = byDay.get(d)?.size || 0;
           const ahead = d > today;
           return (
             <button
@@ -474,22 +477,25 @@ export function CrmStats({ touches, cards, archived = [], onOpenCard }) {
         <span className="crm-stats__count">{list.length}</span>
       </div>
       {list.length === 0 ? (
-        <p className="crm-stats__empty">В этот день задач не закрыто.</p>
+        <p className="crm-stats__empty">В этот день касаний не было.</p>
       ) : (
         <ul className="crm-stats__list">
-          {list.map((t) => {
-            const card = live.get(t.card_id);
+          {list.map(({ cardId, touches: dayTouches }) => {
+            const card = live.get(cardId);
             const content = (
               <>
-                <span className="crm-stats__time">{clockOf(t.touched_at)}</span>
+                <span className="crm-stats__time">{clockOf(dayTouches.at(-1).touched_at)}</span>
                 <span className="crm-stats__text">
-                  <span className="crm-stats__who">{(card || gone.get(t.card_id))?.title || 'Удалённая плашка'}</span>
-                  {t.body && <span className="crm-stats__body">{t.body}</span>}
+                  <span className="crm-stats__who">
+                    {(card || gone.get(cardId))?.title || 'Удалённая плашка'}
+                    {dayTouches.length > 1 && <span className="crm-stats__times">{` ×${dayTouches.length}`}</span>}
+                  </span>
+                  {dayTouches.map((t) => t.body && <span key={t.id} className="crm-stats__body">{t.body}</span>)}
                 </span>
               </>
             );
             return (
-              <li key={t.id}>
+              <li key={cardId}>
                 {card ? (
                   <button type="button" className="crm-stats__row" onClick={() => onOpenCard(card.id)}>
                     {content}

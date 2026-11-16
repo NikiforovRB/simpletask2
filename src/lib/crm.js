@@ -122,17 +122,32 @@ export function momentOf(day, time) {
   return new Date(`${day}T${time || '12:00'}:00`).toISOString();
 }
 
-/** Closed reminders, the work counted day by day: day → touches. */
-export function doneByDay(touches) {
+/**
+ * The work of the board day by day: the clients that were got hold of, a
+ * reminder ticked off or a touch written, each counted once a day however
+ * many touches it took. day → (card id → that day's touches, oldest first).
+ */
+export function clientsByDay(touches) {
   const map = new Map();
   for (const t of touches) {
-    if (!t.closed_reminder) continue;
     const day = touchDay(t);
-    const list = map.get(day);
+    let clients = map.get(day);
+    if (!clients) {
+      clients = new Map();
+      map.set(day, clients);
+    }
+    const list = clients.get(t.card_id);
     if (list) list.push(t);
-    else map.set(day, [t]);
+    else clients.set(t.card_id, [t]);
   }
   return map;
+}
+
+/** How many clients were got hold of on `day`. */
+export function clientsOn(touches, day) {
+  const ids = new Set();
+  for (const t of touches) if (touchDay(t) === day) ids.add(t.card_id);
+  return ids.size;
 }
 
 /** Monday of the week a day belongs to, and the six days after it. */
