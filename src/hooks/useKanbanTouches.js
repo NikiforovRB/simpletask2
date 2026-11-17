@@ -64,6 +64,7 @@ export function useKanbanTouches(boardId) {
       body: '',
       touched_at: now,
       closed_reminder: null,
+      meeting: null,
       ...fields,
       created_at: now,
       updated_at: now,
@@ -77,6 +78,7 @@ export function useKanbanTouches(boardId) {
       body: row.body,
       touched_at: row.touched_at,
       closed_reminder: row.closed_reminder,
+      meeting: row.meeting,
     });
     if (error) await fetchAll();
     return row;

@@ -1244,11 +1244,12 @@ export default function Dashboard() {
    * closed it — which is what the daily count adds up — and the next one, if
    * any, takes its place.
    */
-  const completeKanbanReminder = useCallback((card, { body, next }) => {
+  const completeKanbanReminder = useCallback((card, { body, meeting, next }) => {
     addKanbanTouch({
       board_id: card.board_id,
       card_id: card.id,
       body: body || '',
+      meeting: meeting ?? null,
       closed_reminder: card.remind_date,
     });
     updateKanbanCard(card.id, { remind_date: next?.date ?? null, remind_time: next?.time ?? null });

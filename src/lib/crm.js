@@ -11,6 +11,34 @@ export const MESSENGERS = [
 export const messengerLabel = (id) => MESSENGERS.find((m) => m.id === id)?.label ?? '';
 
 /**
+ * What a touch can have been beyond a message, with the words its count is
+ * read in: 1 видеозвонок, 2 видеозвонка, 5 видеозвонков.
+ */
+export const MEETINGS = [
+  { id: 'video', label: 'Видеозвонок', forms: ['видеозвонок', 'видеозвонка', 'видеозвонков'] },
+  { id: 'live', label: 'Живая встреча', forms: ['живая встреча', 'живые встречи', 'живых встреч'] },
+];
+
+export const meetingLabel = (id) => MEETINGS.find((m) => m.id === id)?.label ?? '';
+
+/** "3 видеозвонка". */
+export function meetingCount(meeting, n) {
+  const [one, few, many] = meeting.forms;
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return `${n} ${one}`;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return `${n} ${few}`;
+  return `${n} ${many}`;
+}
+
+/** How many of the touches were of each kind: { video: n, live: n }. */
+export function meetingsOf(touches) {
+  const out = Object.fromEntries(MEETINGS.map((m) => [m.id, 0]));
+  for (const t of touches) if (t.meeting in out) out[t.meeting] += 1;
+  return out;
+}
+
+/**
  * The digits of a phone the way the world dials it: a Russian number typed
  * as 8 999… or 999… becomes 7 999…. Empty while there is too little to dial.
  */

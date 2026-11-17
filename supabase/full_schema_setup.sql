@@ -2090,3 +2090,18 @@ alter table public.kanban_cards
 
 alter table public.kanban_cards
   add column if not exists remind_starred boolean not null default false;
+
+-- 077: Канбан CRM — касание как видеозвонок или живая встреча
+
+alter table public.kanban_touches
+  add column if not exists meeting text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'kanban_touches_meeting_check'
+  ) then
+    alter table public.kanban_touches
+      add constraint kanban_touches_meeting_check check (meeting in ('video', 'live'));
+  end if;
+end $$;

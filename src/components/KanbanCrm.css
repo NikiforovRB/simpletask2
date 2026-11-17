@@ -142,10 +142,60 @@
   margin-right: 0.1rem;
 }
 
+/* ---- A video call or a meeting in person ---- */
+.crm-meeting-glyph {
+  flex: 0 0 auto;
+  display: block;
+  width: 1rem;
+  height: 1rem;
+}
+
+.crm-meeting {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.crm-meeting__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.crm-meeting__btn:hover {
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+.crm-meeting__btn--on,
+.crm-meeting__btn--on:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.crm-meeting__btn:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
 /* ---- Ticking off: what came of it and when next ---- */
 .crm-done {
   width: 320px;
   max-width: calc(100vw - 16px);
+}
+
+/* In the top right corner, without making the heading any taller. */
+.crm-done__meeting {
+  margin: -0.2rem -0.35rem -0.2rem auto;
 }
 
 .kanban-menu:has(> .crm-done) {
@@ -324,10 +374,55 @@
 }
 
 .crm-stats__total {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6rem;
   padding: 0.35rem 0.35rem 0;
   font-size: 0.75rem;
   color: var(--text-dim);
-  text-align: right;
+}
+
+.crm-stats__week-meet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-stats__week-meet .crm-meeting-glyph {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+/* The calls and meetings of the day picked, under its heading. */
+.crm-stats__meetings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0 0.35rem 0.4rem;
+}
+
+.crm-stats__meet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-stats__meet--zero {
+  background: var(--bg-hover);
+  color: var(--text-dim);
+}
+
+.crm-stats__meet .crm-meeting-glyph {
+  width: 0.8rem;
+  height: 0.8rem;
 }
 
 .crm-stats__day-head {
@@ -413,6 +508,15 @@ button.crm-stats__row:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.crm-stats__mark {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-right: 0.3rem;
+  vertical-align: -0.1em;
+  color: var(--accent);
 }
 
 /* ---- The card panel of a client ---- */
@@ -710,6 +814,18 @@ button.crm-stats__row:hover {
 .crm-touch__tick svg {
   width: 0.85rem;
   height: 0.85rem;
+}
+
+.crm-touch__meeting {
+  display: inline-flex;
+  vertical-align: -0.12em;
+  margin-right: 0.35rem;
+  color: var(--accent);
+}
+
+.crm-touch__meeting .crm-meeting-glyph {
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 .crm-touch__empty {

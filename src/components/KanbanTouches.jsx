@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Popover } from './KanbanView';
-import { CheckGlyph, TouchWhenPicker } from './KanbanCrm';
+import { CheckGlyph, MeetingGlyph, MeetingPicker, TouchWhenPicker } from './KanbanCrm';
 import { useAutoGrow } from '../hooks/useAutoGrow';
-import { clockOf, dayHeading, enterSends, touchDay } from '../lib/crm';
+import { clockOf, dayHeading, enterSends, meetingLabel, touchDay } from '../lib/crm';
 
 /** "Вчера • 18:05". */
 const whenLabel = (iso) => `${dayHeading(touchDay({ touched_at: iso }))} • ${clockOf(iso)}`;
@@ -32,7 +32,8 @@ const SendGlyph = () => (
 
 /**
  * Every touch with a client, the oldest on top, grouped by day. A touch that
- * closed a reminder carries a tick. Any of them opens for editing in place.
+ * closed a reminder carries a tick, a video call or a meeting its own mark.
+ * Any of them opens for editing in place.
  */
 export function TouchHistory({ touches, onUpdate, onDelete }) {
   const [editing, setEditing] = useState(null);
@@ -55,7 +56,9 @@ export function TouchHistory({ touches, onUpdate, onDelete }) {
               touch={t}
               onSave={(patch) => {
                 setEditing(null);
-                if (patch.body !== t.body || patch.touched_at !== t.touched_at) onUpdate(t.id, patch);
+                if (patch.body !== t.body || patch.touched_at !== t.touched_at || patch.meeting !== (t.meeting ?? null)) {
+                  onUpdate(t.id, patch);
+                }
               }}
               onDelete={() => {
                 setEditing(null);
@@ -74,7 +77,16 @@ export function TouchHistory({ touches, onUpdate, onDelete }) {
               <span className="crm-touch__time">{clockOf(t.touched_at)}</span>
               <span className="crm-touch__body">
                 {t.closed_reminder && <span className="crm-touch__tick"><CheckGlyph /></span>}
-                {t.body || <span className="crm-touch__empty">{t.closed_reminder ? 'Задача выполнена' : 'Касание'}</span>}
+                {t.meeting && (
+                  <span className="crm-touch__meeting" title={meetingLabel(t.meeting)}>
+                    <MeetingGlyph kind={t.meeting} />
+                  </span>
+                )}
+                {t.body || (
+                  <span className="crm-touch__empty">
+                    {t.meeting ? meetingLabel(t.meeting) : t.closed_reminder ? 'Задача выполнена' : 'Касание'}
+                  </span>
+                )}
               </span>
             </button>
           )))}
@@ -87,11 +99,12 @@ export function TouchHistory({ touches, onUpdate, onDelete }) {
 function TouchEditor({ touch, onSave, onDelete, onCancel }) {
   const [body, setBody] = useState(touch.body || '');
   const [when, setWhen] = useState(touch.touched_at);
+  const [meeting, setMeeting] = useState(touch.meeting ?? null);
   const [whenOpen, setWhenOpen] = useState(false);
   const [asking, setAsking] = useState(false);
   const whenRef = useRef(null);
   const inputRef = useAutoGrow(body);
-  const save = () => onSave({ body: body.trim(), touched_at: when });
+  const save = () => onSave({ body: body.trim(), touched_at: when, meeting });
 
   return (
     <div className="crm-touch-edit">
@@ -130,6 +143,7 @@ function TouchEditor({ touch, onSave, onDelete, onCancel }) {
             />
           </Popover>
         )}
+        <MeetingPicker value={meeting} onChange={setMeeting} />
         <span className="crm-touch-edit__gap" />
         {asking ? (
           <>

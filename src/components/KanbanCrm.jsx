@@ -5,7 +5,8 @@ import { MONTH_GENITIVE_RU, WEEKDAY_SHORT_RU, toLocalDateString } from '../const
 import { useAutoGrow } from '../hooks/useAutoGrow';
 import { DEFAULT_COLUMN_COLOR, dateColumnTitle, dueInDays, shortDate } from '../lib/kanbanCards';
 import {
-  clientsByDay, clockOf, contactAction, enterSends, momentOf, shiftWeeks, weekOf,
+  MEETINGS, clientsByDay, clockOf, contactAction, enterSends, meetingCount, meetingLabel, meetingsOf, momentOf,
+  shiftWeeks, weekOf,
 } from '../lib/crm';
 import { notificationPermission, requestNotificationPermission } from '../lib/reminders';
 import leftIcon from '../assets/left.svg';
@@ -57,6 +58,54 @@ export function MessengerIcon({ kind }) {
   return (
     <span className="crm-icon crm-icon--phone">
       <PhoneGlyph />
+    </span>
+  );
+}
+
+/** A camera for a video call, two people for a meeting in person. */
+export function MeetingGlyph({ kind, className = '' }) {
+  const line = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  return (
+    <svg className={`crm-meeting-glyph ${className}`} viewBox="0 0 24 24" aria-hidden>
+      {kind === 'video' ? (
+        <>
+          <rect x="2.5" y="6" width="13" height="12" rx="2.5" {...line} />
+          <path d="M15.5 10.2 20 7.6a.8.8 0 0 1 1.2.7v7.4a.8.8 0 0 1-1.2.7l-4.5-2.6" {...line} />
+        </>
+      ) : (
+        <>
+          <circle cx="9" cy="8" r="3.5" {...line} />
+          <path d="M2.5 20v-1a5 5 0 0 1 5-5h3a5 5 0 0 1 5 5v1" {...line} />
+          <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2a5 5 0 0 1 3 4.6V20" {...line} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/**
+ * Whether a touch was a video call or a meeting in person: two marks, at most
+ * one of them on, a press on the lit one taking it off again.
+ */
+export function MeetingPicker({ value = null, onChange, className = '' }) {
+  return (
+    <span className={`crm-meeting ${className}`} role="group" aria-label="Формат касания">
+      {MEETINGS.map((m) => {
+        const on = value === m.id;
+        return (
+          <button
+            key={m.id}
+            type="button"
+            className={`crm-meeting__btn ${on ? 'crm-meeting__btn--on' : ''}`}
+            aria-pressed={on}
+            aria-label={m.label}
+            title={m.label}
+            onClick={() => onChange(on ? null : m.id)}
+          >
+            <MeetingGlyph kind={m.id} />
+          </button>
+        );
+      })}
     </span>
   );
 }
@@ -220,10 +269,12 @@ const NEXT_DAYS = [
 
 /**
  * Ticking a reminder off: what came of it, which goes into the history, and
- * when to get back to the client — or nothing, if there is no next time.
+ * when to get back to the client — or nothing, if there is no next time. The
+ * marks in the corner say whether it was a video call or a meeting in person.
  */
 export function CrmDoneForm({ initialNote = '', onSubmit, onBack }) {
   const [note, setNote] = useState(initialNote);
+  const [meeting, setMeeting] = useState(null);
   const [next, setNext] = useState(null);
   const [at, setAt] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -234,7 +285,7 @@ export function CrmDoneForm({ initialNote = '', onSubmit, onBack }) {
 
   const submit = () => {
     if (next && at && notificationPermission() === 'default') requestNotificationPermission();
-    onSubmit({ body: note.trim(), next: next ? { date: next, time: at || null } : null });
+    onSubmit({ body: note.trim(), meeting, next: next ? { date: next, time: at || null } : null });
   };
 
   return (
@@ -254,6 +305,7 @@ export function CrmDoneForm({ initialNote = '', onSubmit, onBack }) {
           </button>
         )}
         <span className="task-time__title">Задача выполнена</span>
+        <MeetingPicker value={meeting} onChange={setMeeting} className="crm-done__meeting" />
       </div>
 
       <textarea
@@ -420,6 +472,10 @@ export function CrmStats({ touches, cards, archived = [], onOpenCard }) {
   const list = [...(byDay.get(day)?.entries() || [])]
     .map(([cardId, dayTouches]) => ({ cardId, touches: dayTouches.slice().sort(byTime) }))
     .sort((a, b) => byTime(a.touches.at(-1), b.touches.at(-1)));
+  // Every call and meeting counts, two with the same client too.
+  const touchesOf = (days) => days.flatMap((d) => [...(byDay.get(d)?.values() || [])].flat());
+  const dayMeetings = meetingsOf(touchesOf([day]));
+  const weekMeetings = meetingsOf(touchesOf(week));
   const live = new Map(cards.map((c) => [c.id, c]));
   const gone = new Map(archived.map((c) => [c.id, c]));
 
@@ -472,12 +528,30 @@ export function CrmStats({ touches, cards, archived = [], onOpenCard }) {
           );
         })}
       </div>
-      <div className="crm-stats__total">{`За неделю: ${weekTotal}`}</div>
+      <div className="crm-stats__total">
+        <span>{`За неделю: ${weekTotal}`}</span>
+        {MEETINGS.filter((m) => weekMeetings[m.id] > 0).map((m) => (
+          <span key={m.id} className="crm-stats__week-meet" title={`${meetingCount(m, weekMeetings[m.id])} за неделю`}>
+            <MeetingGlyph kind={m.id} />
+            {weekMeetings[m.id]}
+          </span>
+        ))}
+      </div>
 
       <div className="crm-stats__day-head">
         <span>{dateColumnTitle(day)}</span>
         <span className="crm-stats__count">{list.length}</span>
       </div>
+      {list.length > 0 && (
+        <div className="crm-stats__meetings">
+          {MEETINGS.map((m) => (
+            <span key={m.id} className={`crm-stats__meet ${dayMeetings[m.id] ? '' : 'crm-stats__meet--zero'}`}>
+              <MeetingGlyph kind={m.id} />
+              {meetingCount(m, dayMeetings[m.id])}
+            </span>
+          ))}
+        </div>
+      )}
       {list.length === 0 ? (
         <p className="crm-stats__empty">В этот день касаний не было.</p>
       ) : (
@@ -492,7 +566,12 @@ export function CrmStats({ touches, cards, archived = [], onOpenCard }) {
                     {(card || gone.get(cardId))?.title || 'Удалённая плашка'}
                     {dayTouches.length > 1 && <span className="crm-stats__times">{` ×${dayTouches.length}`}</span>}
                   </span>
-                  {dayTouches.map((t) => t.body && <span key={t.id} className="crm-stats__body">{t.body}</span>)}
+                  {dayTouches.map((t) => (t.body || t.meeting) && (
+                    <span key={t.id} className="crm-stats__body">
+                      {t.meeting && <MeetingGlyph kind={t.meeting} className="crm-stats__mark" />}
+                      {t.body || meetingLabel(t.meeting)}
+                    </span>
+                  ))}
                 </span>
               </>
             );
