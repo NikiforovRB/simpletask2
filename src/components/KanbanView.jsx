@@ -142,22 +142,36 @@ export function Popover({ anchor, onClose, className = '', align = 'right', chil
     const box = ref.current;
     const at = anchor?.current;
     if (!box || !at) return undefined;
+    const vv = window.visualViewport;
     const place = () => {
       const a = at.getBoundingClientRect();
-      // Taller than the window, it scrolls inside rather than off the screen.
-      const room = window.innerHeight - 16;
+      // The part of the page that can be seen: with the keyboard of a phone
+      // out, less than the window, and not always from its top.
+      const viewTop = vv ? vv.offsetTop : 0;
+      const viewBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+      // Taller than that, it scrolls inside rather than off the screen.
+      const room = viewBottom - viewTop - 16;
       const tooTall = box.scrollHeight > room;
       box.style.maxHeight = tooTall ? `${room}px` : '';
       box.style.overflowY = tooTall ? 'auto' : '';
       const { offsetWidth: w, offsetHeight: h } = box;
       const wanted = align === 'left' ? a.left : a.right - w;
       box.style.left = `${Math.max(8, Math.min(wanted, window.innerWidth - w - 8))}px`;
-      // Under the button, else over it, else as low as it can go and still be whole.
-      const below = a.bottom + 6;
-      const above = a.top - h - 6;
-      let top = Math.max(8, window.innerHeight - h - 8);
-      if (below + h <= window.innerHeight - 8) top = below;
-      else if (above >= 8) top = above;
+      const lowest = Math.max(viewTop + 8, viewBottom - h - 8);
+      let top = lowest;
+      const focused = document.activeElement;
+      const typing = vv && vv.height < window.innerHeight - 120 && box.contains(focused)
+        && (focused.tagName === 'TEXTAREA' || focused.tagName === 'INPUT');
+      // Typed into on a phone, it sits right over the keyboard: the browser
+      // scrolls the page to bring the field into view, and a popover keeping
+      // to its button would be carried off the screen along with it.
+      if (!typing) {
+        // Under the button, else over it, else as low as it can go and still be whole.
+        const below = a.bottom + 6;
+        const above = a.top - h - 6;
+        if (below >= viewTop + 8 && below + h <= viewBottom - 8) top = below;
+        else if (above >= viewTop + 8 && above + h <= viewBottom - 8) top = above;
+      }
       box.style.top = `${top}px`;
       box.style.visibility = 'visible';
     };
@@ -168,10 +182,16 @@ export function Popover({ anchor, onClose, className = '', align = 'right', chil
     grown?.observe(box);
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
+    vv?.addEventListener('resize', place);
+    vv?.addEventListener('scroll', place);
+    box.addEventListener('focusin', place);
     return () => {
       grown?.disconnect();
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
+      vv?.removeEventListener('resize', place);
+      vv?.removeEventListener('scroll', place);
+      box.removeEventListener('focusin', place);
     };
   });
 
