@@ -259,7 +259,8 @@
 
 /* ---- The week of work ---- */
 .crm-stats {
-  width: 17.5rem;
+  width: 21rem;
+  max-width: calc(100vw - 2rem);
   display: flex;
   flex-direction: column;
 }
@@ -373,6 +374,35 @@
   color: var(--text-dim);
 }
 
+/* The video calls and meetings of a day, small under its count. Two-digit
+   counts that do not fit side by side go one under the other. */
+.crm-stats__day-meets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.05rem 0.2rem;
+}
+
+.crm-stats__day-meet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  font-size: 0.625rem;
+  line-height: 1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-stats__day-meet .crm-meeting-glyph {
+  width: 0.6rem;
+  height: 0.6rem;
+}
+
+.crm-stats__day-meet--zero {
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
 .crm-stats__total {
   display: flex;
   justify-content: flex-end;
@@ -455,6 +485,13 @@
   padding: 0;
   max-height: 26rem;
   overflow-y: auto;
+}
+
+/* On a computer the list reaches down to near the bottom of the window. */
+@media (hover: hover) and (min-width: 768px) {
+  .crm-stats__list {
+    max-height: max(26rem, calc(100vh - 23rem));
+  }
 }
 
 .crm-stats__row {

@@ -459,9 +459,10 @@ function weekLabel(week) {
 }
 
 /**
- * The work of the board, day by day: how many clients were got hold of, a
- * week at a time, and for the day picked — whom and what came of it, one
- * line per client however many touches it took.
+ * The work of the board, day by day: how many clients were got hold of and
+ * how many video calls and meetings it took, a week at a time, and for the day
+ * picked — whom and what came of it, one line per client however many
+ * touches it took.
  */
 export function CrmStats({ touches, cards, archived = [], onOpenCard }) {
   const today = dueInDays(0);
@@ -514,6 +515,7 @@ export function CrmStats({ touches, cards, archived = [], onOpenCard }) {
         {week.map((d) => {
           const n = byDay.get(d)?.size || 0;
           const ahead = d > today;
+          const met = meetingsOf(touchesOf([d]));
           return (
             <button
               key={d}
@@ -524,6 +526,20 @@ export function CrmStats({ touches, cards, archived = [], onOpenCard }) {
             >
               <span className="crm-stats__wd">{WEEKDAY_SHORT_RU[new Date(`${d}T12:00:00`).getDay()]}</span>
               <span className={`crm-stats__n ${n === 0 ? 'crm-stats__n--zero' : ''}`}>{ahead ? '' : n}</span>
+              {!ahead && (
+                <span className="crm-stats__day-meets">
+                  {MEETINGS.map((m) => (
+                    <span
+                      key={m.id}
+                      className={`crm-stats__day-meet ${met[m.id] ? '' : 'crm-stats__day-meet--zero'}`}
+                      title={meetingCount(m, met[m.id])}
+                    >
+                      <MeetingGlyph kind={m.id} />
+                      {met[m.id]}
+                    </span>
+                  ))}
+                </span>
+              )}
             </button>
           );
         })}
