@@ -374,13 +374,13 @@
   color: var(--text-dim);
 }
 
-/* The video calls and meetings of a day, small under its count. Two-digit
-   counts that do not fit side by side go one under the other. */
+/* The video calls and meetings of a day, small under its count: the calls on
+   one line, the meetings on the next. */
 .crm-stats__day-meets {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.05rem 0.2rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
 }
 
 .crm-stats__day-meet {
