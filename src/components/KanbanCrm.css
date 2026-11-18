@@ -386,16 +386,16 @@
 .crm-stats__day-meet {
   display: inline-flex;
   align-items: center;
-  gap: 0.1rem;
-  font-size: 0.625rem;
+  gap: 0.15rem;
+  font-size: 0.75rem;
   line-height: 1;
   color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 
 .crm-stats__day-meet .crm-meeting-glyph {
-  width: 0.6rem;
-  height: 0.6rem;
+  width: 0.75rem;
+  height: 0.75rem;
 }
 
 .crm-stats__day-meet--zero {
