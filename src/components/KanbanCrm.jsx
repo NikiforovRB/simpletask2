@@ -249,10 +249,10 @@ export function CrmStagePicker({ columns, columnId, onPick }) {
                 }}
               >
                 <span className="crm-stage__row">
+                  <span className="crm-stage__dot" aria-hidden />
                   <span className="crm-stage__option-title">{c.title || 'Без названия'}</span>
                   {on && <CheckGlyph />}
                 </span>
-                <span className="crm-stage__strip" aria-hidden />
               </button>
             </li>
           );
