@@ -688,8 +688,10 @@ button.crm-stats__row:hover {
   color: var(--text-dim);
 }
 
-/* The nickname or link of the messenger and «Написать в …» that writes to it. */
-.crm-contact__chat {
+/* The nickname or link of the messenger and «Написать в …» that writes to it;
+   then the amount and the source of the deal — each group on rows of its own. */
+.crm-contact__chat,
+.crm-contact__deal {
   flex: 1 1 100%;
   display: flex;
   flex-wrap: wrap;

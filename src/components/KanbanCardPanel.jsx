@@ -449,28 +449,30 @@ export function KanbanCardPanel({
                   )}
                 </div>
               )}
-              <label className="crm-contact__amount">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  value={amount}
-                  placeholder="Сумма"
-                  aria-label="Сумма"
-                  onChange={(e) => setAmount(e.target.value)}
-                  onBlur={() => setAmount(amountText(saveAmount(amount)))}
+              <div className="crm-contact__deal">
+                <label className="crm-contact__amount">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={amount}
+                    placeholder="Сумма"
+                    aria-label="Сумма"
+                    onChange={(e) => setAmount(e.target.value)}
+                    onBlur={() => setAmount(amountText(saveAmount(amount)))}
+                  />
+                  <span className="crm-contact__currency" aria-hidden>₽</span>
+                </label>
+                <CrmSourcePicker
+                  sources={sources}
+                  sourceId={card.source_id}
+                  onPick={(id) => onUpdateCard(cardId, { source_id: id })}
+                  onAdd={onAddSource}
+                  onUpdate={onUpdateSource}
+                  onDelete={onDeleteSource}
+                  onReorder={onReorderSources}
                 />
-                <span className="crm-contact__currency" aria-hidden>₽</span>
-              </label>
-              <CrmSourcePicker
-                sources={sources}
-                sourceId={card.source_id}
-                onPick={(id) => onUpdateCard(cardId, { source_id: id })}
-                onAdd={onAddSource}
-                onUpdate={onUpdateSource}
-                onDelete={onDeleteSource}
-                onReorder={onReorderSources}
-              />
+              </div>
             </div>
           )}
 
