@@ -2105,3 +2105,111 @@ begin
       add constraint kanban_touches_meeting_check check (meeting in ('video', 'live'));
   end if;
 end $$;
+
+-- 078: Канбан CRM — источники клиентов (настраиваемый список доски)
+
+create table if not exists public.kanban_sources (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  board_id uuid not null references public.task_projects(id) on delete cascade,
+  title text not null default '',
+  position int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists kanban_sources_board on public.kanban_sources(board_id, position);
+
+alter table public.kanban_cards
+  add column if not exists source_id uuid references public.kanban_sources(id) on delete set null;
+
+-- Access: the owner of the board plus everyone it is shared with, mirroring
+-- the policies of the labels.
+alter table public.kanban_sources enable row level security;
+
+drop policy if exists "Users can manage own kanban sources" on public.kanban_sources;
+create policy "Users can manage own kanban sources"
+  on public.kanban_sources for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "members manage shared kanban sources" on public.kanban_sources;
+create policy "members manage shared kanban sources"
+  on public.kanban_sources for all
+  using (public.is_project_member(board_id))
+  with check (public.is_project_member(board_id));
+
+drop policy if exists "owners manage kanban sources" on public.kanban_sources;
+create policy "owners manage kanban sources"
+  on public.kanban_sources for all
+  using (public.is_project_owner(board_id))
+  with check (public.is_project_owner(board_id));
+
+alter table public.kanban_sources replica identity full;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.kanban_sources;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
+
+-- Collaboration: sources broadcast on the `project:<id>` topic of their board,
+-- like everything else on it (see migration 030).
+create or replace function public.broadcast_project_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, realtime
+as $$
+declare
+  rec record;
+  pid uuid;
+begin
+  if tg_op = 'DELETE' then
+    rec := old;
+  else
+    rec := new;
+  end if;
+
+  if tg_table_name = 'tasks' then
+    pid := rec.project_id;
+  elsif tg_table_name = 'board_items' then
+    pid := rec.board_id;
+  elsif tg_table_name = 'kanban_columns' then
+    pid := rec.board_id;
+  elsif tg_table_name = 'kanban_cards' then
+    pid := rec.board_id;
+  elsif tg_table_name = 'kanban_labels' then
+    pid := rec.board_id;
+  elsif tg_table_name = 'kanban_sources' then
+    pid := rec.board_id;
+  elsif tg_table_name = 'kanban_touches' then
+    pid := rec.board_id;
+  elsif tg_table_name = 'mind_nodes' then
+    pid := rec.board_id;
+  elsif tg_table_name = 'task_projects' then
+    pid := rec.id;
+  elsif tg_table_name = 'project_members' then
+    pid := rec.project_id;
+  end if;
+
+  if pid is not null then
+    perform realtime.send(
+      jsonb_build_object('table', tg_table_name, 'op', tg_op),
+      'db_change',
+      'project:' || pid::text,
+      false  -- public topic; payload contains no row data
+    );
+  end if;
+
+  return null;
+end;
+$$;
+
+drop trigger if exists broadcast_kanban_sources_change on public.kanban_sources;
+create trigger broadcast_kanban_sources_change
+  after insert or update or delete on public.kanban_sources
+  for each row execute function public.broadcast_project_change();

@@ -688,6 +688,16 @@ button.crm-stats__row:hover {
   color: var(--text-dim);
 }
 
+/* The nickname or link of the messenger and «Написать в …» that writes to it. */
+.crm-contact__chat {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 /* «Написать в …»: the chat with the client, a row of its own under the contacts. */
 .crm-contact-btn.crm-contact__write,
 .crm-contact__write {
@@ -1436,5 +1446,329 @@ button.crm-stats__row:hover {
   .crm-stage__title,
   .crm-stage__trigger .crm-stage__strip {
     animation: none;
+  }
+}
+
+/* ---- Where the client came from: a field like «Сумма» that opens a list ---- */
+.crm-source {
+  position: relative;
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.crm-source__trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.35rem 0.45rem 0.35rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: normal;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.crm-source__trigger:hover {
+  background: var(--bg-hover);
+}
+
+.crm-source__trigger:focus-visible,
+.crm-source--open .crm-source__trigger {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.crm-source__label {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+}
+
+.crm-source__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.crm-source__value--none {
+  color: var(--text-dim);
+}
+
+.crm-source__chevron {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.18s ease;
+}
+
+.crm-source__trigger:hover .crm-source__chevron,
+.crm-source--open .crm-source__chevron {
+  color: var(--text-primary);
+}
+
+.crm-source--open .crm-source__chevron {
+  transform: rotate(180deg);
+}
+
+.crm-source__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  width: max(100%, 16rem);
+  max-width: calc(100vw - 2rem);
+  max-height: min(26rem, calc(100vh - 10rem));
+  overflow-y: auto;
+  padding: 0.35rem;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-elev);
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(0.98);
+  transform-origin: top right;
+  transition:
+    opacity 0.16s ease,
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    visibility 0s linear 0.2s;
+}
+
+.crm-source--open .crm-source__menu {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1),
+    visibility 0s;
+}
+
+.crm-source__list,
+.crm-source__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crm-source__list li + li {
+  margin-top: 2px;
+}
+
+.crm-source__option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.crm-source__option:hover,
+.crm-source__option:focus-visible {
+  outline: none;
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.crm-source__option--none {
+  color: var(--text-dim);
+}
+
+.crm-source__option--on {
+  color: var(--text-strong);
+}
+
+.crm-source__option svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.crm-source__option-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-source__manage {
+  display: block;
+  width: 100%;
+  margin-top: 0.3rem;
+  padding: 0.45rem 0.55rem;
+  border: none;
+  border-top: 1px solid var(--divider);
+  border-radius: 0 0 8px 8px;
+  background: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.crm-source__manage:hover,
+.crm-source__manage:focus-visible {
+  outline: none;
+  color: var(--accent);
+}
+
+.crm-source__edit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.15rem 0.15rem 0.4rem 0.4rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.crm-source__row,
+.crm-source__add {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin: 0;
+}
+
+.crm-source__row + .crm-source__row {
+  margin-top: 2px;
+}
+
+.crm-source__row--ask {
+  gap: 0.35rem;
+  padding: 0.2rem 0.15rem 0.2rem 0.4rem;
+}
+
+.crm-source__ask {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.crm-source__add {
+  margin-top: 0.3rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--divider);
+}
+
+.crm-source__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.crm-source__input:hover {
+  background: var(--bg-hover);
+}
+
+.crm-source__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg-elev);
+}
+
+.crm-source__input::placeholder {
+  color: var(--text-dim);
+}
+
+.crm-source__tool {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.crm-source__tool svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.crm-source__tool:hover:not(:disabled),
+.crm-source__tool:focus-visible {
+  outline: none;
+  background: var(--bg-hover-strong);
+  color: var(--text-primary);
+}
+
+.crm-source__tool--danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.crm-source__tool:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crm-source__menu,
+  .crm-source--open .crm-source__menu,
+  .crm-source__chevron {
+    transition-duration: 0.01s;
+    transition-delay: 0s;
+  }
+}
+
+/* On a wide screen «Сумма» and «Источник» share a row, and «Написать в …»
+   stands to the right of the nickname or link it writes to. */
+@media (min-width: 768px) {
+  .crm-contact__amount,
+  .crm-source {
+    flex: 1 1 0;
+  }
+
+  .crm-contact__chat .crm-contact__handle {
+    flex: 1 1 0;
+  }
+
+  .crm-contact__handle + .crm-contact-btn.crm-contact__write {
+    flex: 0 1 auto;
+    max-width: 55%;
+    padding-block: 0.25rem;
   }
 }

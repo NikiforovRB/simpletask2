@@ -495,6 +495,11 @@ export default function Dashboard() {
     addLabel: addKanbanLabel,
     updateLabel: updateKanbanLabel,
     deleteLabel: deleteKanbanLabel,
+    sources: kanbanSources,
+    addSource: addKanbanSource,
+    updateSource: updateKanbanSource,
+    deleteSource: deleteKanbanSource,
+    reorderSources: reorderKanbanSources,
   } = useKanban(kanbanBoardIds);
   const mindMaps = useMemo(() => projects.filter((p) => p.kind === 'mindmap'), [projects]);
   const mindMapIds = useMemo(() => mindMaps.map((p) => p.id), [mindMaps]);
@@ -1293,6 +1298,10 @@ export default function Dashboard() {
       : []),
     [openCardBoardId, kanbanColumns],
   );
+  const openCardSources = useMemo(
+    () => (openCardBoardId ? kanbanSources.filter((s) => s.board_id === openCardBoardId) : []),
+    [openCardBoardId, kanbanSources],
+  );
 
   /**
    * A copy of a card next to the original, with its task list copied too:
@@ -1315,6 +1324,7 @@ export default function Dashboard() {
       messenger: card.messenger ?? null,
       telegram: card.telegram || '',
       max_link: card.max_link || '',
+      source_id: card.source_id ?? null,
       amount: card.amount ?? null,
     });
     if (!copy) return;
@@ -2914,6 +2924,11 @@ export default function Dashboard() {
           crm={!!crmBoardId && openCard.board_id === crmBoardId}
           columns={openCardColumns}
           onMoveCard={moveKanbanCard}
+          sources={openCardSources}
+          onAddSource={(title) => addKanbanSource(openCard.board_id, title)}
+          onUpdateSource={updateKanbanSource}
+          onDeleteSource={deleteKanbanSource}
+          onReorderSources={reorderKanbanSources}
           touches={kanbanTouches}
           onAddTouch={addKanbanTouch}
           onUpdateTouch={updateKanbanTouch}

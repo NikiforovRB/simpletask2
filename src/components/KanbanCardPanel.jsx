@@ -6,7 +6,9 @@ import { ColorPalette, LabelPicker, Popover } from './KanbanView';
 import { CalendarPopover } from './CalendarPopover';
 import { getContainerIdForCard } from '../lib/dnd';
 import { KanbanReminderPicker } from './KanbanReminderPicker';
-import { CheckGlyph, ContactButton, CrmDoneForm, CrmStagePicker, MessengerIcon, PhoneGlyph } from './KanbanCrm';
+import {
+  CheckGlyph, ContactButton, CrmDoneForm, CrmSourcePicker, CrmStagePicker, MessengerIcon, PhoneGlyph,
+} from './KanbanCrm';
 import { TouchComposer, TouchHistory } from './KanbanTouches';
 import { MESSENGERS, callHref, contactAction, maxLink, messengerLabel, telegramHandle } from '../lib/crm';
 import {
@@ -61,6 +63,7 @@ export function KanbanCardPanel({
   onCreateSiblingTask, onCreateSiblingSubtask, onCreateSubtaskAndEdit,
   crm: crmBoard = false, touches = [], onAddTouch, onUpdateTouch, onDeleteTouch, onCompleteReminder,
   columns = [], onMoveCard,
+  sources = [], onAddSource, onUpdateSource, onDeleteSource, onReorderSources,
 }) {
   // On a CRM board only a card without a date is a client. One with a date was
   // put straight into a day: a task for that day, kept like a card of any board.
@@ -389,59 +392,63 @@ export function KanbanCardPanel({
                   );
                 })}
               </div>
-              {card.messenger === 'telegram' && (
-                <label className="crm-contact__handle">
-                  <span className="crm-contact__at" aria-hidden>@</span>
-                  <input
-                    type="text"
-                    autoComplete="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    value={telegram}
-                    placeholder="Никнейм в Telegram"
-                    aria-label="Никнейм в Telegram"
-                    onChange={(e) => setTelegram(e.target.value)}
-                    onBlur={() => {
-                      // "@name" or a pasted t.me link is kept as the bare name.
-                      const next = telegramHandle(telegram) || telegram.trim();
-                      if (next !== telegram) setTelegram(next);
-                      if (next !== (card.telegram || '')) onUpdateCard(cardId, { telegram: next });
-                    }}
-                  />
-                </label>
+              {card.messenger && (
+                <div className="crm-contact__chat">
+                  {card.messenger === 'telegram' && (
+                    <label className="crm-contact__handle">
+                      <span className="crm-contact__at" aria-hidden>@</span>
+                      <input
+                        type="text"
+                        autoComplete="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
+                        value={telegram}
+                        placeholder="Никнейм в Telegram"
+                        aria-label="Никнейм в Telegram"
+                        onChange={(e) => setTelegram(e.target.value)}
+                        onBlur={() => {
+                          // "@name" or a pasted t.me link is kept as the bare name.
+                          const next = telegramHandle(telegram) || telegram.trim();
+                          if (next !== telegram) setTelegram(next);
+                          if (next !== (card.telegram || '')) onUpdateCard(cardId, { telegram: next });
+                        }}
+                      />
+                    </label>
+                  )}
+                  {card.messenger === 'max' && (
+                    <label className="crm-contact__handle">
+                      <input
+                        type="url"
+                        autoComplete="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
+                        value={maxProfile}
+                        placeholder="Ссылка на профиль в Max: max.ru/u/…"
+                        aria-label="Ссылка на профиль в Max"
+                        title="В Max у клиента: «Контакты» → «+» → «Пригласить по ссылке». Без ссылки номер копируется и открывается Max"
+                        onChange={(e) => setMaxProfile(e.target.value)}
+                        onBlur={() => {
+                          const next = maxLink(maxProfile) || maxProfile.trim();
+                          if (next !== maxProfile) setMaxProfile(next);
+                          if (next !== (card.max_link || '')) onUpdateCard(cardId, { max_link: next });
+                        }}
+                      />
+                    </label>
+                  )}
+                  {canWrite ? (
+                    <ContactButton card={contact} className="crm-contact__write" label />
+                  ) : (
+                    <span className="crm-contact__write crm-contact__write--off">
+                      <MessengerIcon kind={card.messenger} />
+                      {`Чтобы написать в ${messengerLabel(card.messenger)}, ${{
+                        telegram: 'укажите телефон или никнейм',
+                        whatsapp: 'укажите телефон',
+                        max: 'укажите телефон или ссылку на профиль',
+                      }[card.messenger]}`}
+                    </span>
+                  )}
+                </div>
               )}
-              {card.messenger === 'max' && (
-                <label className="crm-contact__handle">
-                  <input
-                    type="url"
-                    autoComplete="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    value={maxProfile}
-                    placeholder="Ссылка на профиль в Max: max.ru/u/…"
-                    aria-label="Ссылка на профиль в Max"
-                    title="В Max у клиента: «Контакты» → «+» → «Пригласить по ссылке». Без ссылки номер копируется и открывается Max"
-                    onChange={(e) => setMaxProfile(e.target.value)}
-                    onBlur={() => {
-                      const next = maxLink(maxProfile) || maxProfile.trim();
-                      if (next !== maxProfile) setMaxProfile(next);
-                      if (next !== (card.max_link || '')) onUpdateCard(cardId, { max_link: next });
-                    }}
-                  />
-                </label>
-              )}
-              {card.messenger && (canWrite ? (
-                <ContactButton card={contact} className="crm-contact__write" label />
-              ) : (
-                <span className="crm-contact__write crm-contact__write--off">
-                  <MessengerIcon kind={card.messenger} />
-                  {`Чтобы написать в ${messengerLabel(card.messenger)}, ${{
-                    telegram: 'укажите телефон или никнейм',
-                    whatsapp: 'укажите телефон',
-                    max: 'укажите телефон или ссылку на профиль',
-                  }[card.messenger]}`}
-                </span>
-              ))}
               <label className="crm-contact__amount">
                 <input
                   type="text"
@@ -455,6 +462,15 @@ export function KanbanCardPanel({
                 />
                 <span className="crm-contact__currency" aria-hidden>₽</span>
               </label>
+              <CrmSourcePicker
+                sources={sources}
+                sourceId={card.source_id}
+                onPick={(id) => onUpdateCard(cardId, { source_id: id })}
+                onAdd={onAddSource}
+                onUpdate={onUpdateSource}
+                onDelete={onDeleteSource}
+                onReorder={onReorderSources}
+              />
             </div>
           )}
 

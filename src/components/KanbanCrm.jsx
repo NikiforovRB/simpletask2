@@ -262,6 +262,266 @@ export function CrmStagePicker({ columns, columnId, onPick }) {
   );
 }
 
+const Chevron = ({ className, up = false }) => (
+  <svg className={className} viewBox="0 0 16 16" aria-hidden>
+    <path
+      d={up ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+/** One source in the list being set up: renamed in place, moved, taken off. */
+function SourceRow({ source, first, last, onRename, onMove, onDelete }) {
+  const [title, setTitle] = useState(source.title);
+  const [seen, setSeen] = useState(source.title);
+  const [asking, setAsking] = useState(false);
+  if (seen !== source.title) {
+    setSeen(source.title);
+    setTitle(source.title);
+  }
+
+  if (asking) {
+    return (
+      <li className="crm-source__row crm-source__row--ask">
+        <span className="crm-source__ask">{`Удалить «${source.title || 'Без названия'}»?`}</span>
+        <button type="button" className="crm-btn" onClick={() => setAsking(false)}>Нет</button>
+        <button type="button" className="crm-btn crm-btn--danger" onClick={() => onDelete(source.id)}>Удалить</button>
+      </li>
+    );
+  }
+  return (
+    <li className="crm-source__row">
+      <input
+        className="crm-source__input"
+        value={title}
+        maxLength={80}
+        aria-label="Название источника"
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
+        onBlur={() => {
+          const next = title.trim();
+          if (!next) setTitle(source.title);
+          else if (next !== source.title) onRename(source.id, next);
+        }}
+      />
+      <button type="button" className="crm-source__tool" disabled={first} onClick={() => onMove(source.id, -1)} aria-label="Выше" title="Выше">
+        <Chevron up />
+      </button>
+      <button type="button" className="crm-source__tool" disabled={last} onClick={() => onMove(source.id, 1)} aria-label="Ниже" title="Ниже">
+        <Chevron />
+      </button>
+      <button type="button" className="crm-source__tool crm-source__tool--danger" onClick={() => setAsking(true)} aria-label="Удалить" title="Удалить">
+        <svg viewBox="0 0 16 16" aria-hidden>
+          <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      </button>
+    </li>
+  );
+}
+
+/**
+ * Where a client came from: one of the sources of the board, picked from a
+ * short list. The same list is set up from inside it — sources added, renamed,
+ * moved up and down and taken off — without leaving the card.
+ */
+export function CrmSourcePicker({ sources, sourceId, onPick, onAdd, onUpdate, onDelete, onReorder }) {
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+  const listRef = useRef(null);
+  const addRef = useRef(null);
+  const current = sources.find((s) => s.id === sourceId) || null;
+
+  const close = () => {
+    setOpen(false);
+    setEditing(false);
+    setDraft('');
+  };
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      if (!rootRef.current?.contains(e.target)) close();
+    };
+    // Captured before the panel hears it: Escape steps back out of the list,
+    // one level at a time, instead of closing the panel.
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      if (editing) {
+        setEditing(false);
+        setDraft('');
+        return;
+      }
+      close();
+      triggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open, editing]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (editing) {
+      if (sources.length === 0) addRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    const list = listRef.current;
+    (list?.querySelector('[aria-selected="true"]') || list?.querySelector('button'))?.focus({ preventScroll: true });
+    // Only on opening and on coming back from setting up, not on every change of the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editing]);
+
+  const onListKey = (e) => {
+    const items = [...(listRef.current?.querySelectorAll('button') || [])];
+    const at = items.indexOf(document.activeElement);
+    const go = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[e.key];
+    if (go === undefined || !items.length) return;
+    e.preventDefault();
+    items[(go + items.length) % items.length].focus();
+  };
+
+  const pick = (id) => {
+    close();
+    triggerRef.current?.focus({ preventScroll: true });
+    if (id !== (sourceId ?? null)) onPick(id);
+  };
+
+  const move = (id, by) => {
+    const ids = sources.map((s) => s.id);
+    const from = ids.indexOf(id);
+    const to = from + by;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    [ids[from], ids[to]] = [ids[to], ids[from]];
+    onReorder(ids);
+  };
+
+  const add = () => {
+    const title = draft.trim();
+    if (!title) return;
+    onAdd(title);
+    setDraft('');
+    addRef.current?.focus({ preventScroll: true });
+  };
+
+  return (
+    <div className={`crm-source ${open ? 'crm-source--open' : ''}`} ref={rootRef}>
+      <button
+        type="button"
+        ref={triggerRef}
+        className="crm-source__trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => (open ? close() : setOpen(true))}
+      >
+        <span className="crm-source__label">Источник</span>
+        <span className={`crm-source__value ${current ? '' : 'crm-source__value--none'}`}>
+          {current ? current.title || 'Без названия' : 'Не указан'}
+        </span>
+        <Chevron className="crm-source__chevron" />
+      </button>
+
+      <div className="crm-source__menu" inert={!open}>
+        {editing ? (
+          <div className="crm-source__edit">
+            <div className="crm-source__edit-head">
+              <span>Источники</span>
+              <button
+                type="button"
+                className="crm-btn"
+                onClick={() => {
+                  setEditing(false);
+                  setDraft('');
+                }}
+              >
+                Готово
+              </button>
+            </div>
+            {sources.length > 0 && (
+              <ul className="crm-source__rows">
+                {sources.map((s, i) => (
+                  <SourceRow
+                    key={s.id}
+                    source={s}
+                    first={i === 0}
+                    last={i === sources.length - 1}
+                    onRename={(id, title) => onUpdate(id, { title })}
+                    onMove={move}
+                    onDelete={onDelete}
+                  />
+                ))}
+              </ul>
+            )}
+            <form
+              className="crm-source__add"
+              onSubmit={(e) => {
+                e.preventDefault();
+                add();
+              }}
+            >
+              <input
+                ref={addRef}
+                className="crm-source__input"
+                value={draft}
+                maxLength={80}
+                placeholder="Новый источник"
+                aria-label="Новый источник"
+                onChange={(e) => setDraft(e.target.value)}
+              />
+              <button type="submit" className="crm-source__tool" disabled={!draft.trim()} aria-label="Добавить" title="Добавить">
+                <svg viewBox="0 0 16 16" aria-hidden>
+                  <path d="M8 3.5v9M3.5 8h9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+            </form>
+          </div>
+        ) : (
+          <>
+            <ul className="crm-source__list" role="listbox" aria-label="Источник" ref={listRef} onKeyDown={onListKey}>
+              {[{ id: null, title: 'Не указан' }, ...sources].map((s) => {
+                const on = (sourceId ?? null) === s.id;
+                return (
+                  <li key={s.id ?? 'none'} role="none">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={on}
+                      className={`crm-source__option ${on ? 'crm-source__option--on' : ''} ${s.id ? '' : 'crm-source__option--none'}`}
+                      onClick={() => pick(s.id)}
+                    >
+                      <span className="crm-source__option-title">{s.title || 'Без названия'}</span>
+                      {on && <CheckGlyph />}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <button type="button" className="crm-source__manage" onClick={() => setEditing(true)}>
+              {sources.length ? 'Настроить список' : 'Добавить источники'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const NEXT_DAYS = [
   { offset: 1, label: 'Завтра' },
   { offset: 2, label: 'Послезавтра' },

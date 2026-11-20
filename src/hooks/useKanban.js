@@ -26,7 +26,7 @@ const ARCHIVE_MS = ARCHIVE_DAYS * 24 * 60 * 60 * 1000;
  */
 const SYNC_DELAY = 300;
 /** The tables of the boards; touches have a hook of their own. */
-const BOARD_TABLES = new Set(['kanban_columns', 'kanban_cards', 'kanban_labels']);
+const BOARD_TABLES = new Set(['kanban_columns', 'kanban_cards', 'kanban_labels', 'kanban_sources']);
 
 export function useKanban(boardIds) {
   const { user } = useAuth();
@@ -35,6 +35,7 @@ export function useKanban(boardIds) {
   const [cards, setCards] = useState([]);
   const [archived, setArchived] = useState([]);
   const [labels, setLabels] = useState([]);
+  const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
   // Cards as they stand right now, including the ones added a moment ago:
   // typing card after card into a column is faster than a re-render, and the
@@ -97,20 +98,22 @@ export function useKanban(boardIds) {
       putCards([]);
       setArchived([]);
       setLabels([]);
+      setSources([]);
       setLoading(false);
       return;
     }
     const read = ++lastRead.current;
     const changesBefore = changes.current;
-    const [colsRes, cardsRes, labelsRes] = await Promise.all([
+    const [colsRes, cardsRes, labelsRes, sourcesRes] = await Promise.all([
       supabase.from('kanban_columns').select('*').in('board_id', ids).order('position', { ascending: true }),
       supabase.from('kanban_cards').select('*').in('board_id', ids).order('position', { ascending: true }),
       supabase.from('kanban_labels').select('*').in('board_id', ids).order('position', { ascending: true }),
+      supabase.from('kanban_sources').select('*').in('board_id', ids).order('position', { ascending: true }),
     ]);
     // A later read is on its way and will be the one to count.
     if (read !== lastRead.current) return;
     // A failed read says nothing about the boards; emptying them would.
-    if (colsRes.error || cardsRes.error || labelsRes.error) {
+    if (colsRes.error || cardsRes.error || labelsRes.error || sourcesRes.error) {
       setLoading(false);
       return;
     }
@@ -130,6 +133,7 @@ export function useKanban(boardIds) {
     putCards(rows.filter((c) => !c.deleted_at));
     setArchived(rows.filter((c) => c.deleted_at && Date.parse(c.deleted_at) >= expired).sort(byDeletedAt));
     setLabels((lbls || []).slice().sort(byPosition));
+    setSources((sourcesRes.data || []).slice().sort(byPosition));
     setLoading(false);
     if (stale.length > 0) {
       await supabase.from('kanban_cards').delete().in('id', stale.map((c) => c.id));
@@ -145,6 +149,7 @@ export function useKanban(boardIds) {
       putCards([]);
       setArchived([]);
       setLabels([]);
+      setSources([]);
       setLoading(false);
       return undefined;
     }
@@ -155,6 +160,7 @@ export function useKanban(boardIds) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'kanban_columns', filter: `user_id=eq.${userId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'kanban_cards', filter: `user_id=eq.${userId}` }, onChange)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'kanban_labels', filter: `user_id=eq.${userId}` }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kanban_sources', filter: `user_id=eq.${userId}` }, onChange)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [userId, fetchAll, putCards, requestSync]);
@@ -476,6 +482,53 @@ export function useKanban(boardIds) {
     if (results.some((r) => r.error)) resync();
   }, [patchCards, track, resync]);
 
+  const addSource = useCallback(async (boardId, title) => {
+    if (!userId || !boardId) return null;
+    const row = {
+      user_id: userId,
+      board_id: boardId,
+      title,
+      position: nextPosition(sources.filter((s) => s.board_id === boardId)),
+    };
+    const { data, error } = await track(supabase.from('kanban_sources').insert(row).select().single());
+    if (error || !data) {
+      resync();
+      return null;
+    }
+    setSources((prev) => [...prev, data].sort(byPosition));
+    return data;
+  }, [userId, sources, track, resync]);
+
+  const updateSource = useCallback(async (id, patch) => {
+    setSources((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+    const { error } = await track(supabase
+      .from('kanban_sources')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id));
+    if (error) resync();
+  }, [track, resync]);
+
+  /** Drops the source; the cards that came from it are left without one by the database. */
+  const deleteSource = useCallback(async (id) => {
+    setSources((prev) => prev.filter((s) => s.id !== id));
+    patchCards((prev) => prev.map((c) => (c.source_id === id ? { ...c, source_id: null } : c)));
+    const { error } = await track(supabase.from('kanban_sources').delete().eq('id', id));
+    if (error) resync();
+  }, [patchCards, track, resync]);
+
+  /** The sources of a board in the order of `ids`; only those whose place changed are written. */
+  const reorderSources = useCallback(async (ids) => {
+    const at = new Map(ids.map((id, i) => [id, i]));
+    const moved = sources.filter((s) => at.has(s.id) && s.position !== at.get(s.id));
+    if (moved.length === 0) return;
+    setSources((prev) => prev.map((s) => (at.has(s.id) ? { ...s, position: at.get(s.id) } : s)).sort(byPosition));
+    const results = await track(Promise.all(moved.map((s) => supabase
+      .from('kanban_sources')
+      .update({ position: at.get(s.id), updated_at: new Date().toISOString() })
+      .eq('id', s.id))));
+    if (results.some((r) => r.error)) resync();
+  }, [sources, track, resync]);
+
   /**
    * Put a card at `index` of `columnId`, renumbering the column it joins. The
    * column it left keeps its numbers: a gap where it stood changes no order.
@@ -500,9 +553,9 @@ export function useKanban(boardIds) {
 
   /**
    * A card handed over to another board. It lands at the end of that board's
-   * first column and leaves its labels behind — a label belongs to a board and
-   * would mean nothing on the new one — while its tasks and the history of its
-   * touches travel with it.
+   * first column and leaves its labels and source behind — they belong to a
+   * board and would mean nothing on the new one — while its tasks and the
+   * history of its touches travel with it.
    */
   const moveCardToBoard = useCallback(async (cardId, boardId) => {
     const card = cardsRef.current.find((c) => c.id === cardId);
@@ -514,6 +567,7 @@ export function useKanban(boardIds) {
       column_id: home.id,
       position: nextPosition(cardsRef.current.filter((c) => c.column_id === home.id)),
       label_ids: [],
+      source_id: null,
       due_position: null,
     };
     patchCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, ...patch } : c)).sort(byPosition));
@@ -533,6 +587,7 @@ export function useKanban(boardIds) {
     cards,
     archived,
     labels,
+    sources,
     loading,
     addColumn,
     updateColumn,
@@ -550,6 +605,10 @@ export function useKanban(boardIds) {
     addLabel,
     updateLabel,
     deleteLabel,
+    addSource,
+    updateSource,
+    deleteSource,
+    reorderSources,
     refetch: fetchAll,
   };
 }
